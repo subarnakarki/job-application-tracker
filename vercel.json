@@ -4,6 +4,9 @@
   "buildCommand": "npm run build -w @jat/web && npm run build:api",
   "outputDirectory": "web/dist",
   "regions": ["cle1"],
+  "functions": {
+    "api/index.ts": { "maxDuration": 300 }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",

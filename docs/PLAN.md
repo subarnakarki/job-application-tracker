@@ -56,11 +56,12 @@ Each phase ends with lint, type-check and all tests green, then stops for review
 | 12  | Hardening: docs, privacy page, security headers, flake check, OWASP ZAP baseline scan                                 |
 | 13  | Production deploy: migrate job, backups, uptime check, smoke test, CD                                                 |
 
-## Later phases (not built)
+## Later phases
 
-- **Gmail import:** personal-use unless Google verification is obtained (restricted scope). A per-user inbound forwarding address is the cheaper public alternative.
-- **Follow-up reminders:** hourly timezone-bucketed job, unique `(user_id, local_date)`, opt-in email.
-- **Stats by source:** computed on read (bounded per user by the cap).
+- **Gmail import:** built in Phase 10 for the owner only (see its outcome). Opening it to everyone would need
+  Google's verification of the restricted scope; a per-user inbound forwarding address is the cheaper alternative.
+- **Follow-up reminders:** not built. Hourly timezone-bucketed job, unique `(user_id, local_date)`, opt-in email.
+- **Stats by source:** built in Phase 9.
 
 ## Deferred, with revisit triggers
 
@@ -201,6 +202,30 @@ bug on the way: a NUL character in a search term or in notes returned 500; both 
 
 Final state: about 800 unit/API tests and 14 e2e runs, all green in CI on every push; deployed to production at
 https://job-application-tracker-eta-one.vercel.app.
+
+## Phase 9 outcome (stats by source)
+
+`GET /api/stats` and a Stats page (a table on wide screens, cards on phones). Counts use each application's whole
+status history: "responded" is Screening or later, or Rejected after Applied; "interviewed" includes an offer
+made without a recorded interview. The SQL is the twin of `summarizeBySource` in `shared/`, proven equal by a
+real-Postgres property test.
+
+## Phase 10 outcome (Gmail import, owner only)
+
+Decided with the owner: on-demand Gmail API access (no stored tokens), Claude classifies each email, clear results
+are applied automatically with Undo, and only the owner can use it (`GMAIL_IMPORT_USER_IDS`).
+
+- Migration `0004`: `import_runs` and `import_items`. One row per Gmail message per user, claimed before it is
+  applied, so no email is handled twice. Email bodies are never stored.
+- `claude-opus-5-5` at low effort, one email per request, a fixed output schema, refusal fallbacks
+  (`fallbacks: "default"`); refusals, cut-off or malformed answers and API errors send the email to review, and a
+  rejected key stops the run and releases its emails for next time.
+- The rules (`decide`) never move an application backwards or reopen a closed one; several matches, low
+  confidence or an untracked rejection go to review. Undo works only while the application is unchanged since.
+- API docs in [API.md](API.md), the consent flow in [AUTH.md](AUTH.md). Tests: unit (rules, parsing, the real
+  SDK against canned answers), database (the runner and every action), API (consent, callback, isolation, rate
+  limit) and one e2e test of the results page through a test-only route that runs a real import from a fake inbox.
+- Not built: the opt-in classifier eval script from the plan (the prompt was checked with the unit tests only).
 
 ## Planned but not built
 

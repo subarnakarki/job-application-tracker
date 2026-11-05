@@ -16,6 +16,9 @@ Built by an SDET as a portfolio project, so the tests matter as much as the feat
 - Add, edit and delete, with status history. Edits send only changed fields and are guarded against overwriting
   someone else's change (`If-Match`, 412 on conflict).
 - CSV export (respects the filters), JSON download of everything, account deletion.
+- Stats by source: applied, responded, interviewed and offers per source, with response rates.
+- Gmail import (owner only): reads recent job emails with read-only access, has Claude classify each one, applies
+  the clear-cut changes and lists the rest for review, with Undo on every change.
 - Mobile-first, keyboard and screen-reader friendly, light and dark mode.
 
 ## Stack

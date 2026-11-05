@@ -18,6 +18,18 @@ Google sign-in (open signup), the shared **demo** account, and the test-only sig
   deployments (their URLs cannot be registered redirect URIs). The provider is injected into `buildApp`, so tests
   use a stub.
 
+## Gmail import consent
+
+- Separate from sign-in, and only for users on `GMAIL_IMPORT_USER_IDS`. `GET /api/import/gmail/start` asks Google
+  for `gmail.readonly` only (online access: no refresh token), with PKCE, `login_hint` set to the user's email,
+  and the state, verifier and **user id** in a 10-minute `__Host-gmail-import` cookie.
+- The callback clears that cookie and requires the state to match and the signed-in user to be the one who started
+  it. It checks that Gmail was actually granted (granular consent lets the user untick it), uses the access token
+  for this one import, and drops it: tokens are never stored.
+- Email text goes to the Anthropic API one email per request. The prompt treats the email as untrusted data, and
+  the answer is a fixed schema with no ids or actions, so a hostile email can at most mislabel itself; the server
+  matches companies and decides every change. Email bodies are never stored.
+
 ## Sessions
 
 - Cookie `__Host-session`: `Path=/; Secure; HttpOnly; SameSite=Lax`, no `Domain`. The `__Host-` prefix makes

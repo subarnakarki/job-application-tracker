@@ -48,6 +48,35 @@ schemas in `shared/src/responses.ts`; input shapes are in `shared/src/schemas.ts
 Writes are limited to 600/hour per user (120/hour for the demo account). `needsFollowUp` and `isClosed` are
 computed on every response, in the user's time zone (rules in [DOMAIN.md](DOMAIN.md)).
 
+## Stats
+
+`GET /api/stats` (user): for each of the six sources, in order, and in total: applications, applied, responded,
+interviewing, offers, and `responseRate` (responded / applied, `null` when nothing was applied for). Counted over
+each application's whole status history; rules in [DOMAIN.md](DOMAIN.md).
+
+## Gmail import
+
+Owner only: starting an import answers 404 unless the user is on `GMAIL_IMPORT_USER_IDS` (never the demo
+account) and Google and the classifier (`ANTHROPIC_API_KEY`) are configured. The flow is in [AUTH.md](AUTH.md).
+
+| Method | Path                            | Auth | Notes                                                                 |
+| ------ | ------------------------------- | ---- | --------------------------------------------------------------------- |
+| GET    | `/api/import/status`            | user | `{ available }`: whether this user may start an import                |
+| GET    | `/api/import/gmail/start`       | user | 302 to Google for read-only Gmail access; 3 per day per user          |
+| GET    | `/api/import/gmail/callback`    | user | Runs the import, then 302 to `/import/<runId>` (or `/account?import=` |
+|        |                                 |      | with a reason code)                                                   |
+| GET    | `/api/import/runs/:id`          | user | The run and each email's outcome (never the email body)               |
+| POST   | `/api/import/items/:id/undo`    | user | Reverse a create or status change; 409 if the application was edited  |
+|        |                                 |      | since                                                                 |
+| POST   | `/api/import/items/:id/apply`   | user | Make a review item's proposed change                                  |
+| POST   | `/api/import/items/:id/dismiss` | user | Hide a review item                                                    |
+
+An import reads up to 50 job emails from the last 30 days (or since the last import). Claude classifies each one
+on its own into a fixed shape (kind, company, role, confidence, summary) and the server decides the change:
+a confident confirmation adds an application, a confident interview, assessment, offer or rejection moves the one
+matching open application forward. Anything uncertain, ambiguous, backwards or closed goes to review.
+Imported changes are recorded with actor `gmail`. Item actions answer 409 `import_conflict` when not possible.
+
 ## Health
 
 `GET /api/health` (never touches the database) and `GET /api/health/db` (proves the database answers).
