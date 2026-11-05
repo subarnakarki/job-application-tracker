@@ -229,6 +229,36 @@ are applied automatically with Undo, and only the owner can use it (`GMAIL_IMPOR
   and the Anthropic spending limit caps the cost.
 - Not built: the opt-in classifier eval script from the plan (the prompt was checked with the unit tests only).
 
+## Phase 11 plan: board view and quick status change (proposed, awaiting approval)
+
+**Goal:** change an application's status in one step, from the list or by dragging it on a board.
+
+**Decisions**
+
+| Area          | Decision                                                                                                                                                 |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API           | No changes. A move is the existing `PATCH /api/applications/:id` with `{ status }` and `If-Match` (the list already returns every item's version)        |
+| One control   | A "Move to…" status menu on every card, used by both the list and the board. It is the accessible path and the main one on phones                        |
+| Board         | Seven columns in pipeline order; scrolls sideways with snapping on phones; Rejected and Withdrawn muted. Within a column, most recently updated first    |
+| Drag and drop | `@dnd-kit/core` (pointer, touch and keyboard sensors, screen-reader announcements). Native HTML5 drag is not used: it does not work on touch             |
+| View switch   | "List / Board" toggle, kept in the URL (`?view=board`) like the other filters. Search and "Needs follow-up" apply to both; the stage filter is list-only |
+| Updates       | Optimistic: the card moves at once and the pipeline counts update; on failure it moves back with a message                                               |
+| Conflicts     | 412 (changed elsewhere): refetch, put the card where the server says, and say so. Rate limit and other errors: move back, explain                        |
+| Domain rules  | Unchanged and enforced by the server: history row per move, `dateApplied` fills when first reaching Applied, any status to any status                    |
+| Not included  | Undo toast (a move back would write a second history row), reordering within a column, bulk moves                                                        |
+
+**Steps** (each a small green commit)
+
+1. Shared optimistic-update helper for the list and pipeline caches, with unit tests (move, rollback, counts).
+2. `StatusMenu` component and quick status change on list cards; component test.
+3. Board page with dnd-kit columns, keyboard dragging and live-region announcements; view toggle in the URL.
+4. E2E (critical only): change status from the list menu (phone and desktop), drag a card to another column on
+   desktop, a keyboard move on the board, and a 412 conflict shown and recovered.
+5. Docs: README features and this plan's outcome.
+
+**Risks:** dnd-kit drags in Playwright need stepped mouse moves (known pattern); a wide board on small phones relies
+on the menu rather than dragging.
+
 ## Planned but not built
 
 | Item                                | Status                                                                                                    |
