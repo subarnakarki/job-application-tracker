@@ -36,6 +36,28 @@ describe('App', () => {
   });
 });
 
+describe('Sign-in page', () => {
+  it('explains why a Google sign-in came back, and keeps the return path', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ error: 'unauthenticated', message: 'Sign in' }), {
+            status: 401,
+            headers: { 'content-type': 'application/json' },
+          }),
+        ),
+      ),
+    );
+    renderAt('/login?error=google_cancelled&next=%2Fapplications%2Fnew');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Google sign-in was cancelled.');
+    expect(screen.getByRole('link', { name: 'Continue with Google' })).toHaveAttribute(
+      'href',
+      '/api/auth/google/start?next=%2Fapplications%2Fnew',
+    );
+  });
+});
+
 describe('PipelineBar', () => {
   it('selects a stage and clears it when tapped again', async () => {
     const onSelect = vi.fn();

@@ -5,8 +5,19 @@ import { useDemoSignIn, useMe } from '../api/hooks';
 
 /** Only same-site paths are allowed as a return address, never another origin. */
 function safeNext(next: string | null): string {
-  return next && next.startsWith('/') && !next.startsWith('//') ? next : '/';
+  return next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\')
+    ? next
+    : '/';
 }
+
+/** Why a Google sign-in ended back here (set by the server's callback). */
+const GOOGLE_ERRORS: Record<string, string> = {
+  google_cancelled: 'Google sign-in was cancelled.',
+  google_expired: 'The sign-in took too long or was started in another browser. Try again.',
+  google_failed: 'Google sign-in did not work. Try again.',
+  google_unavailable: 'Google sign-in is not available right now.',
+  rate_limited: 'Too many sign-ins from your network. Try again later.',
+};
 
 export function LoginPage() {
   const me = useMe();
@@ -17,12 +28,15 @@ export function LoginPage() {
 
   if (me.data) return <Navigate to={next} replace />;
 
+  const reason = params.get('error');
   const error =
     demo.error instanceof ApiRequestError && demo.error.status === 429
-      ? 'Too many sign-ins from your network. Try again later.'
+      ? GOOGLE_ERRORS['rate_limited']
       : demo.error
         ? 'Sign-in failed. Try again.'
-        : null;
+        : reason
+          ? (GOOGLE_ERRORS[reason] ?? 'Sign-in failed. Try again.')
+          : null;
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-6 px-4">
@@ -41,18 +55,25 @@ export function LoginPage() {
           {error}
         </p>
       )}
-      <button
-        type="button"
-        className="btn-primary"
-        disabled={demo.isPending}
-        onClick={() =>
-          demo.mutate(undefined, { onSuccess: () => void navigate(next, { replace: true }) })
-        }
-      >
-        {demo.isPending ? 'Signing in…' : 'Try the demo'}
-      </button>
+      <div className="flex flex-col gap-3">
+        {/* A full-page navigation, not a fetch: the server redirects to Google. */}
+        <a href={`/api/auth/google/start?next=${encodeURIComponent(next)}`} className="btn-primary">
+          Continue with Google
+        </a>
+        <button
+          type="button"
+          className="btn-secondary"
+          disabled={demo.isPending}
+          onClick={() =>
+            demo.mutate(undefined, { onSuccess: () => void navigate(next, { replace: true }) })
+          }
+        >
+          {demo.isPending ? 'Signing in…' : 'Try the demo'}
+        </button>
+      </div>
       <p className="text-xs text-slate-500 dark:text-slate-400">
-        The demo account is shared by everyone who tries it. Sign-in with Google is coming soon.
+        Your applications are private to your Google account. The demo account is shared by everyone
+        who tries it.
       </p>
     </main>
   );
