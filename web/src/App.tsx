@@ -1,9 +1,41 @@
-import { APP_NAME } from '@jat/shared';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useState } from 'react';
+import { BrowserRouter, Route, Routes } from 'react-router';
+import { Layout } from './components/Layout';
+import {
+  ApplicationDetailPage,
+  EditApplicationPage,
+  NewApplicationPage,
+  NotFoundPage,
+} from './pages/ApplicationPages';
+import { ApplicationsPage } from './pages/ApplicationsPage';
+import { LoginPage } from './pages/LoginPage';
+
+export function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route element={<Layout />}>
+        <Route index element={<ApplicationsPage />} />
+        <Route path="applications/new" element={<NewApplicationPage />} />
+        <Route path="applications/:id" element={<ApplicationDetailPage />} />
+        <Route path="applications/:id/edit" element={<EditApplicationPage />} />
+        <Route path="*" element={<NotFoundPage />} />
+      </Route>
+    </Routes>
+  );
+}
 
 export function App() {
+  const [client] = useState(
+    () =>
+      new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } } }),
+  );
   return (
-    <main className="mx-auto max-w-3xl px-4 py-6">
-      <h1 className="text-2xl font-semibold">{APP_NAME}</h1>
-    </main>
+    <QueryClientProvider client={client}>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }
