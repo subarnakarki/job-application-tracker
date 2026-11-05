@@ -8,6 +8,11 @@ export function Layout() {
   const signOut = useSignOut();
   const navigate = useNavigate();
   const location = useLocation();
+  // The board needs the full width for its seven columns; everything else reads better narrow.
+  const width =
+    location.pathname === '/' && new URLSearchParams(location.search).get('view') === 'board'
+      ? 'max-w-screen-2xl'
+      : 'max-w-4xl';
 
   if (me.isPending) return <p className="p-6 text-sm">Loading…</p>;
   if (me.isError)
@@ -26,7 +31,7 @@ export function Layout() {
   return (
     <div className="min-h-dvh">
       <header className="border-b border-slate-200 dark:border-slate-800">
-        <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-3">
+        <div className={`mx-auto flex items-center justify-between gap-3 px-4 py-3 ${width}`}>
           <Link
             to="/"
             className="font-semibold focus-visible:outline-2 focus-visible:outline-blue-600"
@@ -63,7 +68,7 @@ export function Layout() {
           </p>
         )}
       </header>
-      <main className="mx-auto max-w-4xl px-4 py-6">
+      <main className={`mx-auto px-4 py-6 ${width}`}>
         <Outlet />
       </main>
     </div>
