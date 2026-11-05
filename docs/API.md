@@ -65,6 +65,7 @@ account) and Google and the classifier (`ANTHROPIC_API_KEY`) are configured. The
 | GET    | `/api/import/gmail/start`       | user | 302 to Google for read-only Gmail access; 3 per day per user          |
 | GET    | `/api/import/gmail/callback`    | user | Runs the import, then 302 to `/import/<runId>` (or `/account?import=` |
 |        |                                 |      | with a reason code)                                                   |
+| GET    | `/api/import/runs`              | user | Your recent imports, newest first, with changed / to review / skipped |
 | GET    | `/api/import/runs/:id`          | user | The run and each email's outcome (never the email body)               |
 | POST   | `/api/import/items/:id/undo`    | user | Reverse a create or status change; 409 if the application was edited  |
 |        |                                 |      | since                                                                 |

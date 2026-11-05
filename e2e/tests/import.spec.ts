@@ -34,7 +34,13 @@ test('import results: undo an added application, dismiss a suggestion', async ({
   ]);
   const results = new ImportResultsPage(page);
 
-  await results.goto(runId);
+  // Found again from the Account page, with what is still waiting for review.
+  await page.goto('/account');
+  const pastImport = page.getByRole('list', { name: 'Past imports' }).getByRole('link');
+  await expect(pastImport).toContainText('1 changed · 1 to review · 0 skipped');
+  await pastImport.click();
+  await expect(page).toHaveURL(`/import/${runId}`);
+  await results.heading.waitFor();
   const added = results.card(results.changes, 'Added Initech as Applied');
   await expect(added).toBeVisible();
   const suggestion = results.card(results.review, 'Hooli: suggest Offer');
@@ -45,6 +51,9 @@ test('import results: undo an added application, dismiss a suggestion', async ({
 
   await suggestion.getByRole('button', { name: 'Dismiss' }).click();
   await expect(results.card(results.review, 'Hooli: dismissed')).toBeVisible();
+
+  await page.goto('/account');
+  await expect(pastImport).toContainText('0 changed · 0 to review');
 
   await applicationsPage.goto();
   await expect(applicationsPage.emptyState).toBeVisible();

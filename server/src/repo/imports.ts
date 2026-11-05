@@ -287,3 +287,38 @@ export async function listAllImports(
   );
   return { runs: runs.rows.map(toRun), items: items.rows.map(toItem) };
 }
+
+export interface ImportRunSummary extends ImportRun {
+  changed: number;
+  needsReview: number;
+  skipped: number;
+}
+
+/** This user's most recent runs, newest first, with how their emails turned out. */
+export async function listRuns(
+  db: Queryable,
+  userId: string,
+  limit = 20,
+): Promise<ImportRunSummary[]> {
+  const result = await db.query<
+    RunRow & { changed: number; needs_review: number; skipped: number }
+  >(
+    `select r.id, r.started_at, r.finished_at, r.emails_scanned, r.status,
+            count(i.id) filter (where i.outcome in ('created', 'status_changed'))::int as changed,
+            count(i.id) filter (where i.outcome = 'needs_review')::int as needs_review,
+            count(i.id) filter (where i.outcome = 'ignored')::int as skipped
+       from import_runs r
+       left join import_items i on i.run_id = r.id
+      where r.user_id = $1
+      group by r.id
+      order by r.started_at desc
+      limit $2`,
+    [userId, limit],
+  );
+  return result.rows.map((row) => ({
+    ...toRun(row),
+    changed: row.changed,
+    needsReview: row.needs_review,
+    skipped: row.skipped,
+  }));
+}

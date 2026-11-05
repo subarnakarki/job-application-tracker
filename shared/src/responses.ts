@@ -164,6 +164,18 @@ export const ImportRunDetailSchema = z.strictObject({
 });
 export type ImportRunDetail = z.infer<typeof ImportRunDetailSchema>;
 
+/** `GET /api/import/runs`: recent imports, newest first, with how their emails turned out. */
+export const ImportRunListSchema = z.strictObject({
+  items: z.array(
+    ImportRunSchema.extend({
+      changed: z.number().int().min(0),
+      needsReview: z.number().int().min(0),
+      skipped: z.number().int().min(0),
+    }),
+  ),
+});
+export type ImportRunList = z.infer<typeof ImportRunListSchema>;
+
 /** `GET /api/import/status`: whether this user may import from Gmail. */
 export const ImportStatusSchema = z.strictObject({ available: z.boolean() });
 

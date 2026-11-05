@@ -1,6 +1,7 @@
 import {
   ImportItemSchema,
   ImportRunDetailSchema,
+  ImportRunListSchema,
   ImportStatusSchema,
   type ImportItem as ImportItemView,
 } from '@jat/shared';
@@ -23,7 +24,7 @@ import {
 } from '../import/gmailAuth';
 import { runImport } from '../import/run';
 import type { Owner } from '../repo/applications';
-import { getRun, type ImportItem, type ImportRun } from '../repo/imports';
+import { getRun, listRuns, type ImportItem, type ImportRun } from '../repo/imports';
 import { origin, sameToken } from './google';
 
 export const GMAIL_CALLBACK_PATH = '/api/import/gmail/callback';
@@ -254,6 +255,32 @@ export function registerImportRoutes(app: FastifyInstance, deps: ImportRouteDeps
         }
         throw error;
       }
+    },
+  );
+
+  // Anyone signed in may list their own runs (an empty list for everyone not on the allowlist).
+  app.get(
+    '/api/import/runs',
+    {
+      config: {
+        auth: 'user',
+        contract: {
+          summary: 'Recent Gmail imports, newest first, with counts per outcome',
+          responses: { 200: ImportRunListSchema },
+        },
+      },
+    },
+    async (request) => {
+      const owner = ownerOf(request);
+      const runs = await listRuns(db(), owner.userId);
+      return {
+        items: runs.map((run) => ({
+          ...presentImportRun(run),
+          changed: run.changed,
+          needsReview: run.needsReview,
+          skipped: run.skipped,
+        })),
+      };
     },
   );
 

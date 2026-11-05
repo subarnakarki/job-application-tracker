@@ -3,6 +3,7 @@ import {
   ApplicationListSchema,
   ImportItemSchema,
   ImportRunDetailSchema,
+  ImportRunListSchema,
   ImportStatusSchema,
   PipelineSchema,
   StatsSchema,
@@ -189,6 +190,13 @@ export function useImportStatus() {
   });
 }
 
+export function useImportRuns() {
+  return useQuery({
+    queryKey: ['import-runs'],
+    queryFn: () => apiRequest('/api/import/runs', ImportRunListSchema),
+  });
+}
+
 export function useImportRun(runId: string) {
   return useQuery({
     queryKey: ['import-run', runId],
@@ -210,6 +218,10 @@ export function useImportAction(runId: string) {
         body: {},
       }),
     onSettled: () =>
-      Promise.all([client.invalidateQueries({ queryKey: ['import-run', runId] }), refresh()]),
+      Promise.all([
+        client.invalidateQueries({ queryKey: ['import-run', runId] }),
+        client.invalidateQueries({ queryKey: ['import-runs'] }),
+        refresh(),
+      ]),
   });
 }

@@ -1,4 +1,4 @@
-import { ImportItemSchema, ImportRunDetailSchema } from '@jat/shared';
+import { ImportItemSchema, ImportRunDetailSchema, ImportRunListSchema } from '@jat/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Classification, EmailClassifier } from '../import/classify';
 import type { GmailClient, GmailMessage } from '../import/gmail';
@@ -116,6 +116,22 @@ describe.skipIf(!TEST_DATABASE_URL)(
       expect(detail.items).toMatchObject([
         { outcome: 'created', company: 'Acme', toStatus: 'Applied' },
       ]);
+    });
+
+    it('lists only your own imports, newest first, with counts per outcome', async () => {
+      const me = await importer();
+      const other = await importer();
+      await runImport(me.cookie, me.user.id);
+
+      const mine = ImportRunListSchema.parse((await get('/api/import/runs', me.cookie)).json());
+      const theirs = ImportRunListSchema.parse(
+        (await get('/api/import/runs', other.cookie)).json(),
+      );
+
+      expect(mine.items).toMatchObject([
+        { status: 'finished', emailsScanned: 1, changed: 1, needsReview: 0, skipped: 0 },
+      ]);
+      expect(theirs.items).toEqual([]);
     });
 
     it('refuses a callback without the state this user started', async () => {

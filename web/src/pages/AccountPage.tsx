@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { useDeleteAccount, useImportStatus, useMe, useUpdateTimeZone } from '../api/hooks';
+import {
+  useDeleteAccount,
+  useImportRuns,
+  useImportStatus,
+  useMe,
+  useUpdateTimeZone,
+} from '../api/hooks';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
 /** Why a Gmail import came back to this page (`?import=...`). */
@@ -29,6 +35,8 @@ export function AccountPage() {
   const navigate = useNavigate();
   const [confirming, setConfirming] = useState(false);
   const importStatus = useImportStatus();
+  const importRuns = useImportRuns();
+  const runs = importRuns.data?.items ?? [];
   const [params] = useSearchParams();
   const importReason = params.get('import');
   const user = me.data;
@@ -104,6 +112,40 @@ export function AccountPage() {
                   </div>
                 </>
               )}
+            </section>
+          )}
+
+          {runs.length > 0 && (
+            <section aria-labelledby="imports-heading" className="flex flex-col gap-2">
+              <h2 id="imports-heading" className="text-lg font-semibold">
+                Past imports
+              </h2>
+              <ul className="flex flex-col gap-2" aria-label="Past imports">
+                {runs.map((run) => (
+                  <li key={run.id}>
+                    <Link
+                      to={`/import/${run.id}`}
+                      className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-blue-600 dark:border-slate-700 dark:hover:bg-slate-900"
+                    >
+                      <span className="font-medium">
+                        {new Date(run.startedAt).toLocaleString()}
+                        {run.status === 'failed' && ' · did not finish'}
+                      </span>
+                      <span className="text-slate-600 dark:text-slate-300">
+                        {run.changed} changed ·{' '}
+                        {run.needsReview > 0 ? (
+                          <strong className="text-amber-800 dark:text-amber-300">
+                            {run.needsReview} to review
+                          </strong>
+                        ) : (
+                          '0 to review'
+                        )}{' '}
+                        · {run.skipped} skipped
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             </section>
           )}
 
