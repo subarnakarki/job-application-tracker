@@ -74,3 +74,9 @@ Passed on 2026-11-05; details and lessons in [SPIKE.md](SPIKE.md). Plan changes 
 - Postgres is 18 everywhere (Neon, CI, docker compose).
 - Assert response bodies in smoke tests, never only status codes.
 - Phase 2 sets the `pg` SSL mode explicitly and replaces the spike migration runner and routes.
+
+## Phase 1 outcome
+
+Domain core is in `shared/` (pure, no I/O) with 143 tests including fast-check property tests: constants,
+calendar/time-zone date helpers, `needsFollowUp` and `followUpWindow`, status and `dateApplied` rules,
+`changedFields`, and zod schemas. Rules are written down in [DOMAIN.md](DOMAIN.md).
