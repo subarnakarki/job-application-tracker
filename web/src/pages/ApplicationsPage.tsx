@@ -2,9 +2,17 @@ import { SORTS, STATUSES, type Sort, type Status } from '@jat/shared';
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { formatDate } from '../format';
-import { toQueryString, useApplications, useMe, usePipeline, type ListFilters } from '../api/hooks';
+import {
+  toQueryString,
+  useApplications,
+  useMe,
+  useMoveApplication,
+  usePipeline,
+  type ListFilters,
+} from '../api/hooks';
 import { PipelineBar } from '../components/PipelineBar';
-import { FollowUpFlag, StatusBadge } from '../components/StatusBadge';
+import { FollowUpFlag } from '../components/StatusBadge';
+import { moveErrorMessage, StatusMenu } from '../components/StatusMenu';
 
 const SORT_LABEL: Record<Sort, string> = {
   updated_desc: 'Recently updated',
@@ -36,6 +44,7 @@ export function ApplicationsPage() {
   const me = useMe();
   const pipeline = usePipeline(filters.q);
   const applications = useApplications(filters);
+  const move = useMoveApplication();
 
   // Search as you type, without a request per keystroke.
   useEffect(() => {
@@ -115,6 +124,15 @@ export function ApplicationsPage() {
           `${applications.data.total} ${applications.data.total === 1 ? 'application' : 'applications'}`}
       </p>
 
+      {move.isError && move.variables && (
+        <p
+          role="alert"
+          className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800 dark:bg-rose-950 dark:text-rose-200"
+        >
+          {moveErrorMessage(move.variables.application.company, move.error)}
+        </p>
+      )}
+
       {applications.isPending && <p>Loading…</p>}
       {applications.isError && <p className="text-rose-700">Could not load your applications.</p>}
       {applications.isSuccess && items.length === 0 && (
@@ -130,29 +148,39 @@ export function ApplicationsPage() {
 
       <ul className="flex flex-col gap-3">
         {items.map((application) => (
-          <li key={application.id}>
-            <Link
-              to={`/applications/${application.id}`}
-              className={`block rounded-xl border border-slate-200 p-4 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-blue-600 dark:border-slate-800 dark:hover:bg-slate-900 ${
-                application.isClosed ? 'opacity-60' : ''
-              }`}
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="font-semibold">{application.company}</span>
-                <span className="flex flex-wrap gap-2">
-                  {application.needsFollowUp && <FollowUpFlag />}
-                  <StatusBadge status={application.status} />
+          <li
+            key={application.id}
+            className={`relative rounded-xl border border-slate-200 p-4 hover:bg-slate-50 focus-within:ring-2 focus-within:ring-blue-600 dark:border-slate-800 dark:hover:bg-slate-900 ${
+              application.isClosed ? 'opacity-60' : ''
+            }`}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              {/* The link covers the whole card; the menu sits above it. */}
+              <Link
+                to={`/applications/${application.id}`}
+                className="font-semibold outline-none after:absolute after:inset-0 after:content-['']"
+              >
+                {application.company}
+              </Link>
+              <span className="flex flex-wrap items-center gap-2">
+                {application.needsFollowUp && <FollowUpFlag />}
+                <span className="relative z-10">
+                  <StatusMenu
+                    company={application.company}
+                    status={application.status}
+                    onMove={(to) => move.mutate({ application, to })}
+                  />
                 </span>
-              </div>
-              <p className="text-sm text-slate-600 dark:text-slate-300">{application.role}</p>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                {application.dateApplied
-                  ? `Applied ${formatDate(application.dateApplied)}`
-                  : 'Not applied yet'}
-                {application.nextStep ? ` · Next: ${application.nextStep}` : ''}
-                {application.nextStepDate ? ` (${formatDate(application.nextStepDate)})` : ''}
-              </p>
-            </Link>
+              </span>
+            </div>
+            <p className="text-sm text-slate-600 dark:text-slate-300">{application.role}</p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              {application.dateApplied
+                ? `Applied ${formatDate(application.dateApplied)}`
+                : 'Not applied yet'}
+              {application.nextStep ? ` · Next: ${application.nextStep}` : ''}
+              {application.nextStepDate ? ` (${formatDate(application.nextStepDate)})` : ''}
+            </p>
           </li>
         ))}
       </ul>

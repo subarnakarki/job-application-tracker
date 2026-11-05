@@ -8,12 +8,17 @@ import {
   PipelineSchema,
   StatsSchema,
   UserEnvelopeSchema,
+  type Application,
   type ApplicationInput,
+  type ApplicationList,
   type ApplicationPatch,
   type ListQuery,
+  type Pipeline,
+  type Status,
   type User,
 } from '@jat/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { moveInList, moveInPipeline } from '../optimistic';
 import { apiRequest, ApiRequestError } from './client';
 
 export type ListFilters = Partial<Pick<ListQuery, 'status' | 'followUp' | 'q' | 'sort'>>;
@@ -84,6 +89,52 @@ function useRefresh() {
       client.invalidateQueries({ queryKey: ['stats'] }),
       client.invalidateQueries({ queryKey: ['application'] }),
     ]);
+}
+
+/**
+ * Moves an application to another stage at once (list and pipeline caches), then saves it.
+ * On failure the caches are put back; either way everything is refetched from the server.
+ */
+export function useMoveApplication() {
+  const client = useQueryClient();
+  const refresh = useRefresh();
+  return useMutation({
+    mutationFn: ({ application, to }: { application: Application; to: Status }) =>
+      apiRequest(
+        `/api/applications/${encodeURIComponent(application.id)}`,
+        ApplicationDetailSchema,
+        { method: 'PATCH', body: { status: to }, version: application.version },
+      ),
+    onMutate: async ({ application, to }) => {
+      await Promise.all([
+        client.cancelQueries({ queryKey: ['applications'] }),
+        client.cancelQueries({ queryKey: ['pipeline'] }),
+      ]);
+      const lists = client.getQueriesData<ApplicationList>({ queryKey: ['applications'] });
+      const pipelines = client.getQueriesData<Pipeline>({ queryKey: ['pipeline'] });
+      const now = new Date().toISOString();
+      for (const [key, data] of lists) {
+        if (data)
+          client.setQueryData(
+            key,
+            moveInList(data, application.id, to, (key[1] ?? {}) as ListFilters, now),
+          );
+      }
+      for (const [key, data] of pipelines) {
+        if (data)
+          client.setQueryData(
+            key,
+            moveInPipeline(data, application.status, to, application.needsFollowUp),
+          );
+      }
+      return { lists, pipelines };
+    },
+    onError: (_error, _variables, snapshot) => {
+      for (const [key, data] of [...(snapshot?.lists ?? []), ...(snapshot?.pipelines ?? [])])
+        client.setQueryData(key, data);
+    },
+    onSettled: refresh,
+  });
 }
 
 export function useCreateApplication() {
