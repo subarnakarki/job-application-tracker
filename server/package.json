@@ -1,0 +1,17 @@
+{
+  "name": "@jat/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@jat/shared": "*",
+    "fastify": "^5.12.8"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.0"
+  }
+}
