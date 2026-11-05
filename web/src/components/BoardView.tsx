@@ -25,31 +25,32 @@ interface Props {
 }
 
 /**
- * Keyboard dragging: each Left/Right arrow jumps exactly one column (the default moves a few
- * pixels per press). Other keys do not move the card. Reports the column it aimed at, because
- * dnd-kit works out what is under the card one render later: a quick Space after an arrow would
- * otherwise drop the card in the column it just left.
+ * Keyboard dragging: each Left/Right arrow moves one stage in pipeline order (the default moves
+ * a few pixels per press). Stages are counted, not measured, so it stays exact while the board
+ * scrolls sideways on a phone. `aim` holds the stage aimed at; the drop goes there, because
+ * dnd-kit works out what is under the card one render later.
  */
-function oneColumnPerArrow(onTarget: (status: Status) => void): KeyboardCoordinateGetter {
-  return (event, { currentCoordinates, context }) => {
+function oneColumnPerArrow(aim: {
+  target: () => Status | null;
+  set: (status: Status) => void;
+}): KeyboardCoordinateGetter {
+  return (event, { active, currentCoordinates, context }) => {
     const direction = event.code === 'ArrowRight' ? 1 : event.code === 'ArrowLeft' ? -1 : 0;
     if (!direction) return undefined;
     event.preventDefault();
-    // The sensor's own coordinates (the card's left edge, updated on every press), not measured
-    // rects, which lag a render behind when keys are pressed quickly.
+    const startStatus = context.draggableNodes.get(active)?.data.current?.['status'] as
+      Status | undefined;
+    const from = aim.target() ?? startStatus;
+    if (!from) return currentCoordinates;
+    const next = STATUSES[STATUSES.indexOf(from) + direction];
+    if (!next) return currentCoordinates;
+    aim.set(next);
+    // Draw the card over that column.
+    const rect = context.droppableRects.get(next);
     const width = context.activeNode?.getBoundingClientRect().width ?? 0;
-    const center = currentCoordinates.x + width / 2;
-    const columns = STATUSES.flatMap((status) => {
-      const rect = context.droppableRects.get(status);
-      return rect ? [{ status, center: rect.left + rect.width / 2 }] : [];
-    });
-    const candidates = columns.filter((column) =>
-      direction > 0 ? column.center > center + 1 : column.center < center - 1,
-    );
-    const target = candidates.sort((a, b) => direction * (a.center - b.center))[0];
-    if (!target) return currentCoordinates;
-    onTarget(target.status);
-    return { x: currentCoordinates.x + (target.center - center), y: currentCoordinates.y };
+    return rect
+      ? { x: rect.left + rect.width / 2 - width / 2, y: currentCoordinates.y }
+      : currentCoordinates;
   };
 }
 
@@ -66,12 +67,16 @@ export function BoardView({ items, onMove }: Props) {
   // Where the last arrow key aimed, during a keyboard drag (null for mouse and touch drags).
   // Written only from key and drag events, never during render.
   const [keyboard] = useState(() => {
-    const aim: { target: Status | null } = { target: null };
+    let aimed: Status | null = null;
+    const target = () => aimed;
+    const set = (status: Status) => {
+      aimed = status;
+    };
     return {
-      coordinateGetter: oneColumnPerArrow((status) => (aim.target = status)),
-      target: () => aim.target,
+      coordinateGetter: oneColumnPerArrow({ target, set }),
+      target,
       reset: () => {
-        aim.target = null;
+        aimed = null;
       },
     };
   });
@@ -191,7 +196,10 @@ function DraggableCard({
   application: Application;
   onMove: Props['onMove'];
 }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: application.id });
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: application.id,
+    data: { status: application.status },
+  });
   return (
     // Pointer-only shortcut: keyboard users drag from the handle or use the Move to menu.
     // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions

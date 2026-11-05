@@ -36,6 +36,22 @@ export class Api {
     return (await response.json()) as ApplicationDetail;
   }
 
+  async getApplication(id: string) {
+    const response = await this.request.get(`/api/applications/${id}`);
+    expect(response.status(), await response.text()).toBe(200);
+    return (await response.json()) as ApplicationDetail;
+  }
+
+  /** An edit made somewhere else (another tab or device), as the same user. */
+  async updateApplication(id: string, version: number, patch: Partial<ApplicationInput>) {
+    const response = await this.request.patch(`/api/applications/${id}`, {
+      data: patch,
+      headers: { 'if-match': `"${version}"` },
+    });
+    expect(response.status(), await response.text()).toBe(200);
+    return (await response.json()) as ApplicationDetail;
+  }
+
   /** Runs a real Gmail import from a fake inbox (test-only route); returns the run id. */
   async seedImport(emails: SeedEmail[]) {
     const response = await this.request.post('/api/test/import', { data: { emails } });
