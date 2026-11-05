@@ -46,7 +46,11 @@ describe('localDateIn', () => {
     // Etc/GMT+N means UTC-N (inverted sign). Oracle: shift the instant by hand.
     fc.assert(
       fc.property(
-        fc.date({ min: new Date('2000-01-01T00:00:00Z'), max: new Date('2100-01-01T00:00:00Z') }),
+        fc.date({
+          min: new Date('2000-01-01T00:00:00Z'),
+          max: new Date('2100-01-01T00:00:00Z'),
+          noInvalidDate: true,
+        }),
         fc.integer({ min: -12, max: 14 }),
         (instant, offsetHours) => {
           const zone =
@@ -71,7 +75,11 @@ describe('localDateIn', () => {
     ];
     fc.assert(
       fc.property(
-        fc.date({ min: new Date('1990-01-01T00:00:00Z'), max: new Date('2100-01-01T00:00:00Z') }),
+        fc.date({
+          min: new Date('1990-01-01T00:00:00Z'),
+          max: new Date('2100-01-01T00:00:00Z'),
+          noInvalidDate: true,
+        }),
         fc.constantFrom(...zones),
         (instant, zone) => {
           expect(isValidDate(localDateIn(instant, zone))).toBe(true);
