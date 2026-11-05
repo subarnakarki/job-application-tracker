@@ -8,6 +8,7 @@ import {
   useUpdateTimeZone,
 } from '../api/hooks';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { formatDateTime } from '../format';
 
 /** Why a Gmail import came back to this page (`?import=...`). */
 const IMPORT_MESSAGES: Record<string, string> = {
@@ -127,7 +128,7 @@ export function AccountPage() {
                       className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-blue-600 dark:border-slate-700 dark:hover:bg-slate-900"
                     >
                       <span className="font-medium">
-                        {new Date(run.startedAt).toLocaleString()}
+                        {formatDateTime(run.startedAt)}
                         {run.status === 'failed' && ' · did not finish'}
                       </span>
                       <span className="text-slate-600 dark:text-slate-300">

@@ -1,6 +1,7 @@
 import { SORTS, STATUSES, type Sort, type Status } from '@jat/shared';
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
+import { formatDate } from '../format';
 import { toQueryString, useApplications, useMe, usePipeline, type ListFilters } from '../api/hooks';
 import { PipelineBar } from '../components/PipelineBar';
 import { FollowUpFlag, StatusBadge } from '../components/StatusBadge';
@@ -144,9 +145,11 @@ export function ApplicationsPage() {
               </div>
               <p className="text-sm text-slate-600 dark:text-slate-300">{application.role}</p>
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                {application.dateApplied ? `Applied ${application.dateApplied}` : 'Not applied yet'}
+                {application.dateApplied
+                  ? `Applied ${formatDate(application.dateApplied)}`
+                  : 'Not applied yet'}
                 {application.nextStep ? ` · Next: ${application.nextStep}` : ''}
-                {application.nextStepDate ? ` (${application.nextStepDate})` : ''}
+                {application.nextStepDate ? ` (${formatDate(application.nextStepDate)})` : ''}
               </p>
             </Link>
           </li>

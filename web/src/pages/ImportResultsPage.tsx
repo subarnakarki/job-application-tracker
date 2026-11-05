@@ -1,6 +1,7 @@
 import type { ImportItem } from '@jat/shared';
 import { Link, useParams } from 'react-router';
 import { useImportAction, useImportRun, type ImportAction } from '../api/hooks';
+import { formatDay } from '../format';
 
 const CHANGED = new Set<ImportItem['outcome']>(['created', 'status_changed', 'undone']);
 const REVIEW = new Set<ImportItem['outcome']>(['needs_review', 'dismissed']);
@@ -26,7 +27,7 @@ function headline(item: ImportItem): string {
 function ItemCard({ item, runId }: { item: ImportItem; runId: string }) {
   const action = useImportAction(runId);
   const act = (name: ImportAction) => action.mutate({ itemId: item.id, action: name });
-  const date = item.emailDate ? new Date(item.emailDate).toLocaleDateString() : null;
+  const date = item.emailDate ? formatDay(item.emailDate) : null;
   const linkable = item.applicationId && item.outcome !== 'undone';
 
   return (

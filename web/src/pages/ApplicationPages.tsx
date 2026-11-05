@@ -1,6 +1,7 @@
 import type { ApplicationDetail } from '@jat/shared';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
+import { formatDate, formatDateTime } from '../format';
 import { ApiRequestError } from '../api/client';
 import {
   useApplication,
@@ -118,6 +119,12 @@ export function ApplicationDetailPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <Link
+        to="/"
+        className="self-start text-sm text-blue-700 underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-blue-600 dark:text-blue-400"
+      >
+        ← Back to applications
+      </Link>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">{application.company}</h1>
@@ -138,12 +145,17 @@ export function ApplicationDetailPage() {
       </div>
 
       <dl className="grid gap-4 sm:grid-cols-2">
-        <Field label="Date applied">{application.dateApplied}</Field>
+        <Field label="Date applied">
+          {application.dateApplied && formatDate(application.dateApplied)}
+        </Field>
         <Field label="Source">{application.source}</Field>
         <Field label="Salary">{salary(application)}</Field>
         <Field label="Contact">{application.contact}</Field>
         <Field label="Next step">
-          {[application.nextStep, application.nextStepDate && `(${application.nextStepDate})`]
+          {[
+            application.nextStep,
+            application.nextStepDate && `(${formatDate(application.nextStepDate)})`,
+          ]
             .filter(Boolean)
             .join(' ')}
         </Field>
@@ -177,8 +189,13 @@ export function ApplicationDetailPage() {
                   : `Created as ${entry.toStatus}`}
               </span>
               <time dateTime={entry.occurredAt} className="ml-2 text-slate-500 dark:text-slate-400">
-                {new Date(entry.occurredAt).toLocaleString()}
+                {formatDateTime(entry.occurredAt)}
               </time>
+              {entry.actor === 'gmail' && (
+                <span className="ml-2 rounded bg-sky-100 px-1.5 py-0.5 text-xs text-sky-900 dark:bg-sky-950 dark:text-sky-200">
+                  from Gmail
+                </span>
+              )}
             </li>
           ))}
         </ol>

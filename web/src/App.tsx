@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router';
+import { ApiRequestError } from './api/client';
 import { Layout } from './components/Layout';
 import {
   ApplicationDetailPage,
@@ -37,7 +38,16 @@ export function AppRoutes() {
 export function App() {
   const [client] = useState(
     () =>
-      new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } } }),
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            // A 4xx (not found, signed out, not allowed) will not change on a retry: show it at once.
+            retry: (failures, error) =>
+              failures < 1 && !(error instanceof ApiRequestError && error.status < 500),
+            refetchOnWindowFocus: false,
+          },
+        },
+      }),
   );
   return (
     <QueryClientProvider client={client}>

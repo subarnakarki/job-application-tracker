@@ -44,8 +44,7 @@ export function Layout() {
               to="/account"
               className="text-slate-600 underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-blue-600 dark:text-slate-300"
             >
-              <span className="hidden sm:inline">{me.data.name ?? me.data.email}</span>
-              <span className="sm:hidden">Account</span>
+              Account
             </Link>
             <button
               type="button"
