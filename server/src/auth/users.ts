@@ -73,3 +73,44 @@ export async function updateTimeZone(
   const row = result.rows[0];
   return row ? toSessionUser(row) : null;
 }
+
+export const GOOGLE_PROVIDER = 'google';
+
+/**
+ * The user behind a Google account, matched by Google's stable subject id (never by email,
+ * which can change hands). Created on first sign-in (open signup); later sign-ins refresh
+ * the email, name and picture. Concurrent first sign-ins are serialised per subject.
+ */
+export async function findOrCreateGoogleUser(
+  db: Db,
+  profile: { subject: string; email: string; name: string | null; pictureUrl: string | null },
+): Promise<SessionUser> {
+  return db.transaction(async (tx) => {
+    await tx.query("select pg_advisory_xact_lock(hashtext('jat:google:' || $1))", [
+      profile.subject,
+    ]);
+    const updated = await tx.query<UserRow>(
+      `update users u set email = $3, name = $4, picture_url = $5
+         from identities i
+        where i.user_id = u.id and i.provider = $1 and i.subject = $2
+       returning ${USER_COLUMNS}`,
+      [GOOGLE_PROVIDER, profile.subject, profile.email, profile.name, profile.pictureUrl],
+    );
+    const found = updated.rows[0];
+    if (found) return toSessionUser(found);
+
+    const created = await tx.query<UserRow>(
+      `insert into users (email, name, picture_url) values ($1, $2, $3)
+       returning id, email, name, picture_url, time_zone, is_demo`,
+      [profile.email, profile.name, profile.pictureUrl],
+    );
+    const row = created.rows[0];
+    if (!row) throw new Error('User was not created');
+    await tx.query('insert into identities (user_id, provider, subject) values ($1, $2, $3)', [
+      row.id,
+      GOOGLE_PROVIDER,
+      profile.subject,
+    ]);
+    return toSessionUser(row);
+  });
+}

@@ -21,6 +21,8 @@ const WITH_SECRET = { ...SAME_ORIGIN, 'x-test-secret': SECRET };
 const PUBLIC_ROUTES = [
   'GET /api/health',
   'GET /api/health/db',
+  'GET /api/auth/google/start',
+  'GET /api/auth/google/callback',
   'POST /api/auth/demo',
   'POST /api/auth/logout',
 ].sort();

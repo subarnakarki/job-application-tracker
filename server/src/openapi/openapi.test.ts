@@ -65,7 +65,7 @@ describe('OpenAPI document', () => {
       expect(ids.has(operation.operationId ?? ''), `${where} duplicate operationId`).toBe(false);
       ids.add(operation.operationId ?? '');
       expect(
-        Object.keys(operation.responses).some((status) => /^2\d\d$/.test(status)),
+        Object.keys(operation.responses).some((status) => /^[23]\d\d$/.test(status)),
         where,
       ).toBe(true);
       expect(operation.responses['default'], where).toBeDefined();

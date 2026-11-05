@@ -103,7 +103,7 @@ describe('route policy: every route must declare who may call it', () => {
     const app = bare();
 
     expect(() => app.get('/api/a', { config: { auth: 'public' } }, () => 'x')).toThrow(
-      'must declare config.contract with at least one 2xx response',
+      'must declare config.contract with at least one 2xx or 3xx (redirect) response',
     );
     expect(() =>
       app.get(
@@ -111,14 +111,14 @@ describe('route policy: every route must declare who may call it', () => {
         { config: { auth: 'public', contract: { summary: 'x', responses: { 404: null } } } },
         () => 'x',
       ),
-    ).toThrow('at least one 2xx response');
+    ).toThrow('at least one 2xx or 3xx (redirect) response');
     expect(() =>
       app.get(
         '/api/c',
         { config: { auth: 'public', contract: { summary: 'x', responses: {} } } },
         () => 'x',
       ),
-    ).toThrow('at least one 2xx response');
+    ).toThrow('at least one 2xx or 3xx (redirect) response');
   });
 
   it('applies to the real app: every route buildApp registers is declared', async () => {

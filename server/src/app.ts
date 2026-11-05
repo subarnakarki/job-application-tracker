@@ -9,7 +9,9 @@ import { registerContractValidation, ROUTE_NOT_FOUND } from './http/contractVali
 import { ApiError } from './http/errors';
 import { enforceRoutePolicy } from './http/policy';
 import { registerRequestPipeline } from './http/pipeline';
+import { googleProviderFromEnv, type GoogleProvider } from './auth/google';
 import { registerApplicationRoutes } from './routes/applications';
+import { registerGoogleRoutes } from './routes/google';
 import { registerHealthRoutes } from './routes/health';
 import { registerMeRoutes } from './routes/me';
 import { registerSessionRoutes } from './routes/session';
@@ -23,6 +25,8 @@ export interface AppDeps {
   /** "Now" for sessions, rate limits and (later) domain rules. Tests pass a controllable one. */
   clock?: Clock;
   env?: Record<string, string | undefined>;
+  /** Google sign-in. Defaults to the real provider when GOOGLE_CLIENT_ID/SECRET are set; tests pass a stub. */
+  google?: GoogleProvider | null;
   /** Validate every response against its route contract (tests). */
   validateResponses?: boolean;
 }
@@ -67,6 +71,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   registerRequestPipeline(app, { db: deps.db, clock, perUserClocks: testRoutes !== null });
   registerHealthRoutes(app, deps.db);
   registerSessionRoutes(app, { db: deps.db, clock, env });
+  const google = deps.google === undefined ? googleProviderFromEnv(env) : deps.google;
+  registerGoogleRoutes(app, { db: deps.db, clock, env, google });
   registerMeRoutes(app, deps.db);
   registerApplicationRoutes(app, { db: deps.db, clock });
   if (testRoutes) registerTestRoutes(app, { db: deps.db, clock });

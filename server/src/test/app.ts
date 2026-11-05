@@ -1,6 +1,7 @@
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify';
 import { buildApp } from '../app';
 import { SESSION_COOKIE } from '../auth/cookies';
+import type { GoogleProvider } from '../auth/google';
 import { createSession } from '../auth/sessions';
 import type { Clock } from '../clock';
 import { runMigrations } from '../db/migrate';
@@ -44,6 +45,8 @@ export interface TestApp {
 /** The real app on a fresh, fully migrated schema. */
 export interface TestAppOptions {
   env?: Record<string, string | undefined>;
+  /** Google sign-in stub (defaults to none: Google not configured). */
+  google?: GoogleProvider | null;
   /** Add extra routes (a probe) before the app starts. */
   configure?: (app: FastifyInstance) => void;
 }
@@ -53,7 +56,13 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
   await runMigrations(testDb.url, { schema: testDb.schema });
   const clock = mutableClock();
   // Every API test is also a contract test: each response is checked against its route's declaration.
-  const app = buildApp({ db: testDb.db, clock, env: options.env ?? {}, validateResponses: true });
+  const app = buildApp({
+    db: testDb.db,
+    clock,
+    env: options.env ?? {},
+    google: options.google ?? null,
+    validateResponses: true,
+  });
   options.configure?.(app);
   await app.ready();
 

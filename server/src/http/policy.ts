@@ -48,9 +48,9 @@ export function enforceRoutePolicy(app: FastifyInstance): void {
     }
     const contract = route.config?.contract;
     const declared = Object.keys(contract?.responses ?? {}).map(Number);
-    if (!contract || !declared.some((status) => status >= 200 && status < 300)) {
+    if (!contract || !declared.some((status) => status >= 200 && status < 400)) {
       throw new Error(
-        `Route ${methods.join(',')} ${route.url} must declare config.contract with at least one 2xx response`,
+        `Route ${methods.join(',')} ${route.url} must declare config.contract with at least one 2xx or 3xx (redirect) response`,
       );
     }
     for (const method of methods) {
