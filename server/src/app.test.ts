@@ -88,6 +88,31 @@ describe('GET /api/health/db', () => {
   });
 });
 
+describe('caching', () => {
+  it('forces no-store on API responses even when a handler asks for public caching', async () => {
+    const app = buildApp();
+    app.get('/api/cacheable', { config: { auth: 'public' } }, (_request, reply) => {
+      void reply.header('cache-control', 'public, max-age=3600');
+      return { ok: true };
+    });
+
+    const response = await app.inject({ method: 'GET', url: '/api/cacheable' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['cache-control']).toBe('no-store');
+    await app.close();
+  });
+
+  it('applies to errors and to unknown routes too', async () => {
+    const app = buildApp();
+
+    expect((await app.inject({ method: 'GET', url: '/api/nope' })).headers['cache-control']).toBe(
+      'no-store',
+    );
+    await app.close();
+  });
+});
+
 describe('error handling', () => {
   it('hides the message of an unexpected error and returns a fixed 500 body', async () => {
     const app = buildApp();

@@ -48,6 +48,13 @@ and no upcoming next-step date.
   Vercel production deploys from `main`, so every push redeploys; keep `main` green. Commits are authored by the
   owner with a `Co-Authored-By: Claude` trailer.
 
+## Security rules for routes
+
+- Every route must declare `config: { auth: 'public' | 'user' }`; the app refuses to start otherwise.
+- A new public route must be added to the allowlist in `server/src/routes/registry.test.ts`; a `user` route with an
+  id parameter must be added to `ISOLATION_COVERAGE` there, with the test proving another user gets 404.
+- See `docs/AUTH.md` for the session, CSRF and test-route design.
+
 ## Commands
 
 - `npm run lint`, `npm run format:check`, `npm run typecheck`, `npm test` (all from the repo root)

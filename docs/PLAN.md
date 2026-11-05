@@ -90,3 +90,11 @@ SQL twin of `needsFollowUp`, proven equal by a real-Postgres parity test. Tests 
 if the test database is missing. The app takes injected dependencies (`buildApp({ db, logger })`), has a DB-backed
 `/api/health/db`, and returns a fixed body for any 5xx. Not done here: rate-limit and test-clock tables (Phase 3,
 as additive migrations), applying migrations to Neon (Phase 13).
+
+## Phase 3 outcome
+
+Sessions (`__Host-` cookie, hashed tokens, hourly sliding renewal), the request pipeline (route policy, CSRF guard,
+session resolution, `no-store`), demo sign-in and sign-out, `GET/PATCH /api/me`, a database-backed rate limiter,
+the allowlisted test-only routes with per-user clocks, migration `0002`, and the route-registry meta-test. Details and
+the security reasoning are in [AUTH.md](AUTH.md). Differences from the plan: the profile endpoint is `/api/me`
+(not `/api/auth/me`); the isolation matrix is a coverage check that fails until Phase 4's id routes are claimed.

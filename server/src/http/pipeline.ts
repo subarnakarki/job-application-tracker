@@ -37,7 +37,7 @@ export interface PipelineDeps {
  * The order matters and is fixed here:
  * 1. CSRF guard: cross-site and non-JSON writes are refused before anything else runs.
  * 2. Session: the cookie is resolved; routes marked `user` answer 401 without one.
- * 3. Responses under /api are never cached (they are per-user).
+ * 3. Responses under /api are never cached (they are per-user), whatever a handler sets.
  */
 export function registerRequestPipeline(app: FastifyInstance, deps: PipelineDeps): void {
   app.decorateRequest('auth', null);
@@ -85,10 +85,10 @@ export function registerRequestPipeline(app: FastifyInstance, deps: PipelineDeps
     }
   });
 
+  // Every /api response is per-user, so none may be stored by a shared cache.
+  // This overrides a handler's own cache-control on purpose: a route cannot opt out by accident.
   app.addHook('onSend', async (request, reply, payload) => {
-    if (request.url.startsWith('/api/') && !reply.hasHeader('cache-control')) {
-      void reply.header('cache-control', 'no-store');
-    }
+    if (request.url.startsWith('/api/')) void reply.header('cache-control', 'no-store');
     return payload;
   });
 }
