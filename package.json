@@ -5,7 +5,8 @@
   "workspaces": [
     "shared",
     "server",
-    "web"
+    "web",
+    "e2e"
   ],
   "engines": {
     "node": "24.x"
@@ -22,7 +23,8 @@
     "db:down": "docker compose down",
     "build:api": "esbuild server/src/vercel.ts --bundle --platform=node --format=esm --target=node24 --banner:js=\"import { createRequire as __cr } from \\\"node:module\\\"; const require = __cr(import.meta.url);\" --outfile=build/handler.mjs",
     "db:migrate": "npm run db:migrate -w @jat/server",
-    "openapi": "npm run openapi -w @jat/server"
+    "openapi": "npm run openapi -w @jat/server",
+    "test:e2e": "npm test -w @jat/e2e"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

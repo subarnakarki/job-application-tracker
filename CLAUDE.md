@@ -61,6 +61,8 @@ and no upcoming next-step date.
 - `npm run dev:server` (Fastify on :3000), `npm run dev:web` (Vite, proxies `/api` to :3000)
 - `npm run db:up` starts local Postgres 18 (docker compose). Database tests need `TEST_DATABASE_URL`
   (e.g. `postgres://jat:jat@127.0.0.1:5432/jat`); CI always sets it and fails if it is missing.
+- `E2E_DATABASE_URL=... npm run test:e2e` runs Playwright against the real app (starts the API with test-only
+  routes and Vite itself); the database must be migrated and is written to. First time: `npx playwright install chromium`.
 - `DATABASE_URL_DIRECT=... npm run db:migrate` applies migrations over the direct (unpooled) Neon URL
   (also the manual "Migrate" workflow). Never edit an applied migration: add a new one.
 
