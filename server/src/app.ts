@@ -3,12 +3,22 @@ import Fastify, {
   type FastifyInstance,
   type FastifyServerOptions,
 } from 'fastify';
+import { systemClock, type Clock } from './clock';
 import type { Db } from './db/types';
+import { ApiError } from './http/errors';
+import { enforceRoutePolicy } from './http/policy';
+import { registerRequestPipeline } from './http/pipeline';
+import { registerHealthRoutes } from './routes/health';
+import { registerMeRoutes } from './routes/me';
+import { registerSessionRoutes } from './routes/session';
 
 export interface AppDeps {
   /** Absent in tests that never touch the database. */
   db?: Db;
   logger?: FastifyServerOptions['logger'];
+  /** "Now" for sessions, rate limits and (later) domain rules. Tests pass a controllable one. */
+  clock?: Clock;
+  env?: Record<string, string | undefined>;
 }
 
 /**
@@ -17,10 +27,22 @@ export interface AppDeps {
  */
 export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const app = Fastify({ logger: deps.logger ?? false });
+  const clock = deps.clock ?? systemClock;
+  const env = deps.env ?? process.env;
+
+  // Must come first: it checks every route as it is registered.
+  enforceRoutePolicy(app);
 
   // Never leak internals: a 5xx returns a fixed body (details go to the log),
-  // while deliberate 4xx errors keep their message.
+  // while deliberate errors keep their message.
   app.setErrorHandler((error: FastifyError, request, reply) => {
+    if (error instanceof ApiError) {
+      return reply.code(error.statusCode).send({
+        error: error.code,
+        message: error.message,
+        ...(error.issues ? { issues: error.issues } : {}),
+      });
+    }
     const statusCode = typeof error.statusCode === 'number' ? error.statusCode : 500;
     if (statusCode >= 500) {
       request.log.error(error);
@@ -29,20 +51,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     return reply.code(statusCode).send({ error: error.code, message: error.message });
   });
 
-  // Never touches the database, so an uptime check cannot wake it or be slowed by it.
-  app.get('/api/health', () => ({ status: 'ok' }));
-
-  // Readiness: proves the app can reach the database. For deploy smoke tests, not uptime pings.
-  app.get('/api/health/db', async (request, reply) => {
-    if (!deps.db) return reply.code(503).send({ status: 'unavailable' });
-    try {
-      await deps.db.query('select 1');
-      return { status: 'ok' };
-    } catch (error) {
-      request.log.error(error);
-      return reply.code(503).send({ status: 'unavailable' });
-    }
-  });
+  registerRequestPipeline(app, { db: deps.db, clock });
+  registerHealthRoutes(app, deps.db);
+  registerSessionRoutes(app, { db: deps.db, clock, env });
+  registerMeRoutes(app, deps.db);
 
   return app;
 }

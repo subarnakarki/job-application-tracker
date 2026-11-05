@@ -172,3 +172,7 @@ export type ListQuery = z.output<typeof ListQuerySchema>;
 
 /** An IANA zone name; offsets such as "+05:00" are rejected. */
 export const TimeZoneSchema = z.string().refine(isValidTimeZone, 'Unknown time zone');
+
+/** `PATCH /api/me`: the only setting a user can change so far. */
+export const UserSettingsPatchSchema = z.strictObject({ timeZone: TimeZoneSchema });
+export type UserSettingsPatch = z.output<typeof UserSettingsPatchSchema>;

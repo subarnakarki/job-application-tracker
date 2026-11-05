@@ -45,3 +45,8 @@ export function readSessionToken(header: string | undefined): string | null {
   const value = matches[0]?.[1] ?? '';
   return isPlausibleToken(value) ? value : null;
 }
+
+/** Whether the browser sent a session cookie at all (valid or not), so a dead one can be cleared. */
+export function hasSessionCookie(header: string | undefined): boolean {
+  return parseCookies(header).some(([name]) => name === SESSION_COOKIE);
+}

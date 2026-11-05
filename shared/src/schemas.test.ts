@@ -8,6 +8,7 @@ import {
   isHttpUrl,
   ListQuerySchema,
   TimeZoneSchema,
+  UserSettingsPatchSchema,
 } from './schemas';
 
 const minimal = { company: 'Acme', role: 'SDET' };
@@ -427,5 +428,24 @@ describe('TimeZoneSchema', () => {
     for (const bad of ['+05:00', 'Mars/Olympus', '', 'EST5EDT; select 1', 42, null]) {
       expect(TimeZoneSchema.safeParse(bad).success, String(bad)).toBe(false);
     }
+  });
+});
+
+describe('UserSettingsPatchSchema', () => {
+  it('accepts a valid zone and nothing else', () => {
+    expect(UserSettingsPatchSchema.parse({ timeZone: 'Asia/Kolkata' })).toEqual({
+      timeZone: 'Asia/Kolkata',
+    });
+  });
+
+  it.each([
+    ['empty body', {}],
+    ['offset zone', { timeZone: '+05:00' }],
+    ['unknown zone', { timeZone: 'Mars/Olympus' }],
+    ['null', { timeZone: null }],
+    ['extra key', { timeZone: 'UTC', email: 'x@y.z' }],
+    ['server-owned key', { isDemo: false }],
+  ])('rejects %s', (_label, body) => {
+    expect(UserSettingsPatchSchema.safeParse(body).success).toBe(false);
   });
 });

@@ -91,7 +91,7 @@ describe('GET /api/health/db', () => {
 describe('error handling', () => {
   it('hides the message of an unexpected error and returns a fixed 500 body', async () => {
     const app = buildApp();
-    app.get('/boom', () => {
+    app.get('/boom', { config: { auth: 'public' } }, () => {
       throw new Error('connect ECONNREFUSED 10.0.0.5:5432 password=hunter2');
     });
 
@@ -105,7 +105,7 @@ describe('error handling', () => {
 
   it('hides the message even when the error carries a 5xx status of its own', async () => {
     const app = buildApp();
-    app.get('/bad-gateway', () => {
+    app.get('/bad-gateway', { config: { auth: 'public' } }, () => {
       throw Object.assign(new Error('upstream secret detail'), { statusCode: 502 });
     });
 
@@ -118,7 +118,7 @@ describe('error handling', () => {
 
   it('keeps the message of a deliberate 4xx error', async () => {
     const app = buildApp();
-    app.get('/teapot', () => {
+    app.get('/teapot', { config: { auth: 'public' } }, () => {
       throw Object.assign(new Error('Not allowed here'), { statusCode: 403, code: 'FORBIDDEN' });
     });
 
@@ -140,7 +140,7 @@ describe('error handling', () => {
 
   it('rejects malformed JSON bodies with a 4xx, not a 500', async () => {
     const app = buildApp();
-    app.post('/echo', (request) => request.body);
+    app.post('/echo', { config: { auth: 'public' } }, (request) => request.body);
 
     const response = await app.inject({
       method: 'POST',

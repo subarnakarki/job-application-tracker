@@ -1,6 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
+  hasSessionCookie,
   parseCookies,
   readSessionToken,
   serializeClearedSessionCookie,
@@ -111,5 +112,23 @@ describe('readSessionToken', () => {
       }),
       { numRuns: 200 },
     );
+  });
+});
+
+describe('hasSessionCookie', () => {
+  it('is true for any cookie of that name, valid or not, so a dead one can be cleared', () => {
+    expect(hasSessionCookie(`${SESSION_COOKIE}=${TOKEN}`)).toBe(true);
+    expect(hasSessionCookie(`${SESSION_COOKIE}=garbage`)).toBe(true);
+    expect(hasSessionCookie(`${SESSION_COOKIE}=`)).toBe(true);
+    expect(hasSessionCookie(`a=1; ${SESSION_COOKIE}=${TOKEN}; ${SESSION_COOKIE}=${TOKEN}`)).toBe(
+      true,
+    );
+  });
+
+  it('is false when the cookie is absent or only similarly named', () => {
+    expect(hasSessionCookie(undefined)).toBe(false);
+    expect(hasSessionCookie('')).toBe(false);
+    expect(hasSessionCookie('session=abc; theme=dark')).toBe(false);
+    expect(hasSessionCookie(`${SESSION_COOKIE}x=1`)).toBe(false);
   });
 });
