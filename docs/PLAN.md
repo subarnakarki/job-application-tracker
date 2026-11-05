@@ -132,3 +132,15 @@ non-JavaScript tool, kept by the owner's choice; it runs only in GitHub Actions 
 nothing to install locally.
 
 Not adopted (for now): MSW, Playwright visual comparisons, k6, Lighthouse CI, scheduled production smoke tests.
+
+## Phase 4.5 outcome
+
+- Every route declares a contract (summary, params, headers, body, response schemas, deliberate errors); the app
+  refuses to start without one, and in tests every response is validated against it (a mismatch becomes a 500
+  with the reason). Unknown routes and the test-route guard share one 404 body.
+- `docs/openapi.json` (OpenAPI 3.1) is generated from the contracts (`npm run openapi`); a test fails when stale.
+- `server/src/routes/fuzz.test.ts` fuzzes every route from its contract with fast-check: no 5xx, no undocumented
+  status, a bystander's data unchanged. It found all three planted bugs; nothing in ~7,000 requests on real code.
+- **StrykerJS: deferred by the owner** (to be added later). A first run on `shared/` scored **83.7%**
+  (262 killed, 49 survived) in 46 s, with the surviving mutants mostly in error-message strings, `responses.ts`
+  and a few date-helper branches. The working config is not committed; adding it back is a small step.
