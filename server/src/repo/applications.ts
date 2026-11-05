@@ -5,6 +5,7 @@ import {
   localDateIn,
   planStatusChange,
   resolveDateApplied,
+  STATUSES,
   type ApplicationInput,
   type ApplicationPatch,
   type ListQuery,
@@ -399,12 +400,12 @@ const ORDER: Record<Sort, string> = {
  * literally) in the company, role, contact or notes. The follow-up filter is the
  * SQL twin of needsFollowUp, evaluated in the owner's time zone at `now`.
  */
-export async function listApplications(
-  db: Queryable,
+/** The WHERE clause for the user's applications matching `query` (status optional), with its parameters. */
+function filterClause(
   owner: Owner,
-  query: ListQuery,
+  query: Pick<ListQuery, 'status' | 'followUp' | 'q'>,
   now: Date,
-): Promise<ApplicationRecord[]> {
+): { where: string; params: unknown[] } {
   const params: unknown[] = [owner.userId];
   const where = ['a.user_id = $1'];
 
@@ -425,10 +426,52 @@ export async function listApplications(
         ` or coalesce(a.contact, '') ilike ${p} escape '\\' or a.notes ilike ${p} escape '\\')`,
     );
   }
+  return { where: where.join(' and '), params };
+}
 
+export async function listApplications(
+  db: Queryable,
+  owner: Owner,
+  query: ListQuery,
+  now: Date,
+): Promise<ApplicationRecord[]> {
+  const { where, params } = filterClause(owner, query, now);
   const result = await db.query<ApplicationRow>(
-    `select ${SELECT_COLUMNS} from applications a where ${where.join(' and ')} order by ${ORDER[query.sort]}`,
+    `select ${SELECT_COLUMNS} from applications a where ${where} order by ${ORDER[query.sort]}`,
     params,
   );
   return result.rows.map(toRecord);
+}
+
+export interface PipelineCounts {
+  stages: { status: Status; count: number }[];
+  followUpCount: number;
+  total: number;
+}
+
+/**
+ * Counts per stage for the pipeline bar. They respect the search but ignore any
+ * stage filter, so tapping a stage never zeroes the others.
+ */
+export async function pipelineCounts(
+  db: Queryable,
+  owner: Owner,
+  q: string | undefined,
+  now: Date,
+): Promise<PipelineCounts> {
+  const { where, params } = filterClause(owner, { q }, now);
+  const predicate = followUpPredicate({ now, timeZone: owner.timeZone }, params.length + 1);
+  const result = await db.query<{ status: Status; count: number; follow_up: number }>(
+    `select a.status, count(*)::int as count,
+            count(*) filter (where ${predicate.sql})::int as follow_up
+       from applications a where ${where} group by a.status`,
+    [...params, ...predicate.params],
+  );
+  const byStatus = new Map(result.rows.map((row) => [row.status, row]));
+  const stages = STATUSES.map((status) => ({ status, count: byStatus.get(status)?.count ?? 0 }));
+  return {
+    stages,
+    followUpCount: result.rows.reduce((sum, row) => sum + row.follow_up, 0),
+    total: stages.reduce((sum, stage) => sum + stage.count, 0),
+  };
 }

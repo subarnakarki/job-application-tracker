@@ -4,6 +4,8 @@ import {
   ApplicationListSchema,
   ApplicationPatchSchema,
   ListQuerySchema,
+  localDateIn,
+  PipelineSchema,
 } from '@jat/shared';
 import { z } from 'zod';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -16,10 +18,14 @@ import {
   deleteApplication,
   getApplication,
   listApplications,
+  pipelineCounts,
   updateApplication,
   type Owner,
 } from '../repo/applications';
+import { toCsv } from '../repo/csv';
 import { presentApplication, presentDetail } from '../repo/present';
+
+const PipelineQuery = z.strictObject({ q: ListQuerySchema.shape.q });
 
 /** Path parameter as received: any string (a non-uuid simply answers 404). */
 const IdParams = z.object({ id: z.string() });
@@ -113,6 +119,58 @@ export function registerApplicationRoutes(app: FastifyInstance, deps: Applicatio
         items: records.map((record) => presentApplication(record, present)),
         total: records.length,
       };
+    },
+  );
+
+  app.get(
+    '/api/pipeline',
+    {
+      config: {
+        auth: 'user',
+        contract: {
+          summary: 'Count per stage (respects the search, ignores any stage filter)',
+          query: PipelineQuery,
+          responses: { 200: PipelineSchema },
+        },
+      },
+    },
+    async (request) => {
+      const db = requireDb();
+      const owner = ownerOf(request);
+      const { q } = parseInput(PipelineQuery, { ...(request.query as object) });
+      return pipelineCounts(db, owner, q, request.clock.now());
+    },
+  );
+
+  app.get(
+    '/api/applications/export.csv',
+    {
+      config: {
+        auth: 'user',
+        contract: {
+          summary: 'Download the listed applications as CSV (same filters as the list)',
+          query: ListQuerySchema,
+          responses: { 200: { text: 'text/csv' } },
+          errors: { 403: 'Not available to the demo account' },
+        },
+      },
+    },
+    async (request, reply) => {
+      const db = requireDb();
+      const owner = ownerOf(request);
+      if (owner.isDemo)
+        throw new ApiError(403, 'demo_restricted', 'The shared demo account cannot be exported');
+      const query = parseInput(ListQuerySchema, { ...(request.query as object) });
+      const now = request.clock.now();
+      const records = await listApplications(db, owner, query, now);
+      const present = context(request, owner);
+      void reply
+        .header('content-type', 'text/csv; charset=utf-8')
+        .header(
+          'content-disposition',
+          `attachment; filename="applications-${localDateIn(now, owner.timeZone)}.csv"`,
+        );
+      return toCsv(records.map((record) => presentApplication(record, present)));
     },
   );
 

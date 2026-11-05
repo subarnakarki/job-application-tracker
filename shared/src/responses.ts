@@ -88,3 +88,13 @@ export const ApplicationListSchema = z.strictObject({
   total: z.number().int().min(0),
 });
 export type ApplicationList = z.infer<typeof ApplicationListSchema>;
+
+/** `GET /api/pipeline`: a count for every stage (all seven, in order), plus follow-up. */
+export const PipelineSchema = z.strictObject({
+  stages: z
+    .array(z.strictObject({ status: z.enum(STATUSES), count: z.number().int().min(0) }))
+    .length(STATUSES.length),
+  followUpCount: z.number().int().min(0),
+  total: z.number().int().min(0),
+});
+export type Pipeline = z.infer<typeof PipelineSchema>;
