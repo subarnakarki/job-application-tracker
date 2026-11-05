@@ -1,0 +1,28 @@
+# Replaces the shared demo account's data with the realistic sample set (server/src/demo/seed.ts).
+# Manual for now; adding a schedule here would make it the daily demo reset from the plan.
+name: Seed demo
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: demo-seed
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Seed the demo account
+        run: npm run demo:seed -w @jat/server
+        env:
+          DATABASE_URL_DIRECT: ${{ secrets.DATABASE_URL_DIRECT }}

@@ -231,12 +231,12 @@ are applied automatically with Undo, and only the owner can use it (`GMAIL_IMPOR
 
 ## Planned but not built
 
-| Item                                | Status                                                                                         |
-| ----------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Demo account reset daily            | Not built. The demo cap (30 applications) and banner are in place                              |
-| Nightly `pg_dump` and restore drill | Not built; Neon's built-in restore window is the only backup                                   |
-| Uptime check, error tracking        | Not built                                                                                      |
-| PII-redacted logs                   | Not built: Fastify's default request logs include the URL (so search terms) and client address |
-| Migrations as an automatic CD step  | Manual "Migrate" workflow instead                                                              |
-| StrykerJS, ZAP, axe, flake check    | Deferred or dropped (see the scope change)                                                     |
-| Spike table `spike_ping` in Neon    | Still there; drop only with the owner's go-ahead                                               |
+| Item                                | Status                                                                                                    |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Demo account reset daily            | Seed built (`npm run demo:seed`, manual "Seed demo" workflow); not scheduled yet. Cap and banner in place |
+| Nightly `pg_dump` and restore drill | Not built; Neon's built-in restore window is the only backup                                              |
+| Uptime check, error tracking        | Not built                                                                                                 |
+| PII-redacted logs                   | Not built: Fastify's default request logs include the URL (so search terms) and client address            |
+| Migrations as an automatic CD step  | Manual "Migrate" workflow instead                                                                         |
+| StrykerJS, ZAP, axe, flake check    | Deferred or dropped (see the scope change)                                                                |
+| Spike table `spike_ping` in Neon    | Still there; drop only with the owner's go-ahead                                                          |
