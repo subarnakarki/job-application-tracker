@@ -447,6 +447,88 @@ describe.skipIf(!TEST_DATABASE_URL)('schema (real Postgres, real migrations)', (
     });
   });
 
+  describe('rate_limits (0002)', () => {
+    const consume = (key: string, windowStart: string) =>
+      sql(
+        `insert into rate_limits (key, window_start, count) values ($1, $2, 1)
+         on conflict (key, window_start) do update set count = rate_limits.count + 1
+         returning count`,
+        [key, windowStart],
+      );
+
+    it('counts hits per key and window with one atomic upsert', async () => {
+      const first = await consume('demo:1.2.3.4', '2026-11-05T15:00:00Z');
+      const second = await consume('demo:1.2.3.4', '2026-11-05T15:00:00Z');
+      const nextWindow = await consume('demo:1.2.3.4', '2026-11-05T16:00:00Z');
+      const otherKey = await consume('demo:5.6.7.8', '2026-11-05T15:00:00Z');
+
+      expect(
+        [first, second, nextWindow, otherKey].map(
+          (result) => (result.rows[0] as { count: number }).count,
+        ),
+      ).toEqual([1, 2, 1, 1]);
+    });
+
+    it('refuses a zero count and an empty or oversized key', async () => {
+      expect(
+        (
+          await violation(
+            sql("insert into rate_limits (key, window_start, count) values ('k', now(), 0)"),
+          )
+        ).code,
+      ).toBe('23514');
+      expect(
+        (
+          await violation(
+            sql("insert into rate_limits (key, window_start, count) values ('', now(), 1)"),
+          )
+        ).code,
+      ).toBe('23514');
+      expect(
+        (
+          await violation(
+            sql('insert into rate_limits (key, window_start, count) values ($1, now(), 1)', [
+              'k'.repeat(201),
+            ]),
+          )
+        ).code,
+      ).toBe('23514');
+    });
+  });
+
+  describe('test_clocks (0002)', () => {
+    it('holds one clock per user, defaults to no offset, and disappears with the user', async () => {
+      const userId = await insertUser({ email: 'clock@example.com' });
+      await sql('insert into test_clocks (user_id) values ($1)', [userId]);
+
+      const { rows } = await sql(
+        'select frozen_at, offset_ms::int as offset_ms from test_clocks where user_id = $1',
+        [userId],
+      );
+      expect(rows[0]).toEqual({ frozen_at: null, offset_ms: 0 });
+      expect(
+        (await violation(sql('insert into test_clocks (user_id) values ($1)', [userId]))).code,
+      ).toBe('23505');
+
+      await sql('delete from users where id = $1', [userId]);
+      expect((await sql('select 1 from test_clocks where user_id = $1', [userId])).rowCount).toBe(
+        0,
+      );
+    });
+
+    it('rejects a clock for a user that does not exist', async () => {
+      expect(
+        (
+          await violation(
+            sql('insert into test_clocks (user_id) values ($1)', [
+              '00000000-0000-4000-8000-000000000000',
+            ]),
+          )
+        ).code,
+      ).toBe('23503');
+    });
+  });
+
   it('has the indexes the queries will rely on', async () => {
     const { rows } = await sql(
       'select indexname from pg_indexes where schemaname = current_schema() order by indexname',
@@ -462,6 +544,7 @@ describe.skipIf(!TEST_DATABASE_URL)('schema (real Postgres, real migrations)', (
         'sessions_user_idx',
         'sessions_expires_idx',
         'identities_user_idx',
+        'rate_limits_window_idx',
       ]),
     );
   });
