@@ -53,6 +53,7 @@ interface Plan {
   otherId: string;
   ifMatch: string | undefined;
   body: { kind: 'json'; value: unknown } | { kind: 'raw'; text: string } | { kind: 'none' };
+  query: unknown;
 }
 
 function planFor(route: RegisteredRoute): fc.Arbitrary<Plan> {
@@ -76,7 +77,15 @@ function planFor(route: RegisteredRoute): fc.Arbitrary<Plan> {
         { weight: 1, arbitrary: fc.constant({ kind: 'none' as const }) },
       )
     : fc.constant({ kind: 'none' as const });
+  const querySchema = route.contract.query ? jsonSchemaOf(route.contract.query) : undefined;
+  const query: fc.Arbitrary<unknown> = querySchema
+    ? fc.oneof(
+        { weight: 3, arbitrary: validish(querySchema) },
+        { weight: 2, arbitrary: hostile(querySchema) },
+      )
+    : fc.constant(undefined);
   return fc.record({
+    query,
     signedIn: fc.oneof(
       { weight: 5, arbitrary: fc.constant(true) },
       { weight: 1, arbitrary: fc.constant(false) },
@@ -89,6 +98,24 @@ function planFor(route: RegisteredRoute): fc.Arbitrary<Plan> {
     }),
     body,
   });
+}
+
+/** Any generated value as a query string: arrays repeat the key, objects become JSON text. */
+function toQueryString(value: unknown): string {
+  if (value === undefined) return '';
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    return `?junk=${encodeURIComponent(JSON.stringify(value))}`;
+  const search = new URLSearchParams();
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    const values = Array.isArray(entry) ? entry : [entry];
+    for (const item of values)
+      search.append(
+        key,
+        typeof item === 'object' && item !== null ? JSON.stringify(item) : String(item),
+      );
+  }
+  const text = search.toString();
+  return text ? `?${text}` : '';
 }
 
 describe.skipIf(!TEST_DATABASE_URL)(
@@ -155,7 +182,9 @@ describe.skipIf(!TEST_DATABASE_URL)(
                 ? owned.value.record.id
                 : '00000000-0000-4000-8000-000000000000';
             const id = plan.idChoice === 'real' ? realId : plan.otherId;
-            const url = route.url.replace(/:[A-Za-z_]\w*/g, encodeURIComponent(id));
+            const url =
+              route.url.replace(/:[A-Za-z_]\w*/g, encodeURIComponent(id)) +
+              toQueryString(plan.query);
 
             const headers: Record<string, string> = { ...SAME_ORIGIN, 'x-test-secret': SECRET };
             if (plan.signedIn) headers['cookie'] = owner.cookie;

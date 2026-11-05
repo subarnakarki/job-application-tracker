@@ -7,11 +7,15 @@ import {
   resolveDateApplied,
   type ApplicationInput,
   type ApplicationPatch,
+  type ListQuery,
+  type Sort,
   type Source,
   type Status,
 } from '@jat/shared';
 import type { Db, Queryable } from '../db/types';
 import type { ValidationIssue } from '../http/errors';
+import { followUpPredicate } from './followUpSql';
+import { containsPattern, searchTerms } from './search';
 
 /**
  * All SQL for applications. Every statement is scoped by `user_id`, so an id
@@ -380,4 +384,51 @@ export async function listAllWithHistory(
 export async function deleteUser(db: Queryable, userId: string): Promise<boolean> {
   const result = await db.query('delete from users where id = $1', [userId]);
   return result.rowCount > 0;
+}
+
+/** Every sort ends with the id, so equal keys (common under a frozen clock) still come back in one stable order. */
+const ORDER: Record<Sort, string> = {
+  updated_desc: 'a.updated_at desc, a.id',
+  applied_desc: 'a.date_applied desc nulls last, a.created_at desc, a.id',
+  company_asc: 'lower(a.company), a.created_at desc, a.id',
+};
+
+/**
+ * The user's applications matching the filters. Every value is a bound
+ * parameter. Search: each word must appear (case-insensitively, wildcards taken
+ * literally) in the company, role, contact or notes. The follow-up filter is the
+ * SQL twin of needsFollowUp, evaluated in the owner's time zone at `now`.
+ */
+export async function listApplications(
+  db: Queryable,
+  owner: Owner,
+  query: ListQuery,
+  now: Date,
+): Promise<ApplicationRecord[]> {
+  const params: unknown[] = [owner.userId];
+  const where = ['a.user_id = $1'];
+
+  if (query.status) {
+    params.push(query.status);
+    where.push(`a.status = $${params.length}`);
+  }
+  if (query.followUp !== undefined) {
+    const predicate = followUpPredicate({ now, timeZone: owner.timeZone }, params.length + 1);
+    params.push(...predicate.params);
+    where.push(query.followUp ? predicate.sql : `not ${predicate.sql}`);
+  }
+  for (const term of searchTerms(query.q)) {
+    params.push(containsPattern(term));
+    const p = `$${params.length}`;
+    where.push(
+      `(a.company ilike ${p} escape '\\' or a.role ilike ${p} escape '\\'` +
+        ` or coalesce(a.contact, '') ilike ${p} escape '\\' or a.notes ilike ${p} escape '\\')`,
+    );
+  }
+
+  const result = await db.query<ApplicationRow>(
+    `select ${SELECT_COLUMNS} from applications a where ${where.join(' and ')} order by ${ORDER[query.sort]}`,
+    params,
+  );
+  return result.rows.map(toRecord);
 }

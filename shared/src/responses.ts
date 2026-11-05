@@ -81,3 +81,10 @@ export const HealthSchema = z.strictObject({ status: z.enum(['ok', 'unavailable'
 
 /** `{ user }`, returned by sign-in and the profile routes. */
 export const UserEnvelopeSchema = z.strictObject({ user: UserSchema });
+
+/** `GET /api/applications`: every matching application (at most the per-user cap, so no paging). */
+export const ApplicationListSchema = z.strictObject({
+  items: z.array(ApplicationSchema),
+  total: z.number().int().min(0),
+});
+export type ApplicationList = z.infer<typeof ApplicationListSchema>;

@@ -1,7 +1,9 @@
 import {
   ApplicationDetailSchema,
   ApplicationInputSchema,
+  ApplicationListSchema,
   ApplicationPatchSchema,
+  ListQuerySchema,
 } from '@jat/shared';
 import { z } from 'zod';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -13,10 +15,11 @@ import {
   createApplication,
   deleteApplication,
   getApplication,
+  listApplications,
   updateApplication,
   type Owner,
 } from '../repo/applications';
-import { presentDetail } from '../repo/present';
+import { presentApplication, presentDetail } from '../repo/present';
 
 /** Path parameter as received: any string (a non-uuid simply answers 404). */
 const IdParams = z.object({ id: z.string() });
@@ -87,6 +90,31 @@ export function registerApplicationRoutes(app: FastifyInstance, deps: Applicatio
     now: request.clock.now(),
     timeZone: owner.timeZone,
   });
+
+  app.get(
+    '/api/applications',
+    {
+      config: {
+        auth: 'user',
+        contract: {
+          summary: 'List applications (status and follow-up filters, search, sort)',
+          query: ListQuerySchema,
+          responses: { 200: ApplicationListSchema },
+        },
+      },
+    },
+    async (request) => {
+      const db = requireDb();
+      const owner = ownerOf(request);
+      const query = parseInput(ListQuerySchema, { ...(request.query as object) });
+      const records = await listApplications(db, owner, query, request.clock.now());
+      const present = context(request, owner);
+      return {
+        items: records.map((record) => presentApplication(record, present)),
+        total: records.length,
+      };
+    },
+  );
 
   app.post(
     '/api/applications',
