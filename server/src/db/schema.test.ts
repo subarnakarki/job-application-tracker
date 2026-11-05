@@ -1,0 +1,474 @@
+import { SOURCES, STATUSES } from '@jat/shared';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createTestDb, TEST_DATABASE_URL, type TestDb } from '../test/testDb';
+import { runMigrations } from './migrate';
+
+interface PgError {
+  code?: string;
+  constraint?: string;
+}
+
+describe.skipIf(!TEST_DATABASE_URL)('schema (real Postgres, real migrations)', () => {
+  let testDb: TestDb;
+  const sql = (text: string, params: unknown[] = []) => testDb.db.query(text, params);
+
+  beforeAll(async () => {
+    testDb = await createTestDb();
+    await runMigrations(testDb.url, { schema: testDb.schema });
+  });
+  afterAll(async () => {
+    await testDb.drop();
+  });
+
+  async function insertUser(overrides: Record<string, unknown> = {}): Promise<string> {
+    const values = { email: 'pat@example.com', ...overrides };
+    const columns = Object.keys(values);
+    const result = await sql(
+      `insert into users (${columns.join(', ')}) values (${columns.map((_, index) => `$${index + 1}`).join(', ')}) returning id`,
+      Object.values(values),
+    );
+    return (result.rows[0] as { id: string }).id;
+  }
+
+  async function insertApplication(
+    userId: string,
+    overrides: Record<string, unknown> = {},
+  ): Promise<string> {
+    const values = { user_id: userId, company: 'Acme', role: 'SDET', ...overrides };
+    const columns = Object.keys(values);
+    const result = await sql(
+      `insert into applications (${columns.join(', ')}) values (${columns.map((_, index) => `$${index + 1}`).join(', ')}) returning id`,
+      Object.values(values),
+    );
+    return (result.rows[0] as { id: string }).id;
+  }
+
+  async function violation(promise: Promise<unknown>): Promise<PgError> {
+    try {
+      await promise;
+    } catch (error) {
+      return error as PgError;
+    }
+    throw new Error('Expected the database to reject this, but it was accepted');
+  }
+
+  describe('applications: defaults', () => {
+    it('needs only a user, company and role, and fills the rest', async () => {
+      const userId = await insertUser();
+      const id = await insertApplication(userId);
+
+      const { rows } = await sql('select * from applications where id = $1', [id]);
+      const row = rows[0] as Record<string, unknown>;
+
+      expect(row).toMatchObject({
+        status: 'Saved',
+        source: 'Other',
+        notes: '',
+        version: 1,
+        date_applied: null,
+        next_step_date: null,
+        salary_min: null,
+        job_link: null,
+      });
+      expect(row['created_at']).toBeInstanceOf(Date);
+      expect(row['updated_at']).toBeInstanceOf(Date);
+      expect(row['last_activity_at']).toBeInstanceOf(Date);
+    });
+
+    it('returns date columns as YYYY-MM-DD strings', async () => {
+      const userId = await insertUser();
+      const id = await insertApplication(userId, {
+        date_applied: '2026-11-05',
+        next_step_date: '2026-03-08',
+      });
+
+      const { rows } = await sql(
+        'select date_applied, next_step_date from applications where id = $1',
+        [id],
+      );
+
+      expect(rows[0]).toEqual({ date_applied: '2026-11-05', next_step_date: '2026-03-08' });
+    });
+
+    it('generates distinct ids', async () => {
+      const userId = await insertUser();
+      const ids = await Promise.all([
+        insertApplication(userId),
+        insertApplication(userId),
+        insertApplication(userId),
+      ]);
+
+      expect(new Set(ids).size).toBe(3);
+    });
+  });
+
+  describe('applications: constraints reject what zod would (last line of defence)', () => {
+    it.each([
+      ['blank company', { company: '   ' }, 'applications_company_check'],
+      ['company over 200', { company: 'a'.repeat(201) }, 'applications_company_check'],
+      ['blank role', { role: '' }, 'applications_role_check'],
+      ['unknown status', { status: 'Hired' }, 'applications_status_check'],
+      ['lower-case status', { status: 'applied' }, 'applications_status_check'],
+      ['unknown source', { source: 'Glassdoor' }, 'applications_source_check'],
+      [
+        'negative minimum',
+        { salary_min: -1, salary_currency: 'USD' },
+        'applications_salary_min_check',
+      ],
+      [
+        'negative maximum',
+        { salary_max: -5, salary_currency: 'USD' },
+        'applications_salary_max_check',
+      ],
+      [
+        'maximum below minimum',
+        { salary_min: 200, salary_max: 100, salary_currency: 'USD' },
+        'applications_salary_order',
+      ],
+      ['amount without currency', { salary_min: 100 }, 'applications_salary_currency_required'],
+      [
+        'lower-case currency',
+        { salary_min: 1, salary_currency: 'usd' },
+        'applications_salary_currency_check',
+      ],
+      ['javascript: link', { job_link: 'javascript:alert(1)' }, 'applications_job_link_check'],
+      ['ftp link', { job_link: 'ftp://files.example/x' }, 'applications_job_link_check'],
+      ['link without a scheme', { job_link: 'example.com/job' }, 'applications_job_link_check'],
+      [
+        'link over 2000',
+        { job_link: `https://a.example/${'x'.repeat(2000)}` },
+        'applications_job_link_check',
+      ],
+      ['contact over 200', { contact: 'a'.repeat(201) }, 'applications_contact_check'],
+      ['next step over 500', { next_step: 'a'.repeat(501) }, 'applications_next_step_check'],
+      ['notes over 10000', { notes: 'a'.repeat(10_001) }, 'applications_notes_check'],
+      ['version 0', { version: 0 }, 'applications_version_check'],
+    ])('rejects %s', async (_label, overrides, constraint) => {
+      const userId = await insertUser();
+
+      const error = await violation(insertApplication(userId, overrides));
+
+      expect(error).toMatchObject({ code: '23514', constraint });
+    });
+
+    it('accepts every real status and source, and the boundary values', async () => {
+      const userId = await insertUser();
+      for (const status of STATUSES) await insertApplication(userId, { status });
+      for (const source of SOURCES) await insertApplication(userId, { source });
+      await insertApplication(userId, { company: 'a'.repeat(200), notes: 'a'.repeat(10_000) });
+      await insertApplication(userId, { salary_min: 5, salary_max: 5, salary_currency: 'EUR' });
+      await insertApplication(userId, { salary_min: 90_000, salary_currency: 'USD' });
+      await insertApplication(userId, { job_link: 'HTTPS://ACME.EXAMPLE/jobs?id=1#top' });
+      await insertApplication(userId, { job_link: 'http://acme.example' });
+
+      const count = await sql('select count(*)::int as n from applications where user_id = $1', [
+        userId,
+      ]);
+      expect(count.rows[0]).toEqual({ n: STATUSES.length + SOURCES.length + 5 });
+    });
+
+    it('rejects an application for a user that does not exist', async () => {
+      const error = await violation(insertApplication('00000000-0000-4000-8000-000000000000'));
+
+      expect(error.code).toBe('23503');
+    });
+  });
+
+  describe('the SQL lists cannot drift from the shared constants', () => {
+    async function listedValues(constraint: string): Promise<string[]> {
+      const { rows } = await sql(
+        `select pg_get_constraintdef(c.oid) as definition
+           from pg_constraint c
+           join pg_namespace n on n.oid = c.connamespace
+          where c.conname = $1 and n.nspname = current_schema()`,
+        [constraint],
+      );
+      const definition = (rows[0] as { definition: string }).definition;
+      return [...definition.matchAll(/'([^']+)'::text/g)].map((match) => match[1] ?? '').sort();
+    }
+
+    it.each([
+      ['applications_status_check', STATUSES],
+      ['status_history_from_check', STATUSES],
+      ['status_history_to_check', STATUSES],
+      ['applications_source_check', SOURCES],
+    ])('%s lists exactly the shared values', async (constraint, expected) => {
+      expect(await listedValues(constraint)).toEqual([...expected].sort());
+    });
+  });
+
+  describe('status history', () => {
+    async function applicationWithHistory() {
+      const userId = await insertUser();
+      const applicationId = await insertApplication(userId);
+      return { userId, applicationId };
+    }
+    const insertHistory = (
+      applicationId: string,
+      from: string | null,
+      to: string,
+      actor = 'user',
+    ) =>
+      sql(
+        'insert into status_history (application_id, from_status, to_status, actor) values ($1, $2, $3, $4)',
+        [applicationId, from, to, actor],
+      );
+
+    it('records creation as null -> status and later moves', async () => {
+      const { applicationId } = await applicationWithHistory();
+
+      await insertHistory(applicationId, null, 'Saved');
+      await insertHistory(applicationId, 'Saved', 'Applied');
+
+      const { rows } = await sql(
+        'select from_status, to_status, actor from status_history where application_id = $1 order by occurred_at, id',
+        [applicationId],
+      );
+      expect(rows).toEqual([
+        { from_status: null, to_status: 'Saved', actor: 'user' },
+        { from_status: 'Saved', to_status: 'Applied', actor: 'user' },
+      ]);
+    });
+
+    it('stores when it happened separately from when it was recorded', async () => {
+      const { applicationId } = await applicationWithHistory();
+      await sql(
+        "insert into status_history (application_id, from_status, to_status, occurred_at, actor) values ($1, 'Saved', 'Applied', '2026-01-02T03:04:05Z', 'gmail')",
+        [applicationId],
+      );
+
+      const { rows } = await sql(
+        'select occurred_at, recorded_at from status_history where application_id = $1',
+        [applicationId],
+      );
+      const row = rows[0] as { occurred_at: Date; recorded_at: Date };
+      expect(row.occurred_at.toISOString()).toBe('2026-01-02T03:04:05.000Z');
+      expect(row.recorded_at.getTime()).toBeGreaterThan(row.occurred_at.getTime());
+    });
+
+    it('refuses a row that keeps the same status', async () => {
+      const { applicationId } = await applicationWithHistory();
+
+      expect(await violation(insertHistory(applicationId, 'Applied', 'Applied'))).toMatchObject({
+        code: '23514',
+        constraint: 'status_history_changed',
+      });
+    });
+
+    it.each([
+      ['unknown to_status', null, 'Hired', 'user'],
+      ['unknown from_status', 'Hired', 'Applied', 'user'],
+      ['unknown actor', 'Saved', 'Applied', 'robot'],
+    ])('refuses %s', async (_label, from, to, actor) => {
+      const { applicationId } = await applicationWithHistory();
+
+      expect((await violation(insertHistory(applicationId, from, to, actor))).code).toBe('23514');
+    });
+
+    it('refuses history for an application that does not exist', async () => {
+      expect(
+        (await violation(insertHistory('00000000-0000-4000-8000-000000000000', null, 'Saved')))
+          .code,
+      ).toBe('23503');
+    });
+  });
+
+  describe('identities', () => {
+    it('is unique per provider and subject, but the same subject may exist under another provider', async () => {
+      const first = await insertUser();
+      const second = await insertUser({ email: 'sam@example.com' });
+      await sql(
+        "insert into identities (user_id, provider, subject) values ($1, 'google', 'sub-1')",
+        [first],
+      );
+
+      expect(
+        (
+          await violation(
+            sql(
+              "insert into identities (user_id, provider, subject) values ($1, 'google', 'sub-1')",
+              [second],
+            ),
+          )
+        ).code,
+      ).toBe('23505');
+      await sql(
+        "insert into identities (user_id, provider, subject) values ($1, 'demo', 'sub-1')",
+        [second],
+      );
+    });
+
+    it('only allows synthetic test users to use the test provider with a test: subject', async () => {
+      const userId = await insertUser();
+
+      await sql(
+        "insert into identities (user_id, provider, subject) values ($1, 'test', 'test:abc')",
+        [userId],
+      );
+      expect(
+        (
+          await violation(
+            sql(
+              "insert into identities (user_id, provider, subject) values ($1, 'test', 'real-person')",
+              [userId],
+            ),
+          )
+        ).code,
+      ).toBe('23514');
+    });
+
+    it('rejects an unknown provider', async () => {
+      const userId = await insertUser();
+
+      expect(
+        (
+          await violation(
+            sql(
+              "insert into identities (user_id, provider, subject) values ($1, 'facebook', 'x')",
+              [userId],
+            ),
+          )
+        ).code,
+      ).toBe('23514');
+    });
+  });
+
+  describe('users', () => {
+    it('defaults to UTC, not demo', async () => {
+      const id = await insertUser();
+
+      const { rows } = await sql('select time_zone, is_demo from users where id = $1', [id]);
+      expect(rows[0]).toEqual({ time_zone: 'UTC', is_demo: false });
+    });
+
+    it('accepts IANA names and rejects offsets and junk', async () => {
+      await insertUser({ time_zone: 'America/New_York' });
+      await insertUser({ time_zone: 'Etc/GMT+5' });
+      for (const bad of ['+05:00', '-08:00', 'GMT+5', '', 'UTC; drop table users']) {
+        expect((await violation(insertUser({ time_zone: bad }))).code, bad).toBe('23514');
+      }
+    });
+
+    it('rejects an implausible email and a non-http picture url', async () => {
+      expect((await violation(insertUser({ email: 'a' }))).code).toBe('23514');
+      expect((await violation(insertUser({ picture_url: 'javascript:alert(1)' }))).code).toBe(
+        '23514',
+      );
+    });
+  });
+
+  describe('sessions', () => {
+    const insertSession = (userId: string, tokenHash: Buffer, expiresInDays = 7) =>
+      sql(
+        "insert into sessions (token_hash, user_id, expires_at) values ($1, $2, now() + ($3 || ' days')::interval)",
+        [tokenHash, userId, String(expiresInDays)],
+      );
+
+    it('stores a 32-byte token hash, unique across sessions', async () => {
+      const userId = await insertUser();
+      const hash = Buffer.alloc(32, 7);
+
+      await insertSession(userId, hash);
+
+      expect((await violation(insertSession(userId, hash))).code).toBe('23505');
+      expect((await violation(insertSession(userId, Buffer.alloc(31, 1)))).code).toBe('23514');
+    });
+
+    it('refuses a session that is already expired when created', async () => {
+      const userId = await insertUser();
+
+      expect((await violation(insertSession(userId, Buffer.alloc(32, 9), -1))).code).toBe('23514');
+    });
+  });
+
+  describe('deleting data cascades, and only as far as it should', () => {
+    it('deleting an application removes its history but not its owner or siblings', async () => {
+      const userId = await insertUser();
+      const doomed = await insertApplication(userId);
+      const sibling = await insertApplication(userId);
+      for (const id of [doomed, sibling]) {
+        await sql(
+          "insert into status_history (application_id, from_status, to_status) values ($1, null, 'Saved')",
+          [id],
+        );
+      }
+
+      await sql('delete from applications where id = $1', [doomed]);
+
+      const history = await sql(
+        'select application_id from status_history where application_id in ($1, $2)',
+        [doomed, sibling],
+      );
+      expect(history.rows).toEqual([{ application_id: sibling }]);
+      expect((await sql('select 1 from users where id = $1', [userId])).rowCount).toBe(1);
+    });
+
+    it('deleting a user removes identities, sessions, applications and history, and nobody else', async () => {
+      const doomed = await insertUser({ email: 'doomed@example.com' });
+      const bystander = await insertUser({ email: 'bystander@example.com' });
+      const keep: string[] = [];
+      for (const [owner, subject] of [
+        [doomed, 'doomed-sub'],
+        [bystander, 'bystander-sub'],
+      ] as const) {
+        const applicationId = await insertApplication(owner);
+        if (owner === bystander) keep.push(applicationId);
+        await sql(
+          "insert into status_history (application_id, from_status, to_status) values ($1, null, 'Saved')",
+          [applicationId],
+        );
+        await sql("insert into identities (user_id, provider, subject) values ($1, 'google', $2)", [
+          owner,
+          subject,
+        ]);
+        await sql(
+          "insert into sessions (token_hash, user_id, expires_at) values ($1, $2, now() + interval '1 day')",
+          [Buffer.alloc(32, owner === doomed ? 1 : 2), owner],
+        );
+      }
+
+      await sql('delete from users where id = $1', [doomed]);
+
+      const counts = await sql(
+        `select (select count(*)::int from applications where user_id = $1) as doomed_apps,
+                (select count(*)::int from identities where user_id = $1) as doomed_identities,
+                (select count(*)::int from sessions where user_id = $1) as doomed_sessions,
+                (select count(*)::int from applications where user_id = $2) as bystander_apps,
+                (select count(*)::int from status_history where application_id = any($3::uuid[])) as bystander_history`,
+        [doomed, bystander, keep],
+      );
+      expect(counts.rows[0]).toEqual({
+        doomed_apps: 0,
+        doomed_identities: 0,
+        doomed_sessions: 0,
+        bystander_apps: 1,
+        bystander_history: 1,
+      });
+    });
+  });
+
+  it('has the indexes the queries will rely on', async () => {
+    const { rows } = await sql(
+      'select indexname from pg_indexes where schemaname = current_schema() order by indexname',
+    );
+    const names = rows.map((row) => (row as { indexname: string }).indexname);
+
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'applications_user_activity_idx',
+        'applications_user_status_idx',
+        'applications_user_updated_idx',
+        'status_history_application_idx',
+        'sessions_user_idx',
+        'sessions_expires_idx',
+        'identities_user_idx',
+      ]),
+    );
+  });
+
+  it('is applied once and a second run changes nothing', async () => {
+    const second = await runMigrations(testDb.url, { schema: testDb.schema });
+
+    expect(second).toEqual({ applied: [], unknown: [] });
+  });
+});
