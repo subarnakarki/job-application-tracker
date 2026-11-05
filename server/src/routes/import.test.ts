@@ -164,15 +164,11 @@ describe.skipIf(!TEST_DATABASE_URL)(
       expect(response.headers.location).toBe('/account?import=gmail_not_granted');
     });
 
-    it('allows three imports a day', async () => {
+    it('has no daily limit for an allowed user (each email is still handled once)', async () => {
       const { cookie } = await importer();
-      for (let i = 0; i < 3; i += 1) {
+      for (let i = 0; i < 5; i += 1) {
         expect((await get('/api/import/gmail/start', cookie)).headers.location).toMatch(/^https:/);
       }
-
-      expect((await get('/api/import/gmail/start', cookie)).headers.location).toBe(
-        '/account?import=rate_limited',
-      );
     });
 
     it("undoes an item once, and another user cannot see or touch this user's import", async () => {

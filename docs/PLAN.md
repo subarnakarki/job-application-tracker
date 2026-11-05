@@ -223,8 +223,10 @@ are applied automatically with Undo, and only the owner can use it (`GMAIL_IMPOR
 - The rules (`decide`) never move an application backwards or reopen a closed one; several matches, low
   confidence or an untracked rejection go to review. Undo works only while the application is unchanged since.
 - API docs in [API.md](API.md), the consent flow in [AUTH.md](AUTH.md). Tests: unit (rules, parsing, the real
-  SDK against canned answers), database (the runner and every action), API (consent, callback, isolation, rate
-  limit) and one e2e test of the results page through a test-only route that runs a real import from a fake inbox.
+  SDK against canned answers), database (the runner and every action), API (consent, callback, isolation) and
+  one e2e test of the results page through a test-only route that runs a real import from a fake inbox.
+- No daily import limit (removed at the owner's request): imports are owner-only, each email is handled once,
+  and the Anthropic spending limit caps the cost.
 - Not built: the opt-in classifier eval script from the plan (the prompt was checked with the unit tests only).
 
 ## Planned but not built

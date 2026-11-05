@@ -8,7 +8,6 @@ import {
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { pkceChallenge, randomToken } from '../auth/google';
-import { consumeRateLimit, rateLimitKey, type RateLimitRule } from '../auth/rateLimit';
 import type { Clock } from '../clock';
 import type { Db } from '../db/types';
 import { ApiError } from '../http/errors';
@@ -28,13 +27,6 @@ import { getRun, listRuns, type ImportItem, type ImportRun } from '../repo/impor
 import { origin, sameToken } from './google';
 
 export const GMAIL_CALLBACK_PATH = '/api/import/gmail/callback';
-
-/** Each import reads up to 50 emails and calls Claude for each: a few a day is plenty. */
-export const GMAIL_IMPORT_RULE: RateLimitRule = {
-  name: 'gmail-import',
-  limit: 3,
-  windowMs: 24 * 60 * 60 * 1000,
-};
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const IdParams = z.object({ id: z.string() });
@@ -170,14 +162,6 @@ export function registerImportRoutes(app: FastifyInstance, deps: ImportRouteDeps
       const authorizer = deps.authorizer;
       const user = request.auth?.user;
       if (!authorizer || !user) throw notFound();
-      const limit = await consumeRateLimit(
-        db(),
-        rateLimitKey(GMAIL_IMPORT_RULE.name, owner.userId),
-        GMAIL_IMPORT_RULE,
-        deps.clock.now(),
-      );
-      if (!limit.allowed) return reply.redirect(failTo('rate_limited'), 302);
-
       const pending = { state: randomToken(), verifier: randomToken(), userId: owner.userId };
       void reply.header('set-cookie', serializeImportCookie(pending));
       return reply.redirect(

@@ -17,7 +17,6 @@ const IMPORT_MESSAGES: Record<string, string> = {
   gmail_failed: 'Gmail could not be read just now. Try again shortly.',
   google_failed: 'Google did not confirm the access. Try again.',
   classifier_unavailable: 'The email classifier is unavailable right now. Nothing was changed.',
-  rate_limited: 'You have reached the limit of three imports a day.',
 };
 
 function deviceTimeZone(): string {
