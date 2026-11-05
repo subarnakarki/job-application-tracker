@@ -38,6 +38,22 @@ jobs:
 
   unit:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: jat
+          POSTGRES_PASSWORD: jat
+          POSTGRES_DB: jat
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U jat -d jat"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgres://jat:jat@127.0.0.1:5432/jat
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

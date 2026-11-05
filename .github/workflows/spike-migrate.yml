@@ -1,0 +1,28 @@
+# THROWAWAY (Phase 0.5): proves that migrations can run from CI against the
+# DIRECT (unpooled) Neon connection string. Replaced by the real CD job in Phase 13.
+name: Spike migrate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spike-migrate
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Run migrations
+        run: npm run spike:migrate -w @jat/server
+        env:
+          DATABASE_URL_DIRECT: ${{ secrets.DATABASE_URL_DIRECT }}
