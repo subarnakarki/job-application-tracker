@@ -111,11 +111,20 @@ export function registerImportRoutes(app: FastifyInstance, deps: ImportRouteDeps
     );
   };
 
-  /** Everyone not allowed gets the same 404 as an unknown route: the feature is invisible. */
   const ownerOf = (request: FastifyRequest): Owner => {
     const user = request.auth?.user;
-    if (!user || !available(request)) throw notFound();
+    if (!user) throw new ApiError(401, 'unauthenticated', 'Sign in to continue');
     return { userId: user.id, isDemo: user.isDemo, timeZone: user.timeZone };
+  };
+
+  /**
+   * Starting an import: everyone not allowed gets the same 404 as an unknown route, so the
+   * feature is invisible. Results and Undo only need the run to be yours (only allowed users
+   * ever have runs), so undoing still works if the feature is switched off later.
+   */
+  const importerOf = (request: FastifyRequest): Owner => {
+    if (!available(request)) throw notFound();
+    return ownerOf(request);
   };
 
   const idOf = (request: FastifyRequest): string => {
@@ -156,7 +165,7 @@ export function registerImportRoutes(app: FastifyInstance, deps: ImportRouteDeps
       },
     },
     async (request, reply) => {
-      const owner = ownerOf(request);
+      const owner = importerOf(request);
       const authorizer = deps.authorizer;
       const user = request.auth?.user;
       if (!authorizer || !user) throw notFound();
@@ -200,7 +209,7 @@ export function registerImportRoutes(app: FastifyInstance, deps: ImportRouteDeps
     async (request, reply) => {
       const pending = readImportCookie(request.headers.cookie);
       void reply.header('set-cookie', serializeClearedImportCookie());
-      const owner = ownerOf(request);
+      const owner = importerOf(request);
       const { authorizer, classifier } = deps;
       if (!authorizer || !classifier) throw notFound();
       const query = CallbackQuery.safeParse(request.query);

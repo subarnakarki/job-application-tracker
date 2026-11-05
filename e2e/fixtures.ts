@@ -4,6 +4,26 @@ import { ApplicationDetailPage } from './pages/ApplicationDetailPage';
 import { ApplicationFormPage } from './pages/ApplicationFormPage';
 import { ApplicationsPage } from './pages/ApplicationsPage';
 
+export interface SeedEmail {
+  subject: string;
+  from: string;
+  hoursAgo: number;
+  /** What Claude would say about it; null = it could not be classified. */
+  verdict: {
+    kind:
+      | 'application_confirmation'
+      | 'rejection'
+      | 'interview_invite'
+      | 'assessment'
+      | 'offer'
+      | 'not_job_related';
+    company: string;
+    role: string | null;
+    confidence: 'high' | 'medium' | 'low';
+    summary: string;
+  } | null;
+}
+
 /** Test data goes in through the API, never through the UI. */
 export class Api {
   constructor(private readonly request: APIRequestContext) {}
@@ -14,6 +34,13 @@ export class Api {
     const response = await this.request.post('/api/applications', { data: input });
     expect(response.status(), await response.text()).toBe(201);
     return (await response.json()) as ApplicationDetail;
+  }
+
+  /** Runs a real Gmail import from a fake inbox (test-only route); returns the run id. */
+  async seedImport(emails: SeedEmail[]) {
+    const response = await this.request.post('/api/test/import', { data: { emails } });
+    expect(response.ok(), await response.text()).toBe(true);
+    return ((await response.json()) as { runId: string }).runId;
   }
 
   /** Moves this test user's clock forward (test-only route); nobody else's time changes. */

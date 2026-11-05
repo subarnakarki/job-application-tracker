@@ -1,7 +1,18 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
-import { useDeleteAccount, useMe, useUpdateTimeZone } from '../api/hooks';
+import { Link, useNavigate, useSearchParams } from 'react-router';
+import { useDeleteAccount, useImportStatus, useMe, useUpdateTimeZone } from '../api/hooks';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+
+/** Why a Gmail import came back to this page (`?import=...`). */
+const IMPORT_MESSAGES: Record<string, string> = {
+  gmail_cancelled: 'The import was cancelled on the Google page.',
+  gmail_not_granted: 'Gmail access was not granted, so nothing was imported.',
+  gmail_expired: 'That import link expired. Start it again from here.',
+  gmail_failed: 'Gmail could not be read just now. Try again shortly.',
+  google_failed: 'Google did not confirm the access. Try again.',
+  classifier_unavailable: 'The email classifier is unavailable right now. Nothing was changed.',
+  rate_limited: 'You have reached the limit of three imports a day.',
+};
 
 function deviceTimeZone(): string {
   try {
@@ -17,6 +28,9 @@ export function AccountPage() {
   const deleteAccount = useDeleteAccount();
   const navigate = useNavigate();
   const [confirming, setConfirming] = useState(false);
+  const importStatus = useImportStatus();
+  const [params] = useSearchParams();
+  const importReason = params.get('import');
   const user = me.data;
   if (!user) return null;
   const device = deviceTimeZone();
@@ -65,6 +79,34 @@ export function AccountPage() {
         </p>
       ) : (
         <>
+          {(importStatus.data?.available || importReason) && (
+            <section aria-labelledby="import-heading" className="flex flex-col gap-2">
+              <h2 id="import-heading" className="text-lg font-semibold">
+                Import from Gmail
+              </h2>
+              {importReason && (
+                <p role="alert" className="text-sm text-rose-700 dark:text-rose-400">
+                  {IMPORT_MESSAGES[importReason] ?? 'The import did not finish. Try again.'}
+                </p>
+              )}
+              {importStatus.data?.available && (
+                <>
+                  <p className="text-sm text-slate-600 dark:text-slate-300">
+                    Reads job emails from the last 30 days (or since your last import) once, with
+                    read-only access. Each email&apos;s text is sent to Anthropic&apos;s Claude to
+                    classify it; bodies are not stored. Clear results are applied, and you can undo
+                    each one.
+                  </p>
+                  <div>
+                    <a href="/api/import/gmail/start" className="btn-primary">
+                      Import from Gmail
+                    </a>
+                  </div>
+                </>
+              )}
+            </section>
+          )}
+
           <section aria-labelledby="export-heading" className="flex flex-col gap-2">
             <h2 id="export-heading" className="text-lg font-semibold">
               Your data

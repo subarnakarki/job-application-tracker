@@ -11,6 +11,10 @@ import type { Db } from '../db/types';
 import { ApiError, parseInput } from '../http/errors';
 import { ROUTE_NOT_FOUND } from '../http/contractValidation';
 import { secretsMatch } from '../test-support/config';
+import type { EmailClassifier } from '../import/classify';
+import type { GmailClient, GmailMessage } from '../import/gmail';
+import { runImport } from '../import/run';
+import { EmailVerdictSchema } from '../import/verdict';
 
 const TestLoginResponse = z.strictObject({ user: UserSchema, token: z.string() });
 const NowResponse = z.strictObject({ now: z.iso.datetime({ offset: true }) });
@@ -38,6 +42,24 @@ const ClockBody = z
   .refine((body) => body.frozenAt !== undefined || body.offsetMs !== undefined, {
     message: 'Give frozenAt, offsetMs or both',
   });
+
+/** A fake inbox for one import: each email and what Claude would say about it (null = unclassified). */
+const ImportBody = z.strictObject({
+  emails: z
+    .array(
+      z.strictObject({
+        subject: z.string().max(200),
+        from: z.string().max(200),
+        hoursAgo: z
+          .number()
+          .min(0)
+          .max(24 * 365),
+        verdict: EmailVerdictSchema.nullable(),
+      }),
+    )
+    .max(20),
+});
+const ImportResponse = z.strictObject({ runId: z.uuid() });
 
 const CleanupBody = z.strictObject({
   olderThanMinutes: z
@@ -121,6 +143,58 @@ export function registerTestRoutes(app: FastifyInstance, deps: TestRouteDeps): v
       );
       // The token is returned too, so non-browser clients can send it as a Cookie header.
       return { user, token: session.token };
+    },
+  );
+
+  // Runs a real Gmail import for the test user, with the inbox and Claude's answers given in
+  // the body: the results page can then be tested without Google or Anthropic.
+  app.post(
+    '/api/test/import',
+    {
+      config: {
+        auth: 'user',
+        contract: {
+          summary: 'Test only: run a Gmail import from a fake inbox',
+          headers: SecretHeaders,
+          body: ImportBody,
+          responses: { 200: ImportResponse },
+        },
+      },
+    },
+    async (request) => {
+      const user = requireTestUser(request.auth?.user);
+      await assertIsTestUser(requireDb(), user.id);
+      const body = parseInput(ImportBody, request.body);
+      const now = request.clock.now();
+      const messages = body.emails.map((email, index): GmailMessage => ({
+        id: `test-${randomUUID()}-${index}`,
+        from: email.from,
+        subject: email.subject,
+        date: new Date(now.getTime() - email.hoursAgo * 60 * 60 * 1000),
+        body: '',
+      }));
+      const byId = new Map(messages.map((message, index) => [message.id, body.emails[index]]));
+      const gmail: GmailClient = {
+        listMessageIds: () => Promise.resolve(messages.map((message) => message.id)),
+        getMessage: (_token, id) => {
+          const message = messages.find((candidate) => candidate.id === id);
+          return message ? Promise.resolve(message) : Promise.reject(new Error('unknown'));
+        },
+      };
+      const classifier: EmailClassifier = {
+        classify: (message) => {
+          const verdict = byId.get(message.id)?.verdict ?? null;
+          return Promise.resolve(
+            verdict ? { kind: 'verdict', verdict } : { kind: 'unclassified', reason: 'Declined' },
+          );
+        },
+      };
+      const runId = await runImport(
+        { db: requireDb(), gmail, classifier, clock: request.clock },
+        { userId: user.id, isDemo: user.isDemo, timeZone: user.timeZone },
+        'test-token',
+      );
+      return { runId };
     },
   );
 

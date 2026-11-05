@@ -1,6 +1,9 @@
 import {
   ApplicationDetailSchema,
   ApplicationListSchema,
+  ImportItemSchema,
+  ImportRunDetailSchema,
+  ImportStatusSchema,
   PipelineSchema,
   StatsSchema,
   UserEnvelopeSchema,
@@ -175,5 +178,38 @@ export function useDeleteAccount() {
       client.clear();
       client.setQueryData(['me'], null);
     },
+  });
+}
+
+export function useImportStatus() {
+  return useQuery({
+    queryKey: ['import-status'],
+    queryFn: () => apiRequest('/api/import/status', ImportStatusSchema),
+    staleTime: 60_000,
+  });
+}
+
+export function useImportRun(runId: string) {
+  return useQuery({
+    queryKey: ['import-run', runId],
+    queryFn: () =>
+      apiRequest(`/api/import/runs/${encodeURIComponent(runId)}`, ImportRunDetailSchema),
+  });
+}
+
+export type ImportAction = 'undo' | 'apply' | 'dismiss';
+
+/** Undo, apply or dismiss one imported email; refreshes the run and everything it may change. */
+export function useImportAction(runId: string) {
+  const client = useQueryClient();
+  const refresh = useRefresh();
+  return useMutation({
+    mutationFn: ({ itemId, action }: { itemId: string; action: ImportAction }) =>
+      apiRequest(`/api/import/items/${encodeURIComponent(itemId)}/${action}`, ImportItemSchema, {
+        method: 'POST',
+        body: {},
+      }),
+    onSettled: () =>
+      Promise.all([client.invalidateQueries({ queryKey: ['import-run', runId] }), refresh()]),
   });
 }

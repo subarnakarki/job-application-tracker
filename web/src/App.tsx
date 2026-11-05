@@ -10,6 +10,7 @@ import {
 } from './pages/ApplicationPages';
 import { ApplicationsPage } from './pages/ApplicationsPage';
 import { AccountPage } from './pages/AccountPage';
+import { ImportResultsPage } from './pages/ImportResultsPage';
 import { LoginPage } from './pages/LoginPage';
 import { PrivacyPage } from './pages/PrivacyPage';
 import { StatsPage } from './pages/StatsPage';
@@ -25,6 +26,7 @@ export function AppRoutes() {
         <Route path="applications/:id" element={<ApplicationDetailPage />} />
         <Route path="applications/:id/edit" element={<EditApplicationPage />} />
         <Route path="stats" element={<StatsPage />} />
+        <Route path="import/:runId" element={<ImportResultsPage />} />
         <Route path="account" element={<AccountPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>

@@ -15,7 +15,7 @@ export function PrivacyPage() {
       <ul className="list-disc pl-6">
         <li>
           From your Google account: your Google account id, email address, name and profile picture
-          link. Nothing else is requested: no contacts, no Gmail, no Drive.
+          link. Sign-in requests nothing else: no contacts, no Gmail, no Drive.
         </li>
         <li>The applications you enter, their status history, and your time zone setting.</li>
         <li>
@@ -24,11 +24,22 @@ export function PrivacyPage() {
         </li>
       </ul>
 
+      <h2 className="mt-2 text-lg font-semibold">Gmail import (owner only)</h2>
+      <p>
+        The site owner can import job emails from their own Gmail; it is not offered to other
+        accounts. An import asks Google for read-only Gmail access for that one run, and the access
+        token is used and discarded, never stored. Up to 50 job-related emails are read, and the
+        text of each one is sent to Anthropic&apos;s Claude API to classify it (confirmation,
+        interview, rejection and so on). Email bodies are not stored: only each email&apos;s sender,
+        subject, date and a one-sentence summary, so the results can be shown and undone. These are
+        part of the data download and are deleted with the account.
+      </p>
+
       <h2 className="mt-2 text-lg font-semibold">Cookies</h2>
       <p>
-        Two strictly necessary cookies: one keeps you signed in (30 days), and one holds a Google
-        sign-in for up to 10 minutes while it completes. There are no analytics, ads or tracking
-        cookies.
+        Strictly necessary cookies only: one keeps you signed in (30 days), and one holds a Google
+        sign-in (or a Gmail import) for up to 10 minutes while it completes. There are no analytics,
+        ads or tracking cookies.
       </p>
 
       <h2 className="mt-2 text-lg font-semibold">Who can see your data</h2>
