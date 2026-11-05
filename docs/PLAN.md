@@ -127,7 +127,7 @@ JavaScript across a deploy) is left to backward-compatible API changes and revie
 - **StrykerJS** runs mutation testing on `shared/` and the server's domain and repository code, with a score
   threshold in CI (incremental, so it stays fast).
 
-**Phase 12 addition:** an **OWASP ZAP** baseline scan in CI against a preview deployment. This is the one
+**Phase 12 addition (later dropped, see the scope change below):** an **OWASP ZAP** baseline scan in CI against a preview deployment. This is the one
 non-JavaScript tool, kept by the owner's choice; it runs only in GitHub Actions through ZAP's official action, with
 nothing to install locally.
 
@@ -144,3 +144,72 @@ Not adopted (for now): MSW, Playwright visual comparisons, k6, Lighthouse CI, sc
 - **StrykerJS: deferred by the owner** (to be added later). A first run on `shared/` scored **83.7%**
   (262 killed, 49 survived) in 46 s, with the surviving mutants mostly in error-message strings, `responses.ts`
   and a few date-helper branches. The working config is not committed; adding it back is a small step.
+
+## Scope change (after Phase 5b)
+
+The owner cut the remaining scope to get the app finished: **critical tests only** for each new feature (no
+exhaustive suites, mutation experiments or flake loops), **one review at the very end** instead of after every
+phase, and Google sign-in **after the app works**. As a result:
+
+- Phases 6 and 8 to 11 were built together as one web-app phase; the remaining phases were renumbered:
+  **6** web app, **6e** Playwright e2e, **7** Google sign-in, **8** hardening and docs.
+- Dropped: OWASP ZAP scan, axe accessibility checks, the flake check, the Google redirect E2E.
+- Still deferred: StrykerJS (see Phase 4.5 outcome).
+
+## Phase 5a outcome
+
+`GET /api/applications` takes `status`, `followUp`, `q` (case-insensitive search over company, role, contact and
+notes) and `sort` (`updated_desc`, `applied_desc`, `company_asc`) and returns `{ items, total }`. "Needs follow-up"
+is computed per request in the user's time zone by the SQL twin of `needsFollowUp`.
+
+## Phase 5b outcome
+
+`GET /api/pipeline?q` returns a count per stage, the follow-up count and the total (respecting `q`, ignoring the
+status filter, as planned). `GET /api/applications/export.csv` takes the list filters and writes UTF-8 with BOM,
+CRLF, UTC timestamps and neutralised formula prefixes. The demo account cannot export.
+
+## Phase 6 outcome (web app; original phases 6 and 8 to 11)
+
+React app in `web/`: sign-in page (demo), auth guard, list with the pipeline bar, debounced search, sort,
+follow-up filter and CSV export (all kept in the URL), add/edit forms validated with the shared zod schemas
+(edits send only changed fields with `If-Match`; a 412 asks the user to reload), detail page with status history,
+delete with confirmation, mobile-first, light and dark mode. Critical unit and component tests only.
+
+## Phase 6e outcome
+
+`e2e/` Playwright workspace with page objects and fixtures. Every test signs in as a fresh synthetic user via the
+test-only login (an automatic fixture) and seeds through the API. Flows: add, status change with history, stage
+filter + search + follow-up (the user's clock moved 8 days), delete, sign-in redirect with the demo, account
+deletion, the public privacy page; each on desktop and phone viewports (14 runs). CI job `e2e` runs them against
+Postgres 18 and uploads the report on failure.
+
+## Phase 7 outcome
+
+Google sign-in with the authorization code flow and PKCE, using `jose` (not `openid-client`) and fixed Google
+endpoints. State, verifier and nonce live in a 10-minute `__Host-oauth` cookie; the ID token is checked for
+signature, issuer, audience, expiry, nonce and verified email; users are matched by Google `sub`; failures redirect
+to `/login?error=<reason>`. The provider is injected, so tests use a stub and locally signed tokens. Off on Vercel
+preview deployments, whose URLs cannot be registered redirect URIs. Works on production (verified by the owner).
+Details: [AUTH.md](AUTH.md). Route policy change: a redirect-only route may declare a 3xx as its success response.
+
+## Phase 8 outcome (hardening and docs)
+
+Security headers in `vercel.json` (strict CSP with no inline scripts or styles, HSTS, `nosniff`, frame denial,
+referrer, permissions and opener policies), checked in a browser on the production build. Account page (time zone,
+JSON data download, account deletion) and a public privacy notice. README rewritten. The API fuzzer found a real
+bug on the way: a NUL character in a search term or in notes returned 500; both are now rejected with 400.
+
+Final state: about 800 unit/API tests and 14 e2e runs, all green in CI on every push; deployed to production at
+https://job-application-tracker-eta-one.vercel.app.
+
+## Planned but not built
+
+| Item                                | Status                                                                                         |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Demo account reset daily            | Not built. The demo cap (30 applications) and banner are in place                              |
+| Nightly `pg_dump` and restore drill | Not built; Neon's built-in restore window is the only backup                                   |
+| Uptime check, error tracking        | Not built                                                                                      |
+| PII-redacted logs                   | Not built: Fastify's default request logs include the URL (so search terms) and client address |
+| Migrations as an automatic CD step  | Manual "Migrate" workflow instead                                                              |
+| StrykerJS, ZAP, axe, flake check    | Deferred or dropped (see the scope change)                                                     |
+| Spike table `spike_ping` in Neon    | Still there; drop only with the owner's go-ahead                                               |
