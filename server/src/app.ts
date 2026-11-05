@@ -11,6 +11,8 @@ import { registerRequestPipeline } from './http/pipeline';
 import { registerHealthRoutes } from './routes/health';
 import { registerMeRoutes } from './routes/me';
 import { registerSessionRoutes } from './routes/session';
+import { registerTestRoutes, registerTestSecretGuard } from './routes/testSupport';
+import { resolveTestRoutes } from './test-support/config';
 
 export interface AppDeps {
   /** Absent in tests that never touch the database. */
@@ -51,10 +53,16 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     return reply.code(statusCode).send({ error: error.code, message: error.message });
   });
 
-  registerRequestPipeline(app, { db: deps.db, clock });
+  // Test-only routes exist only when the environment explicitly allows them (never in production).
+  const testRoutes = resolveTestRoutes(env);
+  // The secret guard goes first, so a caller without it sees a plain 404 for anything under /api/test/.
+  if (testRoutes) registerTestSecretGuard(app, testRoutes.secret);
+
+  registerRequestPipeline(app, { db: deps.db, clock, perUserClocks: testRoutes !== null });
   registerHealthRoutes(app, deps.db);
   registerSessionRoutes(app, { db: deps.db, clock, env });
   registerMeRoutes(app, deps.db);
+  if (testRoutes) registerTestRoutes(app, { db: deps.db, clock });
 
   return app;
 }

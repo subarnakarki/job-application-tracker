@@ -42,13 +42,18 @@ export interface TestApp {
 }
 
 /** The real app on a fresh, fully migrated schema. */
-export async function createTestApp(
-  options: { env?: Record<string, string | undefined> } = {},
-): Promise<TestApp> {
+export interface TestAppOptions {
+  env?: Record<string, string | undefined>;
+  /** Add extra routes (a probe) before the app starts. */
+  configure?: (app: FastifyInstance) => void;
+}
+
+export async function createTestApp(options: TestAppOptions = {}): Promise<TestApp> {
   const testDb = await createTestDb();
   await runMigrations(testDb.url, { schema: testDb.schema });
   const clock = mutableClock();
   const app = buildApp({ db: testDb.db, clock, env: options.env ?? {} });
+  options.configure?.(app);
   await app.ready();
 
   return {
