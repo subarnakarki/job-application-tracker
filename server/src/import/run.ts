@@ -1,4 +1,4 @@
-import { ApplicationInputSchema } from '@jat/shared';
+import { ApplicationInputSchema, localDateIn, resolveDateApplied, type Status } from '@jat/shared';
 import type { Clock } from '../clock';
 import type { Db } from '../db/types';
 import {
@@ -47,6 +47,26 @@ interface Prepared {
   itemId: string;
   message: GmailMessage | null;
   classification: Classification;
+}
+
+/**
+ * The date applied an import should record: the day of the email (in the user's time zone),
+ * exactly when the usual rule would fill in "today" (first reaching Applied or later with no
+ * date yet). Undefined otherwise, or when the email has no date, so the usual rule applies.
+ */
+export function importedDateApplied(
+  previousStatus: Status | null,
+  newStatus: Status,
+  currentDateApplied: string | null,
+  emailDate: Date | null,
+  timeZone: string,
+): string | undefined {
+  if (!emailDate || currentDateApplied !== null) return undefined;
+  const emailDay = localDateIn(emailDate, timeZone);
+  return (
+    resolveDateApplied({ previousStatus, newStatus, dateApplied: null, today: emailDay }) ??
+    undefined
+  );
 }
 
 /** Placeholder when an email names no role: `role` is required on an application. */
@@ -157,6 +177,9 @@ async function applyOne(deps: ImportDeps, owner: Owner, prepared: Prepared): Pro
         company: verdict.company.trim(),
         role: verdict.role?.trim() || UNKNOWN_ROLE,
         status: decision.status,
+        dateApplied:
+          importedDateApplied(null, decision.status, null, message?.date ?? null, owner.timeZone) ??
+          null,
         source: 'Other',
         notes: `Added from Gmail: ${verdict.summary}`,
       });
@@ -182,7 +205,16 @@ async function applyOne(deps: ImportDeps, owner: Owner, prepared: Prepared): Pro
         owner,
         candidate.id,
         candidate.version,
-        { status: decision.to },
+        {
+          status: decision.to,
+          dateApplied: importedDateApplied(
+            candidate.status,
+            decision.to,
+            candidate.dateApplied,
+            message?.date ?? null,
+            owner.timeZone,
+          ),
+        },
         clock.now(),
         'gmail',
       );

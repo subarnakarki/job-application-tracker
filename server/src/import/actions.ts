@@ -15,7 +15,7 @@ import {
   type ItemFields,
   type Outcome,
 } from '../repo/imports';
-import { UNKNOWN_ROLE } from './run';
+import { importedDateApplied, UNKNOWN_ROLE } from './run';
 
 export type ActionResult =
   | { kind: 'done'; item: ImportItem }
@@ -101,7 +101,16 @@ export function applyItem(db: Db, owner: Owner, itemId: string, now: Date) {
         owner,
         app.record.id,
         app.record.version,
-        { status: target },
+        {
+          status: target,
+          dateApplied: importedDateApplied(
+            app.record.status,
+            target,
+            app.record.dateApplied,
+            item.emailDate,
+            owner.timeZone,
+          ),
+        },
         now,
       );
       if (updated.kind === 'unchanged') return { conflict: `It is already ${target}` };
@@ -119,6 +128,7 @@ export function applyItem(db: Db, owner: Owner, itemId: string, now: Date) {
       company: item.company ?? '',
       role: item.role ?? UNKNOWN_ROLE,
       status: target,
+      dateApplied: importedDateApplied(null, target, null, item.emailDate, owner.timeZone) ?? null,
       source: 'Other',
       notes: item.summary ? `Added from Gmail: ${item.summary}` : '',
     });

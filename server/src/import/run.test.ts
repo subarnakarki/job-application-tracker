@@ -157,6 +157,65 @@ describe.skipIf(!TEST_DATABASE_URL)('Gmail import (real Postgres, fake Gmail and
     expect(createdApp?.history[0]?.actor).toBe('gmail');
   });
 
+  describe('date applied', () => {
+    /** 03:00 UTC on 20 Oct is still the evening of 19 Oct in New York. */
+    const onOct20Utc = (id: string): GmailMessage => ({
+      ...email(id, 0),
+      date: new Date('2026-10-20T03:00:00Z'),
+    });
+
+    it("is the email's day in the user's time zone, not the day of the import", async () => {
+      owner = { ...owner, timeZone: 'America/New_York' };
+      const saved = await track('Saved Co', 'Saved');
+      inbox
+        .add(onOct20Utc('new'), verdict({ kind: 'application_confirmation', company: 'New Co' }))
+        .add(
+          onOct20Utc('saved'),
+          verdict({ kind: 'application_confirmation', company: 'Saved Co' }),
+        );
+
+      const items = await itemsOf(await runImport(deps, owner, 'token'));
+      const created = await getApplication(
+        testDb.db,
+        owner.userId,
+        items.get('new')?.applicationId ?? '',
+      );
+      const moved = await getApplication(testDb.db, owner.userId, saved.id);
+
+      expect(created?.record.dateApplied).toBe('2026-10-19');
+      expect(moved?.record.dateApplied).toBe('2026-10-19');
+    });
+
+    it('never replaces a date that is already there', async () => {
+      const app = await track('Dated', 'Applied'); // auto-filled with the day it was tracked
+      const before = app.dateApplied;
+      inbox.add(onOct20Utc('no'), verdict({ kind: 'rejection', company: 'Dated' }));
+
+      await runImport(deps, owner, 'token');
+
+      expect((await getApplication(testDb.db, owner.userId, app.id))?.record.dateApplied).toBe(
+        before,
+      );
+    });
+
+    it("uses the email's day when a review item is applied", async () => {
+      inbox.add(
+        onOct20Utc('maybe'),
+        verdict({ kind: 'application_confirmation', company: 'Maybe Co', confidence: 'low' }),
+      );
+      const item = (await itemsOf(await runImport(deps, owner, 'token'))).get('maybe');
+
+      const applied = await applyItem(testDb.db, owner, item?.id ?? '', clock.now());
+      const app = await getApplication(
+        testDb.db,
+        owner.userId,
+        applied.kind === 'done' ? (applied.item.applicationId ?? '') : '',
+      );
+
+      expect(app?.record.dateApplied).toBe('2026-10-20');
+    });
+  });
+
   it('applies emails oldest first: a confirmation, then that company rejecting', async () => {
     inbox
       .add(email('no', 1), verdict({ kind: 'rejection', company: 'Hooli' }))
