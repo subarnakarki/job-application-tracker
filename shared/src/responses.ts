@@ -98,3 +98,22 @@ export const PipelineSchema = z.strictObject({
   total: z.number().int().min(0),
 });
 export type Pipeline = z.infer<typeof PipelineSchema>;
+
+const count = z.number().int().min(0);
+const stageCounts = {
+  total: count,
+  applied: count,
+  responded: count,
+  interviewing: count,
+  offers: count,
+  responseRate: z.number().min(0).max(1).nullable(),
+};
+
+/** `GET /api/stats`: how far applications from each source got (all six sources, in order). */
+export const StatsSchema = z.strictObject({
+  sources: z
+    .array(z.strictObject({ source: z.enum(SOURCES), ...stageCounts }))
+    .length(SOURCES.length),
+  totals: z.strictObject(stageCounts),
+});
+export type Stats = z.infer<typeof StatsSchema>;
