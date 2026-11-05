@@ -1,3 +1,4 @@
+import type { ACTORS } from '@jat/shared';
 import {
   changedFields,
   findSalaryIssues,
@@ -17,6 +18,8 @@ import type { Db, Queryable } from '../db/types';
 import type { ValidationIssue } from '../http/errors';
 import { followUpPredicate } from './followUpSql';
 import { containsPattern, searchTerms } from './search';
+
+export type Actor = (typeof ACTORS)[number];
 
 /**
  * All SQL for applications. Every statement is scoped by `user_id`, so an id
@@ -49,7 +52,7 @@ export interface HistoryRecord {
   fromStatus: Status | null;
   toStatus: Status;
   occurredAt: Date;
-  actor: 'user' | 'gmail' | 'system';
+  actor: Actor;
 }
 
 export interface ApplicationWithHistory {
@@ -163,11 +166,12 @@ async function recordHistory(
   fromStatus: Status | null,
   toStatus: Status,
   now: Date,
+  actor: Actor,
 ): Promise<void> {
   await tx.query(
     `insert into status_history (application_id, from_status, to_status, occurred_at, recorded_at, actor)
-     values ($1, $2, $3, $4, $4, 'user')`,
-    [applicationId, fromStatus, toStatus, now],
+     values ($1, $2, $3, $4, $4, $5)`,
+    [applicationId, fromStatus, toStatus, now, actor],
   );
 }
 
@@ -194,6 +198,7 @@ export async function createApplication(
   owner: Owner,
   input: ApplicationInput,
   now: Date,
+  actor: Actor = 'user',
 ): Promise<CreateResult> {
   return db.transaction(async (tx) => {
     await tx.query('select 1 from users where id = $1 for update', [owner.userId]);
@@ -238,7 +243,7 @@ export async function createApplication(
     if (!row) throw new Error('Application was not created');
     const record = toRecord(row);
     const plan = planStatusChange(null, record.status);
-    await recordHistory(tx, record.id, plan.fromStatus, plan.toStatus, now);
+    await recordHistory(tx, record.id, plan.fromStatus, plan.toStatus, now, actor);
     const history = await historyOf(tx, [record.id]);
     return { kind: 'created', value: { record, history: history.get(record.id) ?? [] } };
   });
@@ -279,6 +284,7 @@ export async function updateApplication(
   expectedVersion: number,
   patch: ApplicationPatch,
   now: Date,
+  actor: Actor = 'user',
 ): Promise<UpdateResult> {
   return db.transaction(async (tx) => {
     const locked = await tx.query<ApplicationRow>(
@@ -337,7 +343,8 @@ export async function updateApplication(
     if (!updatedRow) throw new Error('Application vanished inside its own transaction');
 
     const plan = planStatusChange(current.status, merged.status);
-    if (plan.changed) await recordHistory(tx, current.id, plan.fromStatus, plan.toStatus, now);
+    if (plan.changed)
+      await recordHistory(tx, current.id, plan.fromStatus, plan.toStatus, now, actor);
     const history = await historyOf(tx, [current.id]);
     return {
       kind: 'updated',
