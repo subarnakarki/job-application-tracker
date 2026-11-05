@@ -44,7 +44,7 @@ Each phase ends with lint, type-check and all tests green, then stops for review
 | 2   | DB layer: `pg`, migration runner, schema, `identities`, migration and constraint tests                                |
 | 3   | Sessions, CSRF, test-login, per-user clock, demo login, 401s, route-registry meta-test                                |
 | 4   | User-scoped CRUD, status history, `version`, locked caps, account deletion, data export, isolation and contract tests |
-| 4.5 | Contracts and mutation testing: route response schemas, OpenAPI, oasdiff, StrykerJS                                   |
+| 4.5 | Contracts and mutation testing: route response schemas, OpenAPI, fast-check API fuzzing, StrykerJS                    |
 | 5a  | Query API: filters, search, sort                                                                                      |
 | 5b  | Pipeline counts and CSV export                                                                                        |
 | 6   | Web shell, list page, E2E infrastructure with synthetic users, axe, CI e2e job                                        |
@@ -113,18 +113,22 @@ history written at the same instant keeps its order. Neon now has migrations 000
 Chosen by the owner. Consumer-driven contract testing (Pact) was considered and left out: the web app is the only
 consumer, lives in the same repo, shares the zod schemas and deploys atomically with the API, so Pact would only
 re-verify what the compiler and the schema tests already guarantee. The real skew risk (a browser tab running old
-JavaScript across a deploy) is covered by breaking-change detection instead.
+JavaScript across a deploy) is left to backward-compatible API changes and review of the committed OpenAPI spec.
 
-**Phase 4.5: contracts and mutation testing** (JavaScript/Node tools only; Schemathesis was dropped as a Python tool) (before 5a, so the list endpoint is covered from day one)
+**Phase 4.5: contracts and mutation testing** (JavaScript/Node tools only: Schemathesis (Python) was replaced by fast-check fuzzing, and oasdiff (Go) was dropped) (before 5a, so the list endpoint is covered from day one)
 
 - Every route declares its response schemas in its route config, next to `auth`; a shared `ErrorSchema` covers
   error bodies. In tests, every JSON response is validated against the declared schema, and the route-registry
   meta-test fails for any route without one, so contract coverage is automatic, like the security checks.
 - An OpenAPI document is generated from those schemas (committed, and served in non-production builds).
-- `oasdiff` in CI compares the spec with `main` and fails on breaking API changes.
+- **API fuzzing with fast-check** (Vitest): for every route, generate valid and hostile inputs from the declared
+  schemas, send them through the real app, and assert there is never a 500 and every response matches its
+  declared contract. New routes are fuzzed automatically.
 - **StrykerJS** runs mutation testing on `shared/` and the server's domain and repository code, with a score
   threshold in CI (incremental, so it stays fast).
 
-**Phase 12 addition:** an **OWASP ZAP** baseline scan in CI against a preview deployment.
+**Phase 12 addition:** an **OWASP ZAP** baseline scan in CI against a preview deployment. This is the one
+non-JavaScript tool, kept by the owner's choice; it runs only in GitHub Actions through ZAP's official action, with
+nothing to install locally.
 
 Not adopted (for now): MSW, Playwright visual comparisons, k6, Lighthouse CI, scheduled production smoke tests.
