@@ -482,3 +482,25 @@ export async function pipelineCounts(
     total: stages.reduce((sum, stage) => sum + stage.count, 0),
   };
 }
+
+export interface MatchCandidate {
+  id: string;
+  company: string;
+  role: string;
+  status: Status;
+  dateApplied: string | null;
+  version: number;
+}
+
+/** Just what Gmail import needs to match an email to one of this user's applications. */
+export async function listMatchCandidates(
+  db: Queryable,
+  userId: string,
+): Promise<MatchCandidate[]> {
+  const result = await db.query<MatchCandidate>(
+    `select id, company, role, status, date_applied as "dateApplied", version
+       from applications where user_id = $1`,
+    [userId],
+  );
+  return result.rows;
+}

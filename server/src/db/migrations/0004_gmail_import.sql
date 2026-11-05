@@ -32,6 +32,8 @@ create table import_items (
   company text check (length(company) <= 200),
   role text check (length(role) <= 200),
   summary text not null default '' check (length(summary) <= 300),
+  -- Why the import did what it did, e.g. "Several applications match".
+  reason text not null default '' check (length(reason) <= 200),
   -- 'pending' while the email is being handled: the row is claimed first, so
   -- two overlapping runs can never apply the same email twice.
   outcome text not null check (
