@@ -3,7 +3,7 @@
 Track job applications through a hiring pipeline: pipeline counts per stage, status history,
 a "needs follow-up" flag, search and CSV export.
 
-**Status:** Phases 0, 0.5 (deploy spike), 1 (domain core) and 2 (database layer) done. See [docs/PLAN.md](docs/PLAN.md) for the plan and [docs/DOMAIN.md](docs/DOMAIN.md) for the rules.
+**Status:** Phases 0 to 4 done (domain core, database, sessions and security, applications API). See [docs/PLAN.md](docs/PLAN.md), [docs/API.md](docs/API.md), [docs/AUTH.md](docs/AUTH.md) and [docs/DOMAIN.md](docs/DOMAIN.md).
 
 ## Requirements
 

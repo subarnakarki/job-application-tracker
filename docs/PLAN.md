@@ -98,3 +98,11 @@ session resolution, `no-store`), demo sign-in and sign-out, `GET/PATCH /api/me`,
 the allowlisted test-only routes with per-user clocks, migration `0002`, and the route-registry meta-test. Details and
 the security reasoning are in [AUTH.md](AUTH.md). Differences from the plan: the profile endpoint is `/api/me`
 (not `/api/auth/me`); the isolation matrix is a coverage check that fails until Phase 4's id routes are claimed.
+
+## Phase 4 outcome
+
+`POST /api/applications`, `GET/PATCH/DELETE /api/applications/:id`, `GET /api/me/export`, `DELETE /api/me`, with
+strict response contracts, optimistic concurrency, quotas under a lock, per-user write limits, and isolation tests
+for every id route. Reference: [API.md](API.md). Differences from the plan: a stale version answers **412** (with
+`If-Match`, standard HTTP) rather than 409, and a missing `If-Match` answers 428. Migration `0003` adds a sequence so
+history written at the same instant keeps its order. Neon now has migrations 0001 to 0003.
