@@ -91,10 +91,14 @@ describe('GET /api/health/db', () => {
 describe('caching', () => {
   it('forces no-store on API responses even when a handler asks for public caching', async () => {
     const app = buildApp();
-    app.get('/api/cacheable', { config: { auth: 'public' } }, (_request, reply) => {
-      void reply.header('cache-control', 'public, max-age=3600');
-      return { ok: true };
-    });
+    app.get(
+      '/api/cacheable',
+      { config: { auth: 'public', contract: { summary: 'test route', responses: { 200: null } } } },
+      (_request, reply) => {
+        void reply.header('cache-control', 'public, max-age=3600');
+        return { ok: true };
+      },
+    );
 
     const response = await app.inject({ method: 'GET', url: '/api/cacheable' });
 
@@ -116,9 +120,13 @@ describe('caching', () => {
 describe('error handling', () => {
   it('hides the message of an unexpected error and returns a fixed 500 body', async () => {
     const app = buildApp();
-    app.get('/boom', { config: { auth: 'public' } }, () => {
-      throw new Error('connect ECONNREFUSED 10.0.0.5:5432 password=hunter2');
-    });
+    app.get(
+      '/boom',
+      { config: { auth: 'public', contract: { summary: 'test route', responses: { 200: null } } } },
+      () => {
+        throw new Error('connect ECONNREFUSED 10.0.0.5:5432 password=hunter2');
+      },
+    );
 
     const response = await app.inject({ method: 'GET', url: '/boom' });
 
@@ -130,9 +138,13 @@ describe('error handling', () => {
 
   it('hides the message even when the error carries a 5xx status of its own', async () => {
     const app = buildApp();
-    app.get('/bad-gateway', { config: { auth: 'public' } }, () => {
-      throw Object.assign(new Error('upstream secret detail'), { statusCode: 502 });
-    });
+    app.get(
+      '/bad-gateway',
+      { config: { auth: 'public', contract: { summary: 'test route', responses: { 200: null } } } },
+      () => {
+        throw Object.assign(new Error('upstream secret detail'), { statusCode: 502 });
+      },
+    );
 
     const response = await app.inject({ method: 'GET', url: '/bad-gateway' });
 
@@ -143,9 +155,13 @@ describe('error handling', () => {
 
   it('keeps the message of a deliberate 4xx error', async () => {
     const app = buildApp();
-    app.get('/teapot', { config: { auth: 'public' } }, () => {
-      throw Object.assign(new Error('Not allowed here'), { statusCode: 403, code: 'FORBIDDEN' });
-    });
+    app.get(
+      '/teapot',
+      { config: { auth: 'public', contract: { summary: 'test route', responses: { 200: null } } } },
+      () => {
+        throw Object.assign(new Error('Not allowed here'), { statusCode: 403, code: 'FORBIDDEN' });
+      },
+    );
 
     const response = await app.inject({ method: 'GET', url: '/teapot' });
 
@@ -165,7 +181,11 @@ describe('error handling', () => {
 
   it('rejects malformed JSON bodies with a 4xx, not a 500', async () => {
     const app = buildApp();
-    app.post('/echo', { config: { auth: 'public' } }, (request) => request.body);
+    app.post(
+      '/echo',
+      { config: { auth: 'public', contract: { summary: 'test route', responses: { 200: null } } } },
+      (request) => request.body,
+    );
 
     const response = await app.inject({
       method: 'POST',

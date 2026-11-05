@@ -3,6 +3,7 @@ import {
   ApplicationDetailSchema,
   ApplicationSchema,
   DataExportSchema,
+  ErrorSchema,
   HistoryEntrySchema,
   UserSchema,
 } from './responses';
@@ -96,5 +97,34 @@ describe('response contracts', () => {
   it('reject a user carrying session or internal fields', () => {
     expect(UserSchema.safeParse({ ...user, sessionId: ID }).success).toBe(false);
     expect(UserSchema.safeParse({ ...user, tokenHash: 'x' }).success).toBe(false);
+  });
+});
+
+describe('ErrorSchema', () => {
+  it('accepts the error shapes the API sends', () => {
+    expect(ErrorSchema.safeParse({ error: 'internal_error' }).success).toBe(true);
+    expect(
+      ErrorSchema.safeParse({ error: 'not_found', message: 'Application not found' }).success,
+    ).toBe(true);
+    expect(
+      ErrorSchema.safeParse({
+        error: 'validation_error',
+        message: 'x',
+        issues: [{ path: 'company', message: 'Required' }],
+      }).success,
+    ).toBe(true);
+  });
+
+  it.each([
+    ['no code', { message: 'x' }],
+    ['an empty code', { error: '' }],
+    [
+      "Fastify's default shape",
+      { statusCode: 404, error: 'Not Found', message: 'Route GET:/x not found' },
+    ],
+    ['a stack trace', { error: 'internal_error', stack: 'Error: at ...' }],
+    ['a malformed issue', { error: 'validation_error', issues: [{ path: 'a' }] }],
+  ])('rejects %s', (_label, value) => {
+    expect(ErrorSchema.safeParse(value).success).toBe(false);
   });
 });

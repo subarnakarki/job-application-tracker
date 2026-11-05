@@ -60,6 +60,7 @@ describe('isolation coverage checker (the mechanism itself)', () => {
     url,
     auth,
     mutating: method !== 'GET',
+    contract: { summary: 'fake', responses: { 200: null } },
   });
 
   it('flags a signed-in route with an id that no isolation test claims', () => {

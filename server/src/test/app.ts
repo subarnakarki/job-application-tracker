@@ -52,7 +52,8 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
   const testDb = await createTestDb();
   await runMigrations(testDb.url, { schema: testDb.schema });
   const clock = mutableClock();
-  const app = buildApp({ db: testDb.db, clock, env: options.env ?? {} });
+  // Every API test is also a contract test: each response is checked against its route's declaration.
+  const app = buildApp({ db: testDb.db, clock, env: options.env ?? {}, validateResponses: true });
   options.configure?.(app);
   await app.ready();
 

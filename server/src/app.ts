@@ -5,6 +5,7 @@ import Fastify, {
 } from 'fastify';
 import { systemClock, type Clock } from './clock';
 import type { Db } from './db/types';
+import { registerContractValidation, ROUTE_NOT_FOUND } from './http/contractValidation';
 import { ApiError } from './http/errors';
 import { enforceRoutePolicy } from './http/policy';
 import { registerRequestPipeline } from './http/pipeline';
@@ -22,6 +23,8 @@ export interface AppDeps {
   /** "Now" for sessions, rate limits and (later) domain rules. Tests pass a controllable one. */
   clock?: Clock;
   env?: Record<string, string | undefined>;
+  /** Validate every response against its route contract (tests). */
+  validateResponses?: boolean;
 }
 
 /**
@@ -35,6 +38,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   // Must come first: it checks every route as it is registered.
   enforceRoutePolicy(app);
+  if (deps.validateResponses) registerContractValidation(app);
+  app.setNotFoundHandler((_request, reply) => reply.code(404).send(ROUTE_NOT_FOUND));
 
   // Never leak internals: a 5xx returns a fixed body (details go to the log),
   // while deliberate errors keep their message.

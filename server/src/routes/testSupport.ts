@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { TimeZoneSchema } from '@jat/shared';
+import { TimeZoneSchema, UserSchema } from '@jat/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { serializeSessionCookie } from '../auth/cookies';
@@ -9,7 +9,13 @@ import { toSessionUser } from '../auth/users';
 import type { Clock } from '../clock';
 import type { Db } from '../db/types';
 import { ApiError, parseInput } from '../http/errors';
+import { ROUTE_NOT_FOUND } from '../http/contractValidation';
 import { secretsMatch } from '../test-support/config';
+
+const TestLoginResponse = z.strictObject({ user: UserSchema, token: z.string() });
+const NowResponse = z.strictObject({ now: z.iso.datetime({ offset: true }) });
+const CleanupResponse = z.strictObject({ deleted: z.number().int().min(0) });
+const SecretHeaders = z.object({ 'x-test-secret': z.string() });
 
 /**
  * Test-only routes. They are registered only when `resolveTestRoutes` allows it
@@ -47,7 +53,7 @@ export function registerTestSecretGuard(app: FastifyInstance, secret: string): v
     if (!request.url.startsWith('/api/test/')) return;
     const provided = request.headers['x-test-secret'];
     if (!secretsMatch(secret, Array.isArray(provided) ? provided[0] : provided)) {
-      return reply.code(404).send({ error: 'not_found' });
+      return reply.code(404).send(ROUTE_NOT_FOUND);
     }
   });
 }
@@ -64,88 +70,143 @@ export function registerTestRoutes(app: FastifyInstance, deps: TestRouteDeps): v
   };
 
   // Creates a brand-new synthetic user and signs them in. One per test: no shared state, no reset.
-  app.post('/api/test/login', { config: { auth: 'public' } }, async (request, reply) => {
-    const db = requireDb();
-    const body = parseInput(LoginBody, request.body ?? {});
-    const now = deps.clock.now();
-    const id = randomUUID();
+  app.post(
+    '/api/test/login',
+    {
+      config: {
+        auth: 'public',
+        contract: {
+          summary: 'Test only: a new synthetic user, signed in',
+          headers: SecretHeaders,
+          body: LoginBody,
+          responses: { 200: TestLoginResponse },
+        },
+      },
+    },
+    async (request, reply) => {
+      const db = requireDb();
+      const body = parseInput(LoginBody, request.body ?? {});
+      const now = deps.clock.now();
+      const id = randomUUID();
 
-    const user = await db.transaction(async (tx) => {
-      const created = await tx.query<{
-        id: string;
-        email: string;
-        name: string | null;
-        picture_url: string | null;
-        time_zone: string;
-        is_demo: boolean;
-      }>(
-        `insert into users (email, name, time_zone) values ($1, $2, $3)
+      const user = await db.transaction(async (tx) => {
+        const created = await tx.query<{
+          id: string;
+          email: string;
+          name: string | null;
+          picture_url: string | null;
+          time_zone: string;
+          is_demo: boolean;
+        }>(
+          `insert into users (email, name, time_zone) values ($1, $2, $3)
          returning id, email, name, picture_url, time_zone, is_demo`,
-        [`test-${id}@example.invalid`, 'Test User', body.timeZone ?? 'UTC'],
-      );
-      const row = created.rows[0];
-      if (!row) throw new Error('Test user was not created');
-      await tx.query(
-        "insert into identities (user_id, provider, subject, created_at) values ($1, 'test', $2, $3)",
-        [row.id, `test:${id}`, now],
-      );
-      return toSessionUser(row);
-    });
+          [`test-${id}@example.invalid`, 'Test User', body.timeZone ?? 'UTC'],
+        );
+        const row = created.rows[0];
+        if (!row) throw new Error('Test user was not created');
+        await tx.query(
+          "insert into identities (user_id, provider, subject, created_at) values ($1, 'test', $2, $3)",
+          [row.id, `test:${id}`, now],
+        );
+        return toSessionUser(row);
+      });
 
-    const session = await createSession(db, user.id, now);
-    void reply.header(
-      'set-cookie',
-      serializeSessionCookie(
-        session.token,
-        Math.floor((session.expiresAt.getTime() - now.getTime()) / 1000),
-      ),
-    );
-    // The token is returned too, so non-browser clients can send it as a Cookie header.
-    return { user, token: session.token };
-  });
+      const session = await createSession(db, user.id, now);
+      void reply.header(
+        'set-cookie',
+        serializeSessionCookie(
+          session.token,
+          Math.floor((session.expiresAt.getTime() - now.getTime()) / 1000),
+        ),
+      );
+      // The token is returned too, so non-browser clients can send it as a Cookie header.
+      return { user, token: session.token };
+    },
+  );
 
   // Freezes or shifts the signed-in test user's own clock. Nobody else's time moves.
-  app.post('/api/test/clock', { config: { auth: 'user' } }, async (request) => {
-    const db = requireDb();
-    const body = parseInput(ClockBody, request.body);
-    const user = requireTestUser(request.auth?.user);
-    await assertIsTestUser(db, user.id);
+  app.post(
+    '/api/test/clock',
+    {
+      config: {
+        auth: 'user',
+        contract: {
+          summary: "Test only: freeze or shift the user's clock",
+          headers: SecretHeaders,
+          body: ClockBody,
+          responses: { 200: NowResponse },
+        },
+      },
+    },
+    async (request) => {
+      const db = requireDb();
+      const body = parseInput(ClockBody, request.body);
+      const user = requireTestUser(request.auth?.user);
+      await assertIsTestUser(db, user.id);
 
-    await db.query(
-      `insert into test_clocks (user_id, frozen_at, offset_ms) values ($1, $2, $3)
+      await db.query(
+        `insert into test_clocks (user_id, frozen_at, offset_ms) values ($1, $2, $3)
        on conflict (user_id) do update set
          frozen_at = case when $4 then excluded.frozen_at else test_clocks.frozen_at end,
          offset_ms = case when $5 then excluded.offset_ms else test_clocks.offset_ms end`,
-      [
-        user.id,
-        body.frozenAt ? new Date(body.frozenAt) : null,
-        body.offsetMs ?? 0,
-        body.frozenAt !== undefined,
-        body.offsetMs !== undefined,
-      ],
-    );
-    return { now: (await userClock(db, user.id, deps.clock)).now().toISOString() };
-  });
+        [
+          user.id,
+          body.frozenAt ? new Date(body.frozenAt) : null,
+          body.offsetMs ?? 0,
+          body.frozenAt !== undefined,
+          body.offsetMs !== undefined,
+        ],
+      );
+      return { now: (await userClock(db, user.id, deps.clock)).now().toISOString() };
+    },
+  );
 
   // The time this user's domain logic sees. Lets tests prove clocks are isolated per user.
-  app.get('/api/test/now', { config: { auth: 'user' } }, (request) => ({
-    now: request.clock.now().toISOString(),
-  }));
+  app.get(
+    '/api/test/now',
+    {
+      config: {
+        auth: 'user',
+        contract: {
+          summary: "Test only: the user's current time",
+          headers: SecretHeaders,
+          responses: { 200: NowResponse },
+        },
+      },
+    },
+    (request) => ({
+      now: request.clock.now().toISOString(),
+    }),
+  );
 
   // Housekeeping for long-lived preview databases: removes synthetic users (and, by cascade, all their data).
-  app.post('/api/test/cleanup', { config: { auth: 'public' } }, async (request) => {
-    const db = requireDb();
-    const body = parseInput(CleanupBody, request.body);
-    const cutoff = new Date(deps.clock.now().getTime() - body.olderThanMinutes * 60 * 1000);
+  app.post(
+    '/api/test/cleanup',
+    {
+      config: {
+        auth: 'public',
+        contract: {
+          summary: 'Test only: remove old synthetic users',
+          headers: SecretHeaders,
+          body: CleanupBody,
+          responses: { 200: CleanupResponse },
+        },
+      },
+    },
+    async (request) => {
+      const db = requireDb();
+      const body = parseInput(CleanupBody, request.body);
+      const cutoff = new Date(deps.clock.now().getTime() - body.olderThanMinutes * 60 * 1000);
 
-    const result = await db.query(
-      `delete from users u
+      const result = await db.query(
+        `delete from users u
         where exists (select 1 from identities i
                        where i.user_id = u.id and i.provider = 'test' and i.created_at < $1)`,
-      [cutoff],
-    );
-    return { deleted: result.rowCount };
-  });
+        [cutoff],
+      );
+      return { deleted: result.rowCount };
+    },
+  );
 }
 
 function requireTestUser(user: SessionUser | undefined): SessionUser {

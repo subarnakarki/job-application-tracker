@@ -39,16 +39,38 @@ describe('route policy: every route must declare who may call it', () => {
 
   it('accepts both modes and records them with whether the method changes state', async () => {
     const app = bare();
-    app.get('/api/open', { config: { auth: 'public' } }, () => 'x');
-    app.post('/api/closed', { config: { auth: 'user' } }, () => 'x');
-    app.delete('/api/closed/:id', { config: { auth: 'user' } }, () => 'x');
+    app.get(
+      '/api/open',
+      { config: { auth: 'public', contract: { summary: 'test route', responses: { 200: null } } } },
+      () => 'x',
+    );
+    app.post(
+      '/api/closed',
+      { config: { auth: 'user', contract: { summary: 'test route', responses: { 200: null } } } },
+      () => 'x',
+    );
+    app.delete(
+      '/api/closed/:id',
+      { config: { auth: 'user', contract: { summary: 'test route', responses: { 200: null } } } },
+      () => 'x',
+    );
     await app.ready();
 
-    expect(app.registeredRoutes).toEqual([
+    expect(
+      app.registeredRoutes.map(({ method, url, auth, mutating }) => ({
+        method,
+        url,
+        auth,
+        mutating,
+      })),
+    ).toEqual([
       { method: 'GET', url: '/api/open', auth: 'public', mutating: false },
       { method: 'POST', url: '/api/closed', auth: 'user', mutating: true },
       { method: 'DELETE', url: '/api/closed/:id', auth: 'user', mutating: true },
     ]);
+    expect(app.registeredRoutes.every((route) => route.contract.summary === 'test route')).toBe(
+      true,
+    );
   });
 
   it('lists a multi-method route once per method', () => {
@@ -56,7 +78,7 @@ describe('route policy: every route must declare who may call it', () => {
     app.route({
       method: ['GET', 'PUT'],
       url: '/api/multi',
-      config: { auth: 'user' },
+      config: { auth: 'user', contract: { summary: 'test route', responses: { 200: null } } },
       handler: () => 'x',
     });
 
@@ -68,9 +90,35 @@ describe('route policy: every route must declare who may call it', () => {
 
   it('does not list the HEAD route Fastify derives from a GET', () => {
     const app = bare();
-    app.get('/api/open', { config: { auth: 'public' } }, () => 'x');
+    app.get(
+      '/api/open',
+      { config: { auth: 'public', contract: { summary: 'test route', responses: { 200: null } } } },
+      () => 'x',
+    );
 
     expect(app.registeredRoutes.map((route) => route.method)).toEqual(['GET']);
+  });
+
+  it('refuses a route without a contract, and one that declares no success response', () => {
+    const app = bare();
+
+    expect(() => app.get('/api/a', { config: { auth: 'public' } }, () => 'x')).toThrow(
+      'must declare config.contract with at least one 2xx response',
+    );
+    expect(() =>
+      app.get(
+        '/api/b',
+        { config: { auth: 'public', contract: { summary: 'x', responses: { 404: null } } } },
+        () => 'x',
+      ),
+    ).toThrow('at least one 2xx response');
+    expect(() =>
+      app.get(
+        '/api/c',
+        { config: { auth: 'public', contract: { summary: 'x', responses: {} } } },
+        () => 'x',
+      ),
+    ).toThrow('at least one 2xx response');
   });
 
   it('applies to the real app: every route buildApp registers is declared', async () => {

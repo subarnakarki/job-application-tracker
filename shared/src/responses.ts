@@ -68,3 +68,16 @@ export const DataExportSchema = z.strictObject({
   applications: z.array(ApplicationDetailSchema),
 });
 export type DataExport = z.infer<typeof DataExportSchema>;
+
+/** Every 4xx/5xx body. `issues` lists field problems for validation errors. */
+export const ErrorSchema = z.strictObject({
+  error: z.string().min(1),
+  message: z.string().optional(),
+  issues: z.array(z.strictObject({ path: z.string(), message: z.string() })).optional(),
+});
+export type ApiErrorBody = z.infer<typeof ErrorSchema>;
+
+export const HealthSchema = z.strictObject({ status: z.enum(['ok', 'unavailable']) });
+
+/** `{ user }`, returned by sign-in and the profile routes. */
+export const UserEnvelopeSchema = z.strictObject({ user: UserSchema });

@@ -1,3 +1,4 @@
+import { UserEnvelopeSchema } from '@jat/shared';
 import type { FastifyInstance } from 'fastify';
 import type { Clock } from '../clock';
 import {
@@ -31,46 +32,67 @@ export function registerSessionRoutes(app: FastifyInstance, deps: SessionRouteDe
   };
 
   // Sign in as the shared demo user. Rate-limited per client address.
-  app.post('/api/auth/demo', { config: { auth: 'public' } }, async (request, reply) => {
-    const db = requireDb();
-    const now = deps.clock.now();
-    const ip = clientIp({
-      headers: request.headers,
-      remoteAddress: request.socket.remoteAddress,
-      env: deps.env,
-    });
+  app.post(
+    '/api/auth/demo',
+    {
+      config: {
+        auth: 'public',
+        contract: {
+          summary: 'Sign in as the shared demo account',
+          responses: { 200: UserEnvelopeSchema },
+        },
+      },
+    },
+    async (request, reply) => {
+      const db = requireDb();
+      const now = deps.clock.now();
+      const ip = clientIp({
+        headers: request.headers,
+        remoteAddress: request.socket.remoteAddress,
+        env: deps.env,
+      });
 
-    const limit = await consumeRateLimit(
-      db,
-      rateLimitKey(DEMO_LOGIN_RULE.name, ip),
-      DEMO_LOGIN_RULE,
-      now,
-    );
-    if (!limit.allowed) {
-      void reply.header('retry-after', String(limit.retryAfterSeconds));
-      throw new ApiError(429, 'rate_limited', 'Too many sign-in attempts. Try again later.');
-    }
+      const limit = await consumeRateLimit(
+        db,
+        rateLimitKey(DEMO_LOGIN_RULE.name, ip),
+        DEMO_LOGIN_RULE,
+        now,
+      );
+      if (!limit.allowed) {
+        void reply.header('retry-after', String(limit.retryAfterSeconds));
+        throw new ApiError(429, 'rate_limited', 'Too many sign-in attempts. Try again later.');
+      }
 
-    // Signing in replaces whatever session this browser already had.
-    if (request.auth) await deleteSession(db, request.auth.token);
+      // Signing in replaces whatever session this browser already had.
+      if (request.auth) await deleteSession(db, request.auth.token);
 
-    const user = await findOrCreateDemoUser(db);
-    const session = await createSession(db, user.id, now);
-    void reply.header(
-      'set-cookie',
-      serializeSessionCookie(
-        session.token,
-        Math.floor((session.expiresAt.getTime() - now.getTime()) / 1000),
-      ),
-    );
-    return { user };
-  });
+      const user = await findOrCreateDemoUser(db);
+      const session = await createSession(db, user.id, now);
+      void reply.header(
+        'set-cookie',
+        serializeSessionCookie(
+          session.token,
+          Math.floor((session.expiresAt.getTime() - now.getTime()) / 1000),
+        ),
+      );
+      return { user };
+    },
+  );
 
   // Idempotent: signing out when already signed out is not an error.
-  app.post('/api/auth/logout', { config: { auth: 'public' } }, async (request, reply) => {
-    const token = readSessionToken(request.headers.cookie);
-    if (token && deps.db) await deleteSession(deps.db, token);
-    void reply.header('set-cookie', serializeClearedSessionCookie());
-    return reply.code(204).send();
-  });
+  app.post(
+    '/api/auth/logout',
+    {
+      config: {
+        auth: 'public',
+        contract: { summary: 'Sign out (idempotent)', responses: { 204: null } },
+      },
+    },
+    async (request, reply) => {
+      const token = readSessionToken(request.headers.cookie);
+      if (token && deps.db) await deleteSession(deps.db, token);
+      void reply.header('set-cookie', serializeClearedSessionCookie());
+      return reply.code(204).send();
+    },
+  );
 }

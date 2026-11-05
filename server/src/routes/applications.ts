@@ -1,4 +1,9 @@
-import { ApplicationInputSchema, ApplicationPatchSchema } from '@jat/shared';
+import {
+  ApplicationDetailSchema,
+  ApplicationInputSchema,
+  ApplicationPatchSchema,
+} from '@jat/shared';
+import { z } from 'zod';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { consumeRateLimit, rateLimitKey, type RateLimitRule } from '../auth/rateLimit';
 import type { Clock } from '../clock';
@@ -12,6 +17,10 @@ import {
   type Owner,
 } from '../repo/applications';
 import { presentDetail } from '../repo/present';
+
+/** Path parameter as received: any string (a non-uuid simply answers 404). */
+const IdParams = z.object({ id: z.string() });
+const IfMatchHeaders = z.object({ 'if-match': z.string().optional() });
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -79,73 +88,123 @@ export function registerApplicationRoutes(app: FastifyInstance, deps: Applicatio
     timeZone: owner.timeZone,
   });
 
-  app.post('/api/applications', { config: { auth: 'user' } }, async (request, reply) => {
-    const db = requireDb();
-    const owner = ownerOf(request);
-    const input = parseInput(ApplicationInputSchema, request.body);
-    await spendWrite(db, owner, reply);
+  app.post(
+    '/api/applications',
+    {
+      config: {
+        auth: 'user',
+        contract: {
+          summary: 'Create an application',
+          body: ApplicationInputSchema,
+          responses: { 201: ApplicationDetailSchema },
+        },
+      },
+    },
+    async (request, reply) => {
+      const db = requireDb();
+      const owner = ownerOf(request);
+      const input = parseInput(ApplicationInputSchema, request.body);
+      await spendWrite(db, owner, reply);
 
-    const result = await createApplication(db, owner, input, request.clock.now());
-    if (result.kind === 'limit_reached') {
-      throw new ApiError(409, 'limit_reached', `You can keep up to ${result.limit} applications`);
-    }
-    void reply.code(201).header('location', `/api/applications/${result.value.record.id}`);
-    void reply.header('etag', etag(result.value.record.version));
-    return presentDetail(result.value, context(request, owner));
-  });
+      const result = await createApplication(db, owner, input, request.clock.now());
+      if (result.kind === 'limit_reached') {
+        throw new ApiError(409, 'limit_reached', `You can keep up to ${result.limit} applications`);
+      }
+      void reply.code(201).header('location', `/api/applications/${result.value.record.id}`);
+      void reply.header('etag', etag(result.value.record.version));
+      return presentDetail(result.value, context(request, owner));
+    },
+  );
 
-  app.get('/api/applications/:id', { config: { auth: 'user' } }, async (request, reply) => {
-    const db = requireDb();
-    const owner = ownerOf(request);
-    const found = await getApplication(db, owner.userId, idOf(request));
-    if (!found) throw notFound();
-    void reply.header('etag', etag(found.record.version));
-    return presentDetail(found, context(request, owner));
-  });
+  app.get(
+    '/api/applications/:id',
+    {
+      config: {
+        auth: 'user',
+        contract: {
+          summary: 'One application with its history',
+          params: IdParams,
+          responses: { 200: ApplicationDetailSchema },
+        },
+      },
+    },
+    async (request, reply) => {
+      const db = requireDb();
+      const owner = ownerOf(request);
+      const found = await getApplication(db, owner.userId, idOf(request));
+      if (!found) throw notFound();
+      void reply.header('etag', etag(found.record.version));
+      return presentDetail(found, context(request, owner));
+    },
+  );
 
-  app.patch('/api/applications/:id', { config: { auth: 'user' } }, async (request, reply) => {
-    const db = requireDb();
-    const owner = ownerOf(request);
-    const id = idOf(request);
-    const expected = parseIfMatch(request.headers['if-match']);
-    if (expected === null) {
-      throw new ApiError(
-        428,
-        'precondition_required',
-        'Send If-Match with the version you are editing',
-      );
-    }
-    if (expected === 'invalid')
-      throw new ApiError(400, 'invalid_if_match', 'If-Match must look like "3"');
-    const patch = parseInput(ApplicationPatchSchema, request.body);
-    await spendWrite(db, owner, reply);
-
-    const result = await updateApplication(db, owner, id, expected, patch, request.clock.now());
-    switch (result.kind) {
-      case 'not_found':
-        throw notFound();
-      case 'version_conflict':
-        void reply.header('etag', etag(result.currentVersion));
+  app.patch(
+    '/api/applications/:id',
+    {
+      config: {
+        auth: 'user',
+        contract: {
+          summary: 'Edit an application (needs If-Match)',
+          params: IdParams,
+          headers: IfMatchHeaders,
+          body: ApplicationPatchSchema,
+          responses: { 200: ApplicationDetailSchema },
+        },
+      },
+    },
+    async (request, reply) => {
+      const db = requireDb();
+      const owner = ownerOf(request);
+      const id = idOf(request);
+      const expected = parseIfMatch(request.headers['if-match']);
+      if (expected === null) {
         throw new ApiError(
-          412,
-          'version_conflict',
-          'This application was changed elsewhere. Reload and try again.',
+          428,
+          'precondition_required',
+          'Send If-Match with the version you are editing',
         );
-      case 'invalid':
-        throw new ApiError(400, 'validation_error', 'The request is invalid', result.issues);
-      case 'unchanged':
-      case 'updated':
-        void reply.header('etag', etag(result.value.record.version));
-        return presentDetail(result.value, context(request, owner));
-    }
-  });
+      }
+      if (expected === 'invalid')
+        throw new ApiError(400, 'invalid_if_match', 'If-Match must look like "3"');
+      const patch = parseInput(ApplicationPatchSchema, request.body);
+      await spendWrite(db, owner, reply);
 
-  app.delete('/api/applications/:id', { config: { auth: 'user' } }, async (request, reply) => {
-    const db = requireDb();
-    const owner = ownerOf(request);
-    const id = idOf(request);
-    await spendWrite(db, owner, reply);
-    if (!(await deleteApplication(db, owner.userId, id))) throw notFound();
-    return reply.code(204).send();
-  });
+      const result = await updateApplication(db, owner, id, expected, patch, request.clock.now());
+      switch (result.kind) {
+        case 'not_found':
+          throw notFound();
+        case 'version_conflict':
+          void reply.header('etag', etag(result.currentVersion));
+          throw new ApiError(
+            412,
+            'version_conflict',
+            'This application was changed elsewhere. Reload and try again.',
+          );
+        case 'invalid':
+          throw new ApiError(400, 'validation_error', 'The request is invalid', result.issues);
+        case 'unchanged':
+        case 'updated':
+          void reply.header('etag', etag(result.value.record.version));
+          return presentDetail(result.value, context(request, owner));
+      }
+    },
+  );
+
+  app.delete(
+    '/api/applications/:id',
+    {
+      config: {
+        auth: 'user',
+        contract: { summary: 'Delete an application', params: IdParams, responses: { 204: null } },
+      },
+    },
+    async (request, reply) => {
+      const db = requireDb();
+      const owner = ownerOf(request);
+      const id = idOf(request);
+      await spendWrite(db, owner, reply);
+      if (!(await deleteApplication(db, owner.userId, id))) throw notFound();
+      return reply.code(204).send();
+    },
+  );
 }

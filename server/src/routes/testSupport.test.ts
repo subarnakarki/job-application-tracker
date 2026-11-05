@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { SESSION_COOKIE } from '../auth/cookies';
+import { ROUTE_NOT_FOUND } from '../http/contractValidation';
 import { createTestApp, SAME_ORIGIN, sessionTokenFrom, T0, type TestApp } from '../test/app';
 import { TEST_DATABASE_URL } from '../test/testDb';
 
@@ -41,9 +43,21 @@ describe.skipIf(!TEST_DATABASE_URL)('test-only routes (real app, real database)'
   describe('per-user clocks are looked up only when test routes are enabled', () => {
     it('leaves a real user on the shared clock even if a stray test_clocks row exists', async () => {
       const probe = (app: FastifyInstance) =>
-        app.get('/api/probe/now', { config: { auth: 'user' } }, (request) => ({
-          now: request.clock.now().toISOString(),
-        }));
+        app.get(
+          '/api/probe/now',
+          {
+            config: {
+              auth: 'user',
+              contract: {
+                summary: 'probe',
+                responses: { 200: z.strictObject({ now: z.string() }) },
+              },
+            },
+          },
+          (request) => ({
+            now: request.clock.now().toISOString(),
+          }),
+        );
       const disabled = await createTestApp({ env: {}, configure: probe });
       const enabled = await createTestApp({ env: ENV, configure: probe });
       try {
@@ -117,9 +131,17 @@ describe.skipIf(!TEST_DATABASE_URL)('test-only routes (real app, real database)'
         ] as const) {
           const response = await call(method, url, headers, method === 'POST' ? {} : undefined);
           expect(response.statusCode, `${method} ${url}`).toBe(404);
-          expect(response.json()).toEqual({ error: 'not_found' });
+          expect(response.json()).toEqual(ROUTE_NOT_FOUND);
         }
         expect((await t.db.query('select 1 from users')).rowCount).toBe(before);
+      });
+
+      it('answers exactly like a route that does not exist, byte for byte', async () => {
+        const guarded = await call('POST', '/api/test/login', SAME_ORIGIN, {});
+        const nonexistent = await call('POST', '/api/definitely-not-a-route', SAME_ORIGIN, {});
+
+        expect(guarded.statusCode).toBe(nonexistent.statusCode);
+        expect(guarded.body).toBe(nonexistent.body);
       });
 
       it('answers 404, not 401, even for a route that normally needs a session (it does not reveal itself)', async () => {
