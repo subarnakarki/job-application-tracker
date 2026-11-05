@@ -45,3 +45,43 @@ and is deleted when the spike ends.
 Record the exact error here before changing approach. Known fallbacks: bundle the function with
 esbuild instead of relying on Vercel's TS handling; use relative imports instead of `@jat/shared`
 inside the function; switch driver only if the pooler rejects transactions.
+
+## Status log
+
+### 2026-11-05
+
+Done and verified:
+
+- CI is green on `main` (lint, typecheck, unit with a Postgres service container).
+- "Spike migrate" workflow ran against Neon (direct URL): `Applied: 001_spike_ping.sql`.
+- Neon project is in **AWS us-east-2 (Ohio)**; `vercel.json` pins functions to `cle1` (Cleveland).
+  Whether `cle1` is accepted on the Hobby plan is **not yet confirmed**.
+- Vercel project deployed from `main` at https://job-application-tracker-eta-one.vercel.app
+
+Observed on the deployed site:
+
+- `GET /` returns 200 `text/html` (static build and SPA rewrite work).
+- Every `/api/*` route, including `/api/health` (which never touches the database), returns
+  `500 FUNCTION_INVOCATION_FAILED`. So the function crashes when it loads. It is not a Neon,
+  pooler or `DATABASE_URL` problem.
+
+Not yet known: the actual runtime error (Vercel logs were not reachable from the first session).
+
+Leading hypothesis (unconfirmed): Vercel loads `api/index.ts` as ESM without bundling, so either the
+extensionless relative imports (`../server/src/app`) fail, or `@jat/shared` (which exports `.ts`
+source) cannot be loaded from `node_modules`. Fallback if confirmed: bundle the function with
+esbuild into one self-contained file, build it in `buildCommand`, and test the bundle locally.
+
+Next steps:
+
+1. Read the deployment events and, if available, the runtime logs for the latest `main` deployment
+   (Vercel connector, or the Logs tab in the dashboard).
+2. Fix the cause, verify locally, push, redeploy.
+3. Re-run the checks in the table above against the deployed URL, including `POST /api/spike/db/ping`
+   and the cookie round trip (use a curl cookie jar), and record cold vs warm `queryMs`.
+4. Confirm the function region and Node 24 from `/api/spike/info`.
+5. Delete the spike code and write up the outcome in `docs/PLAN.md`; then Phase 1.
+
+Environment notes: the cloud session's network policy must allow
+`job-application-tracker-eta-one.vercel.app` (Settings of the cloud environment, Network access),
+or `curl` returns `403 CONNECT tunnel failed`.
