@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT, type JWTPayload } from 'jose';
-import { GoogleSignInError, pkceChallenge, verifyIdToken } from './google';
+import { googleProviderFromEnv, GoogleSignInError, pkceChallenge, verifyIdToken } from './google';
 
 const CLIENT_ID = 'client-123.apps.googleusercontent.com';
 const NONCE = 'n'.repeat(43);
@@ -64,5 +64,14 @@ describe('verifyIdToken', () => {
     expect(pkceChallenge('dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk')).toBe(
       'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
     );
+  });
+});
+
+describe('googleProviderFromEnv', () => {
+  const configured = { GOOGLE_CLIENT_ID: 'id', GOOGLE_CLIENT_SECRET: 'secret' };
+  it('is on in production and off without credentials or on preview deployments', () => {
+    expect(googleProviderFromEnv({ ...configured, VERCEL_ENV: 'production' })).not.toBeNull();
+    expect(googleProviderFromEnv({ GOOGLE_CLIENT_ID: 'id' })).toBeNull();
+    expect(googleProviderFromEnv({ ...configured, VERCEL_ENV: 'preview' })).toBeNull();
   });
 });

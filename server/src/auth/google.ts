@@ -103,6 +103,9 @@ export function googleProviderFromEnv(
   env: Record<string, string | undefined>,
   fetchImpl: typeof fetch = fetch,
 ): GoogleProvider | null {
+  // Preview deployments each get their own URL, which Google cannot have registered as a
+  // redirect URI, so sign-in there would end on Google's error page. Previews use the demo.
+  if (env['VERCEL_ENV'] === 'preview') return null;
   const clientId = env['GOOGLE_CLIENT_ID']?.trim();
   const clientSecret = env['GOOGLE_CLIENT_SECRET']?.trim();
   if (!clientId || !clientSecret) return null;

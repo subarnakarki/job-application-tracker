@@ -1,7 +1,22 @@
 # Authentication and request security
 
-Implemented in `server/src/auth/` and `server/src/http/`. Google sign-in arrives in Phase 7 and plugs into the
-same sessions; today the app has the shared **demo** sign-in and the test-only sign-in.
+Implemented in `server/src/auth/` and `server/src/http/`. Three ways in, all ending in the same session:
+Google sign-in (open signup), the shared **demo** account, and the test-only sign-in.
+
+## Google sign-in
+
+- `GET /api/auth/google/start?next=/path` creates a random state, PKCE verifier and nonce, keeps them in a
+  10-minute `__Host-oauth` cookie (HttpOnly, Secure, SameSite=Lax) and redirects to Google
+  (`openid email profile`, S256 challenge).
+- `GET /api/auth/google/callback` always clears that cookie, requires the returned `state` to equal it
+  (constant-time; stops login CSRF), exchanges the code with the verifier, and verifies the ID token with `jose`
+  against Google's keys: issuer, audience (our client id), expiry, nonce, and `email_verified`.
+- Users are matched by Google `sub`, never by email; the first sign-in creates the account, later ones refresh
+  email, name and picture. Any existing session in the browser (e.g. the demo) is replaced.
+- Every failure redirects to `/login?error=<reason>`; details go to the log only. `next` must be a same-site path.
+- Enabled only when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set, and never on Vercel preview
+  deployments (their URLs cannot be registered redirect URIs). The provider is injected into `buildApp`, so tests
+  use a stub.
 
 ## Sessions
 
