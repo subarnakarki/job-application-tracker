@@ -12,6 +12,7 @@ export default defineConfig(
     '**/coverage/**',
     '**/playwright-report/**',
     '**/test-results/**',
+    'api/index.js',
   ]),
   js.configs.recommended,
   tseslint.configs.recommendedTypeChecked,
