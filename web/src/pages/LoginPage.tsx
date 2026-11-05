@@ -1,5 +1,5 @@
 import { APP_NAME } from '@jat/shared';
-import { Navigate, useNavigate, useSearchParams } from 'react-router';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router';
 import { ApiRequestError } from '../api/client';
 import { useDemoSignIn, useMe } from '../api/hooks';
 
@@ -73,7 +73,10 @@ export function LoginPage() {
       </div>
       <p className="text-xs text-slate-500 dark:text-slate-400">
         Your applications are private to your Google account. The demo account is shared by everyone
-        who tries it.
+        who tries it.{' '}
+        <Link to="/privacy" className="underline">
+          Privacy
+        </Link>
       </p>
     </main>
   );

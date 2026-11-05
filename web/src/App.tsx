@@ -9,17 +9,21 @@ import {
   NotFoundPage,
 } from './pages/ApplicationPages';
 import { ApplicationsPage } from './pages/ApplicationsPage';
+import { AccountPage } from './pages/AccountPage';
 import { LoginPage } from './pages/LoginPage';
+import { PrivacyPage } from './pages/PrivacyPage';
 
 export function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/privacy" element={<PrivacyPage />} />
       <Route element={<Layout />}>
         <Route index element={<ApplicationsPage />} />
         <Route path="applications/new" element={<NewApplicationPage />} />
         <Route path="applications/:id" element={<ApplicationDetailPage />} />
         <Route path="applications/:id/edit" element={<EditApplicationPage />} />
+        <Route path="account" element={<AccountPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

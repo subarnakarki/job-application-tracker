@@ -34,9 +34,13 @@ export function Layout() {
             {APP_NAME}
           </Link>
           <div className="flex items-center gap-3 text-sm">
-            <span className="hidden text-slate-600 sm:inline dark:text-slate-300">
-              {me.data.name ?? me.data.email}
-            </span>
+            <Link
+              to="/account"
+              className="text-slate-600 underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-blue-600 dark:text-slate-300"
+            >
+              <span className="hidden sm:inline">{me.data.name ?? me.data.email}</span>
+              <span className="sm:hidden">Account</span>
+            </Link>
             <button
               type="button"
               className="btn-secondary"

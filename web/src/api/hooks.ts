@@ -136,3 +136,34 @@ export function useSignOut() {
     },
   });
 }
+
+export function useUpdateTimeZone() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (timeZone: string) =>
+      apiRequest('/api/me', UserEnvelopeSchema, { method: 'PATCH', body: { timeZone } }),
+    onSuccess: ({ user }) => {
+      client.setQueryData(['me'], user);
+      // "Needs follow-up" depends on the user's time zone.
+      return client.invalidateQueries({ predicate: (query) => query.queryKey[0] !== 'me' });
+    },
+  });
+}
+
+/** The phrase the API requires, so an account is never deleted by a stray request. */
+export const ACCOUNT_DELETION_CONFIRMATION = 'delete my account';
+
+export function useDeleteAccount() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiRequest('/api/me', null, {
+        method: 'DELETE',
+        body: { confirm: ACCOUNT_DELETION_CONFIRMATION },
+      }),
+    onSuccess: () => {
+      client.clear();
+      client.setQueryData(['me'], null);
+    },
+  });
+}
