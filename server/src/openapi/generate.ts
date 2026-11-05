@@ -1,6 +1,6 @@
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { buildApp } from '../app';
 import { buildOpenApi } from './build';
 
@@ -22,7 +22,7 @@ export async function generateSpec(): Promise<Record<string, unknown>> {
 }
 
 const entry = process.argv[1];
-if (entry && import.meta.url === `file://${entry}`) {
+if (entry && import.meta.url === pathToFileURL(entry).href) {
   generateSpec()
     .then((spec) => writeFile(SPEC_PATH, `${JSON.stringify(spec, null, 2)}\n`))
     .then(() => console.log(`Wrote ${SPEC_PATH}`))
