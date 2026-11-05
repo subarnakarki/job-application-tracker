@@ -4,5 +4,6 @@ export * from './constants';
 export * from './dates';
 export * from './followUp';
 export * from './patch';
+export * from './responses';
 export * from './schemas';
 export * from './status';
