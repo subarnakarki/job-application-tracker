@@ -95,6 +95,7 @@ export function registerApplicationRoutes(app: FastifyInstance, deps: Applicatio
         auth: 'user',
         contract: {
           summary: 'Create an application',
+          errors: { 409: 'The application quota is reached', 429: 'Too many changes' },
           body: ApplicationInputSchema,
           responses: { 201: ApplicationDetailSchema },
         },
@@ -123,6 +124,7 @@ export function registerApplicationRoutes(app: FastifyInstance, deps: Applicatio
         auth: 'user',
         contract: {
           summary: 'One application with its history',
+          errors: { 404: 'No such application (or not yours)' },
           params: IdParams,
           responses: { 200: ApplicationDetailSchema },
         },
@@ -145,6 +147,12 @@ export function registerApplicationRoutes(app: FastifyInstance, deps: Applicatio
         auth: 'user',
         contract: {
           summary: 'Edit an application (needs If-Match)',
+          errors: {
+            404: 'No such application (or not yours)',
+            412: 'The version is stale; ETag holds the current one',
+            428: 'If-Match is required',
+            429: 'Too many changes',
+          },
           params: IdParams,
           headers: IfMatchHeaders,
           body: ApplicationPatchSchema,
@@ -195,7 +203,12 @@ export function registerApplicationRoutes(app: FastifyInstance, deps: Applicatio
     {
       config: {
         auth: 'user',
-        contract: { summary: 'Delete an application', params: IdParams, responses: { 204: null } },
+        contract: {
+          summary: 'Delete an application',
+          errors: { 404: 'No such application (or not yours)', 429: 'Too many changes' },
+          params: IdParams,
+          responses: { 204: null },
+        },
       },
     },
     async (request, reply) => {

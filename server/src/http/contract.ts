@@ -18,4 +18,10 @@ export interface RouteContract {
   headers?: z.ZodType;
   body?: z.ZodType;
   responses: Partial<Record<number, z.ZodType | null>>;
+  /**
+   * Error statuses the route returns on purpose, with what they mean. Their bodies use the shared
+   * ErrorSchema. 400 for a malformed request, 401 on signed-in routes and 403/415 on writes are
+   * implied and need not be listed.
+   */
+  errors?: Partial<Record<number, string>>;
 }

@@ -1,0 +1,2409 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Job Application Tracker API",
+    "version": "0.1.0",
+    "description": "Generated from the route contracts in server/src/routes. Writes must be same-origin and send JSON; see docs/AUTH.md."
+  },
+  "paths": {
+    "/api/applications": {
+      "post": {
+        "summary": "Create an application",
+        "operationId": "postApplications",
+        "tags": [
+          "applications"
+        ],
+        "x-auth": "user",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "company": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "role": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "status": {
+                    "default": "Saved",
+                    "type": "string",
+                    "enum": [
+                      "Saved",
+                      "Applied",
+                      "Screening",
+                      "Interviewing",
+                      "Offer",
+                      "Rejected",
+                      "Withdrawn"
+                    ]
+                  },
+                  "dateApplied": {
+                    "default": null,
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "source": {
+                    "default": "Other",
+                    "type": "string",
+                    "enum": [
+                      "LinkedIn",
+                      "Indeed",
+                      "Referral",
+                      "Company site",
+                      "Recruiter",
+                      "Other"
+                    ]
+                  },
+                  "salaryMin": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100000000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "salaryMax": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100000000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "salaryCurrency": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^[A-Z]{3}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "jobLink": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 2000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "contact": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "nextStep": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 500
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "nextStepDate": {
+                    "default": null,
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "notes": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 10000
+                  }
+                },
+                "required": [
+                  "company",
+                  "role"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "201",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "company": {
+                      "type": "string"
+                    },
+                    "role": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "Saved",
+                        "Applied",
+                        "Screening",
+                        "Interviewing",
+                        "Offer",
+                        "Rejected",
+                        "Withdrawn"
+                      ]
+                    },
+                    "dateApplied": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "LinkedIn",
+                        "Indeed",
+                        "Referral",
+                        "Company site",
+                        "Recruiter",
+                        "Other"
+                      ]
+                    },
+                    "salaryMin": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "salaryMax": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "salaryCurrency": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "jobLink": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "contact": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "nextStep": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "nextStepDate": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "notes": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "lastActivityAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "needsFollowUp": {
+                      "type": "boolean"
+                    },
+                    "isClosed": {
+                      "type": "boolean"
+                    },
+                    "history": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "fromStatus": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "Saved",
+                                  "Applied",
+                                  "Screening",
+                                  "Interviewing",
+                                  "Offer",
+                                  "Rejected",
+                                  "Withdrawn"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "toStatus": {
+                            "type": "string",
+                            "enum": [
+                              "Saved",
+                              "Applied",
+                              "Screening",
+                              "Interviewing",
+                              "Offer",
+                              "Rejected",
+                              "Withdrawn"
+                            ]
+                          },
+                          "occurredAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                          },
+                          "actor": {
+                            "type": "string",
+                            "enum": [
+                              "user",
+                              "gmail",
+                              "system"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "fromStatus",
+                          "toStatus",
+                          "occurredAt",
+                          "actor"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "company",
+                    "role",
+                    "status",
+                    "dateApplied",
+                    "source",
+                    "salaryMin",
+                    "salaryMax",
+                    "salaryCurrency",
+                    "jobLink",
+                    "contact",
+                    "nextStep",
+                    "nextStepDate",
+                    "notes",
+                    "createdAt",
+                    "updatedAt",
+                    "lastActivityAt",
+                    "version",
+                    "needsFollowUp",
+                    "isClosed",
+                    "history"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cross-site request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The application quota is reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The body is not JSON",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many changes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error, always in the shared error shape",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/applications/{id}": {
+      "delete": {
+        "summary": "Delete an application",
+        "operationId": "deleteApplicationsById",
+        "tags": [
+          "applications"
+        ],
+        "x-auth": "user",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "204 (no body)"
+          },
+          "400": {
+            "description": "The request is malformed or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cross-site request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such application (or not yours)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The body is not JSON",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many changes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error, always in the shared error shape",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "One application with its history",
+        "operationId": "getApplicationsById",
+        "tags": [
+          "applications"
+        ],
+        "x-auth": "user",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "company": {
+                      "type": "string"
+                    },
+                    "role": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "Saved",
+                        "Applied",
+                        "Screening",
+                        "Interviewing",
+                        "Offer",
+                        "Rejected",
+                        "Withdrawn"
+                      ]
+                    },
+                    "dateApplied": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "LinkedIn",
+                        "Indeed",
+                        "Referral",
+                        "Company site",
+                        "Recruiter",
+                        "Other"
+                      ]
+                    },
+                    "salaryMin": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "salaryMax": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "salaryCurrency": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "jobLink": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "contact": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "nextStep": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "nextStepDate": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "notes": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "lastActivityAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "needsFollowUp": {
+                      "type": "boolean"
+                    },
+                    "isClosed": {
+                      "type": "boolean"
+                    },
+                    "history": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "fromStatus": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "Saved",
+                                  "Applied",
+                                  "Screening",
+                                  "Interviewing",
+                                  "Offer",
+                                  "Rejected",
+                                  "Withdrawn"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "toStatus": {
+                            "type": "string",
+                            "enum": [
+                              "Saved",
+                              "Applied",
+                              "Screening",
+                              "Interviewing",
+                              "Offer",
+                              "Rejected",
+                              "Withdrawn"
+                            ]
+                          },
+                          "occurredAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                          },
+                          "actor": {
+                            "type": "string",
+                            "enum": [
+                              "user",
+                              "gmail",
+                              "system"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "fromStatus",
+                          "toStatus",
+                          "occurredAt",
+                          "actor"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "company",
+                    "role",
+                    "status",
+                    "dateApplied",
+                    "source",
+                    "salaryMin",
+                    "salaryMax",
+                    "salaryCurrency",
+                    "jobLink",
+                    "contact",
+                    "nextStep",
+                    "nextStepDate",
+                    "notes",
+                    "createdAt",
+                    "updatedAt",
+                    "lastActivityAt",
+                    "version",
+                    "needsFollowUp",
+                    "isClosed",
+                    "history"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such application (or not yours)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error, always in the shared error shape",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Edit an application (needs If-Match)",
+        "operationId": "patchApplicationsById",
+        "tags": [
+          "applications"
+        ],
+        "x-auth": "user",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "if-match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "company": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "role": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "Saved",
+                      "Applied",
+                      "Screening",
+                      "Interviewing",
+                      "Offer",
+                      "Rejected",
+                      "Withdrawn"
+                    ]
+                  },
+                  "dateApplied": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "LinkedIn",
+                      "Indeed",
+                      "Referral",
+                      "Company site",
+                      "Recruiter",
+                      "Other"
+                    ]
+                  },
+                  "salaryMin": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100000000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "salaryMax": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100000000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "salaryCurrency": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^[A-Z]{3}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "jobLink": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 2000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "contact": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "nextStep": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 500
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "nextStepDate": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "notes": {
+                    "type": "string",
+                    "maxLength": 10000
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "company": {
+                      "type": "string"
+                    },
+                    "role": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "Saved",
+                        "Applied",
+                        "Screening",
+                        "Interviewing",
+                        "Offer",
+                        "Rejected",
+                        "Withdrawn"
+                      ]
+                    },
+                    "dateApplied": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "LinkedIn",
+                        "Indeed",
+                        "Referral",
+                        "Company site",
+                        "Recruiter",
+                        "Other"
+                      ]
+                    },
+                    "salaryMin": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "salaryMax": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "salaryCurrency": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "jobLink": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "contact": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "nextStep": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "nextStepDate": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "notes": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "lastActivityAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "needsFollowUp": {
+                      "type": "boolean"
+                    },
+                    "isClosed": {
+                      "type": "boolean"
+                    },
+                    "history": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "fromStatus": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "Saved",
+                                  "Applied",
+                                  "Screening",
+                                  "Interviewing",
+                                  "Offer",
+                                  "Rejected",
+                                  "Withdrawn"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "toStatus": {
+                            "type": "string",
+                            "enum": [
+                              "Saved",
+                              "Applied",
+                              "Screening",
+                              "Interviewing",
+                              "Offer",
+                              "Rejected",
+                              "Withdrawn"
+                            ]
+                          },
+                          "occurredAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                          },
+                          "actor": {
+                            "type": "string",
+                            "enum": [
+                              "user",
+                              "gmail",
+                              "system"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "fromStatus",
+                          "toStatus",
+                          "occurredAt",
+                          "actor"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "company",
+                    "role",
+                    "status",
+                    "dateApplied",
+                    "source",
+                    "salaryMin",
+                    "salaryMax",
+                    "salaryCurrency",
+                    "jobLink",
+                    "contact",
+                    "nextStep",
+                    "nextStepDate",
+                    "notes",
+                    "createdAt",
+                    "updatedAt",
+                    "lastActivityAt",
+                    "version",
+                    "needsFollowUp",
+                    "isClosed",
+                    "history"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cross-site request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such application (or not yours)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "The version is stale; ETag holds the current one",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The body is not JSON",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "If-Match is required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many changes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error, always in the shared error shape",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/demo": {
+      "post": {
+        "summary": "Sign in as the shared demo account",
+        "operationId": "postAuthDemo",
+        "tags": [
+          "auth"
+        ],
+        "x-auth": "public",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "pictureUrl": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "timeZone": {
+                          "type": "string"
+                        },
+                        "isDemo": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "email",
+                        "name",
+                        "pictureUrl",
+                        "timeZone",
+                        "isDemo"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "user"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cross-site request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The body is not JSON",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many sign-in attempts from this address",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error, always in the shared error shape",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "summary": "Sign out (idempotent)",
+        "operationId": "postAuthLogout",
+        "tags": [
+          "auth"
+        ],
+        "x-auth": "public",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "204 (no body)"
+          },
+          "400": {
+            "description": "The request is malformed or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cross-site request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The body is not JSON",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error, always in the shared error shape",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "summary": "Liveness (never touches the database)",
+        "operationId": "getHealth",
+        "tags": [
+          "health"
+        ],
+        "x-auth": "public",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ok",
+                        "unavailable"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error, always in the shared error shape",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health/db": {
+      "get": {
+        "summary": "Readiness: the database answers",
+        "operationId": "getHealthDb",
+        "tags": [
+          "health"
+        ],
+        "x-auth": "public",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ok",
+                        "unavailable"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ok",
+                        "unavailable"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error, always in the shared error shape",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/me": {
+      "delete": {
+        "summary": "Delete the account and all its data",
+        "operationId": "deleteMe",
+        "tags": [
+          "me"
+        ],
+        "x-auth": "user",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "confirm": {
+                    "type": "string",
+                    "const": "delete my account"
+                  }
+                },
+                "required": [
+                  "confirm"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "204 (no body)"
+          },
+          "400": {
+            "description": "The request is malformed or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not available to the demo account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The body is not JSON",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error, always in the shared error shape",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "The signed-in user",
+        "operationId": "getMe",
+        "tags": [
+          "me"
+        ],
+        "x-auth": "user",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "pictureUrl": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "timeZone": {
+                          "type": "string"
+                        },
+                        "isDemo": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "email",
+                        "name",
+                        "pictureUrl",
+                        "timeZone",
+                        "isDemo"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "user"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error, always in the shared error shape",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Change settings (time zone)",
+        "operationId": "patchMe",
+        "tags": [
+          "me"
+        ],
+        "x-auth": "user",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "timeZone": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "timeZone"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "pictureUrl": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "timeZone": {
+                          "type": "string"
+                        },
+                        "isDemo": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "email",
+                        "name",
+                        "pictureUrl",
+                        "timeZone",
+                        "isDemo"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "user"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cross-site request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The body is not JSON",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error, always in the shared error shape",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/me/export": {
+      "get": {
+        "summary": "Download everything about the user as JSON",
+        "operationId": "getMeExport",
+        "tags": [
+          "me"
+        ],
+        "x-auth": "user",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exportedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "pictureUrl": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "timeZone": {
+                          "type": "string"
+                        },
+                        "isDemo": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "email",
+                        "name",
+                        "pictureUrl",
+                        "timeZone",
+                        "isDemo"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "applications": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "company": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "Saved",
+                              "Applied",
+                              "Screening",
+                              "Interviewing",
+                              "Offer",
+                              "Rejected",
+                              "Withdrawn"
+                            ]
+                          },
+                          "dateApplied": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "LinkedIn",
+                              "Indeed",
+                              "Referral",
+                              "Company site",
+                              "Recruiter",
+                              "Other"
+                            ]
+                          },
+                          "salaryMin": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "salaryMax": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "salaryCurrency": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "jobLink": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "contact": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "nextStep": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "nextStepDate": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "notes": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                          },
+                          "lastActivityAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "needsFollowUp": {
+                            "type": "boolean"
+                          },
+                          "isClosed": {
+                            "type": "boolean"
+                          },
+                          "history": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "fromStatus": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "Saved",
+                                        "Applied",
+                                        "Screening",
+                                        "Interviewing",
+                                        "Offer",
+                                        "Rejected",
+                                        "Withdrawn"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "toStatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "Saved",
+                                    "Applied",
+                                    "Screening",
+                                    "Interviewing",
+                                    "Offer",
+                                    "Rejected",
+                                    "Withdrawn"
+                                  ]
+                                },
+                                "occurredAt": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                                },
+                                "actor": {
+                                  "type": "string",
+                                  "enum": [
+                                    "user",
+                                    "gmail",
+                                    "system"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "fromStatus",
+                                "toStatus",
+                                "occurredAt",
+                                "actor"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "company",
+                          "role",
+                          "status",
+                          "dateApplied",
+                          "source",
+                          "salaryMin",
+                          "salaryMax",
+                          "salaryCurrency",
+                          "jobLink",
+                          "contact",
+                          "nextStep",
+                          "nextStepDate",
+                          "notes",
+                          "createdAt",
+                          "updatedAt",
+                          "lastActivityAt",
+                          "version",
+                          "needsFollowUp",
+                          "isClosed",
+                          "history"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "exportedAt",
+                    "user",
+                    "applications"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not available to the demo account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error, always in the shared error shape",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "minLength": 1
+          },
+          "message": {
+            "type": "string"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "message"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "securitySchemes": {
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "__Host-session"
+      }
+    }
+  }
+}

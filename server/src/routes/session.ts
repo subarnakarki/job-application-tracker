@@ -39,6 +39,7 @@ export function registerSessionRoutes(app: FastifyInstance, deps: SessionRouteDe
         auth: 'public',
         contract: {
           summary: 'Sign in as the shared demo account',
+          errors: { 429: 'Too many sign-in attempts from this address' },
           responses: { 200: UserEnvelopeSchema },
         },
       },

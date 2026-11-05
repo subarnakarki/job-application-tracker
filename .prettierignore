@@ -6,3 +6,4 @@ test-results
 package-lock.json
 build
 api/index.ts
+docs/openapi.json

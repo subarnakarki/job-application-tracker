@@ -132,6 +132,7 @@ export function registerTestRoutes(app: FastifyInstance, deps: TestRouteDeps): v
         auth: 'user',
         contract: {
           summary: "Test only: freeze or shift the user's clock",
+          errors: { 403: 'Only synthetic test users may change their clock' },
           headers: SecretHeaders,
           body: ClockBody,
           responses: { 200: NowResponse },

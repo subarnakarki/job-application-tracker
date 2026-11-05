@@ -63,6 +63,7 @@ export function registerMeRoutes(app: FastifyInstance, db: Db | undefined): void
         auth: 'user',
         contract: {
           summary: 'Download everything about the user as JSON',
+          errors: { 403: 'Not available to the demo account' },
           responses: { 200: DataExportSchema },
         },
       },
@@ -97,6 +98,7 @@ export function registerMeRoutes(app: FastifyInstance, db: Db | undefined): void
         auth: 'user',
         contract: {
           summary: 'Delete the account and all its data',
+          errors: { 403: 'Not available to the demo account' },
           body: DeleteAccountBody,
           responses: { 204: null },
         },
