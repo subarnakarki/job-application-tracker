@@ -100,7 +100,8 @@ export function ApplicationsPage() {
           onClick={() => setFilters({ followUp: filters.followUp ? undefined : true })}
           className={filters.followUp ? 'btn-primary' : 'btn-secondary'}
         >
-          Needs follow-up ({pipeline.data?.followUpCount ?? 0})
+          Needs follow-up
+          {pipeline.data ? ` (${pipeline.data.followUpCount})` : ''}
         </button>
         {!me.data?.isDemo && (
           <a href={exportHref} className="btn-secondary" download>
