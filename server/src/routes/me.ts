@@ -11,7 +11,9 @@ import { updateTimeZone } from '../auth/users';
 import type { Db } from '../db/types';
 import { ApiError, parseInput } from '../http/errors';
 import { deleteUser, listAllWithHistory } from '../repo/applications';
+import { listAllImports } from '../repo/imports';
 import { presentDetail } from '../repo/present';
+import { presentImportItem, presentImportRun } from './import';
 
 /** Deleting an account cannot be undone, so the request must say so explicitly. */
 export const ACCOUNT_DELETION_CONFIRMATION = 'delete my account';
@@ -76,6 +78,7 @@ export function registerMeRoutes(app: FastifyInstance, db: Db | undefined): void
 
       const now = request.clock.now();
       const applications = await listAllWithHistory(db, user.id);
+      const imports = await listAllImports(db, user.id);
       void reply.header(
         'content-disposition',
         `attachment; filename="job-applications-${localDateIn(now, user.timeZone)}.json"`,
@@ -86,6 +89,11 @@ export function registerMeRoutes(app: FastifyInstance, db: Db | undefined): void
         applications: applications.map((entry) =>
           presentDetail(entry, { now, timeZone: user.timeZone }),
         ),
+        imports: {
+          runs: imports.runs.map(presentImportRun),
+          // Unfinished claims are internal bookkeeping, not data about the user.
+          items: imports.items.filter((item) => item.outcome !== 'pending').map(presentImportItem),
+        },
       };
     },
   );

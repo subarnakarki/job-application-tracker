@@ -13,6 +13,10 @@ import { googleProviderFromEnv, type GoogleProvider } from './auth/google';
 import { registerApplicationRoutes } from './routes/applications';
 import { registerGoogleRoutes } from './routes/google';
 import { registerHealthRoutes } from './routes/health';
+import { registerImportRoutes } from './routes/import';
+import { classifierFromEnv, type EmailClassifier } from './import/classify';
+import { gmailRestClient, type GmailClient } from './import/gmail';
+import { gmailAuthorizerFromEnv, type GmailAuthorizer } from './import/gmailAuth';
 import { registerMeRoutes } from './routes/me';
 import { registerSessionRoutes } from './routes/session';
 import { registerTestRoutes, registerTestSecretGuard } from './routes/testSupport';
@@ -27,6 +31,10 @@ export interface AppDeps {
   env?: Record<string, string | undefined>;
   /** Google sign-in. Defaults to the real provider when GOOGLE_CLIENT_ID/SECRET are set; tests pass a stub. */
   google?: GoogleProvider | null;
+  /** Gmail import: read-only Gmail consent, the Gmail API and the Claude classifier. Tests pass stubs. */
+  gmailAuthorizer?: GmailAuthorizer | null;
+  gmail?: GmailClient;
+  classifier?: EmailClassifier | null;
   /** Validate every response against its route contract (tests). */
   validateResponses?: boolean;
 }
@@ -75,6 +83,15 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   registerGoogleRoutes(app, { db: deps.db, clock, env, google });
   registerMeRoutes(app, deps.db);
   registerApplicationRoutes(app, { db: deps.db, clock });
+  registerImportRoutes(app, {
+    db: deps.db,
+    clock,
+    env,
+    authorizer:
+      deps.gmailAuthorizer === undefined ? gmailAuthorizerFromEnv(env) : deps.gmailAuthorizer,
+    gmail: deps.gmail ?? gmailRestClient,
+    classifier: deps.classifier === undefined ? classifierFromEnv(env) : deps.classifier,
+  });
   if (testRoutes) registerTestRoutes(app, { db: deps.db, clock });
 
   return app;

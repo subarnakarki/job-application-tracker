@@ -37,6 +37,10 @@ const ISOLATION_COVERAGE: Record<string, string> = {
   'GET /api/applications/:id': 'server/src/routes/applications.test.ts',
   'PATCH /api/applications/:id': 'server/src/routes/applications.test.ts',
   'DELETE /api/applications/:id': 'server/src/routes/applications.test.ts',
+  'GET /api/import/runs/:id': 'server/src/routes/import.test.ts',
+  'POST /api/import/items/:id/undo': 'server/src/routes/import.test.ts',
+  'POST /api/import/items/:id/apply': 'server/src/routes/import.test.ts',
+  'POST /api/import/items/:id/dismiss': 'server/src/routes/import.test.ts',
 };
 
 const callRoute = (

@@ -2,6 +2,9 @@ import type { FastifyInstance, LightMyRequestResponse } from 'fastify';
 import { buildApp } from '../app';
 import { SESSION_COOKIE } from '../auth/cookies';
 import type { GoogleProvider } from '../auth/google';
+import type { EmailClassifier } from '../import/classify';
+import type { GmailClient } from '../import/gmail';
+import type { GmailAuthorizer } from '../import/gmailAuth';
 import { createSession } from '../auth/sessions';
 import type { Clock } from '../clock';
 import { runMigrations } from '../db/migrate';
@@ -47,6 +50,10 @@ export interface TestAppOptions {
   env?: Record<string, string | undefined>;
   /** Google sign-in stub (defaults to none: Google not configured). */
   google?: GoogleProvider | null;
+  /** Gmail import stubs (default: not configured). */
+  gmailAuthorizer?: GmailAuthorizer | null;
+  gmail?: GmailClient;
+  classifier?: EmailClassifier | null;
   /** Add extra routes (a probe) before the app starts. */
   configure?: (app: FastifyInstance) => void;
 }
@@ -61,6 +68,9 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     clock,
     env: options.env ?? {},
     google: options.google ?? null,
+    gmailAuthorizer: options.gmailAuthorizer ?? null,
+    ...(options.gmail ? { gmail: options.gmail } : {}),
+    classifier: options.classifier ?? null,
     validateResponses: true,
   });
   options.configure?.(app);

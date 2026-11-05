@@ -38,7 +38,7 @@ export interface GoogleRouteDeps {
 }
 
 /** The public origin the browser used. On Vercel the platform sets the forwarded headers. */
-function origin(request: FastifyRequest, env: Record<string, string | undefined>): string {
+export function origin(request: FastifyRequest, env: Record<string, string | undefined>): string {
   const configured = env['PUBLIC_ORIGIN'];
   if (configured) return configured.replace(/\/$/, '');
   const header = (name: string) => {
@@ -51,7 +51,7 @@ function origin(request: FastifyRequest, env: Record<string, string | undefined>
   return `http://${header('host') ?? 'localhost'}`;
 }
 
-function sameToken(a: string, b: string): boolean {
+export function sameToken(a: string, b: string): boolean {
   const left = Buffer.from(a);
   const right = Buffer.from(b);
   return left.length === right.length && timingSafeEqual(left, right);

@@ -60,6 +60,7 @@ describe('response contracts', () => {
         exportedAt: '2026-11-05T12:00:00.000Z',
         user,
         applications: [{ ...application, history: [history] }],
+        imports: { runs: [], items: [] },
       }).success,
     ).toBe(true);
   });

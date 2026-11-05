@@ -61,14 +61,6 @@ export const UserSchema = z.strictObject({
 });
 export type User = z.infer<typeof UserSchema>;
 
-/** `GET /api/me/export`: everything the app holds about the user. */
-export const DataExportSchema = z.strictObject({
-  exportedAt: instant,
-  user: UserSchema,
-  applications: z.array(ApplicationDetailSchema),
-});
-export type DataExport = z.infer<typeof DataExportSchema>;
-
 /** Every 4xx/5xx body. `issues` lists field problems for validation errors. */
 export const ErrorSchema = z.strictObject({
   error: z.string().min(1),
@@ -117,3 +109,70 @@ export const StatsSchema = z.strictObject({
   totals: z.strictObject(stageCounts),
 });
 export type Stats = z.infer<typeof StatsSchema>;
+
+export const IMPORT_VERDICT_KINDS = [
+  'application_confirmation',
+  'rejection',
+  'interview_invite',
+  'assessment',
+  'offer',
+  'not_job_related',
+] as const;
+
+/** Visible outcomes of one imported email ('pending' is internal and never returned). */
+export const IMPORT_OUTCOMES = [
+  'created',
+  'status_changed',
+  'needs_review',
+  'ignored',
+  'undone',
+  'dismissed',
+] as const;
+
+/** One email from a Gmail import and what it led to. The email body is never stored. */
+export const ImportItemSchema = z.strictObject({
+  id: z.uuid(),
+  emailFrom: z.string(),
+  emailSubject: z.string(),
+  emailDate: instant.nullable(),
+  verdictKind: z.enum(IMPORT_VERDICT_KINDS).nullable(),
+  confidence: z.enum(['high', 'medium', 'low']).nullable(),
+  company: z.string().nullable(),
+  role: z.string().nullable(),
+  summary: z.string(),
+  reason: z.string(),
+  outcome: z.enum(IMPORT_OUTCOMES),
+  proposedStatus: z.enum(STATUSES).nullable(),
+  applicationId: z.uuid().nullable(),
+  fromStatus: z.enum(STATUSES).nullable(),
+  toStatus: z.enum(STATUSES).nullable(),
+});
+export type ImportItem = z.infer<typeof ImportItemSchema>;
+
+export const ImportRunSchema = z.strictObject({
+  id: z.uuid(),
+  startedAt: instant,
+  finishedAt: instant.nullable(),
+  emailsScanned: z.number().int().min(0),
+  status: z.enum(['running', 'finished', 'failed']),
+});
+
+/** `GET /api/import/runs/:id`. */
+export const ImportRunDetailSchema = z.strictObject({
+  run: ImportRunSchema,
+  items: z.array(ImportItemSchema),
+});
+export type ImportRunDetail = z.infer<typeof ImportRunDetailSchema>;
+
+/** `GET /api/import/status`: whether this user may import from Gmail. */
+export const ImportStatusSchema = z.strictObject({ available: z.boolean() });
+
+/** `GET /api/me/export`: everything the app holds about the user. */
+export const DataExportSchema = z.strictObject({
+  exportedAt: instant,
+  user: UserSchema,
+  applications: z.array(ApplicationDetailSchema),
+  /** Gmail imports: which emails were read and what each led to (never the email body). */
+  imports: z.strictObject({ runs: z.array(ImportRunSchema), items: z.array(ImportItemSchema) }),
+});
+export type DataExport = z.infer<typeof DataExportSchema>;

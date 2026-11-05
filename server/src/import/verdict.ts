@@ -1,14 +1,7 @@
-import { isClosed, STATUSES, type Status } from '@jat/shared';
+import { IMPORT_VERDICT_KINDS, isClosed, STATUSES, type Status } from '@jat/shared';
 import { z } from 'zod';
 
-export const VERDICT_KINDS = [
-  'application_confirmation',
-  'rejection',
-  'interview_invite',
-  'assessment',
-  'offer',
-  'not_job_related',
-] as const;
+export const VERDICT_KINDS = IMPORT_VERDICT_KINDS;
 export type VerdictKind = (typeof VERDICT_KINDS)[number];
 
 export const CONFIDENCES = ['high', 'medium', 'low'] as const;
