@@ -44,6 +44,9 @@ and no upcoming next-step date.
 - Work in phases. After each phase: run lint, type-check, and all tests before moving on, then stop for review.
 - Commit after each small logical step (not only at the end of a phase) and push immediately, so progress is
   always on the remote. Keep every commit green (lint, type-check, tests) and use clear, descriptive messages.
+- Work directly on `main` and push to `main` (the owner's standing instruction; plain pushes, never force).
+  Vercel production deploys from `main`, so every push redeploys; keep `main` green. Commits are authored by the
+  owner with a `Co-Authored-By: Claude` trailer.
 
 ## Commands
 
