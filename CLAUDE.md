@@ -42,6 +42,8 @@ and no upcoming next-step date.
 
 - Plan first. Don't write code until the plan is approved. The approved plan is in `docs/PLAN.md`.
 - Work in phases. After each phase: run lint, type-check, and all tests before moving on, then stop for review.
+- Commit after each small logical step (not only at the end of a phase) and push immediately, so progress is
+  always on the remote. Keep every commit green (lint, type-check, tests) and use clear, descriptive messages.
 
 ## Commands
 
