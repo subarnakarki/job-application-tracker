@@ -20,7 +20,7 @@
     "test": "vitest run",
     "db:up": "docker compose up -d --wait db",
     "db:down": "docker compose down",
-    "build:api": "esbuild server/src/vercel.ts --bundle --platform=node --format=esm --target=node24 --banner:js=\"import { createRequire as __cr } from \\\"node:module\\\"; const require = __cr(import.meta.url);\" --outfile=api/index.js"
+    "build:api": "esbuild server/src/vercel.ts --bundle --platform=node --format=esm --target=node24 --banner:js=\"import { createRequire as __cr } from \\\"node:module\\\"; const require = __cr(import.meta.url);\" --outfile=build/handler.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

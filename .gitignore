@@ -9,4 +9,4 @@ test-results
 *.log
 .DS_Store
 .vercel
-api/index.js
+build
