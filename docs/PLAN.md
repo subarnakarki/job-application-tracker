@@ -106,3 +106,26 @@ strict response contracts, optimistic concurrency, quotas under a lock, per-user
 for every id route. Reference: [API.md](API.md). Differences from the plan: a stale version answers **412** (with
 `If-Match`, standard HTTP) rather than 409, and a missing `If-Match` answers 428. Migration `0003` adds a sequence so
 history written at the same instant keeps its order. Neon now has migrations 0001 to 0003.
+
+## Portfolio tooling (added after Phase 4)
+
+Chosen by the owner. Consumer-driven contract testing (Pact) was considered and left out: the web app is the only
+consumer, lives in the same repo, shares the zod schemas and deploys atomically with the API, so Pact would only
+re-verify what the compiler and the schema tests already guarantee. The real skew risk (a browser tab running old
+JavaScript across a deploy) is covered by breaking-change detection instead.
+
+**Phase 4.5: contracts and mutation testing** (before 5a, so the list endpoint is covered from day one)
+
+- Every route declares its response schemas in its route config, next to `auth`; a shared `ErrorSchema` covers
+  error bodies. In tests, every JSON response is validated against the declared schema, and the route-registry
+  meta-test fails for any route without one, so contract coverage is automatic, like the security checks.
+- An OpenAPI document is generated from those schemas (committed, and served in non-production builds).
+- `oasdiff` in CI compares the spec with `main` and fails on breaking API changes.
+- **Schemathesis** fuzzes the API from the spec against a CI instance (with a test user), failing on any 500,
+  schema violation or undocumented status.
+- **StrykerJS** runs mutation testing on `shared/` and the server's domain and repository code, with a score
+  threshold in CI (incremental, so it stays fast).
+
+**Phase 12 addition:** an **OWASP ZAP** baseline scan in CI against a preview deployment.
+
+Not adopted (for now): MSW, Playwright visual comparisons, k6, Lighthouse CI, scheduled production smoke tests.
