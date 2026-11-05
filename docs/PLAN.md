@@ -80,3 +80,13 @@ Passed on 2026-11-05; details and lessons in [SPIKE.md](SPIKE.md). Plan changes 
 Domain core is in `shared/` (pure, no I/O) with 143 tests including fast-check property tests: constants,
 calendar/time-zone date helpers, `needsFollowUp` and `followUpWindow`, status and `dateApplied` rules,
 `changedFields`, and zod schemas. Rules are written down in [DOMAIN.md](DOMAIN.md).
+
+## Phase 2 outcome
+
+`server/src/db/`: `createDb` (small pool, explicit TLS, `date` as strings, transactions), the migration runner
+(numbered files, checksums, lock/statement timeouts, no-transaction escape hatch, advisory lock), and
+`0001_init.sql` (users, identities, sessions, applications, status_history). `server/src/repo/followUpSql.ts` is the
+SQL twin of `needsFollowUp`, proven equal by a real-Postgres parity test. Tests run in isolated schemas and CI fails
+if the test database is missing. The app takes injected dependencies (`buildApp({ db, logger })`), has a DB-backed
+`/api/health/db`, and returns a fixed body for any 5xx. Not done here: rate-limit and test-clock tables (Phase 3,
+as additive migrations), applying migrations to Neon (Phase 13).

@@ -52,7 +52,10 @@ and no upcoming next-step date.
 
 - `npm run lint`, `npm run format:check`, `npm run typecheck`, `npm test` (all from the repo root)
 - `npm run dev:server` (Fastify on :3000), `npm run dev:web` (Vite, proxies `/api` to :3000)
-- `npm run db:up` starts local Postgres (docker compose); used from Phase 2
+- `npm run db:up` starts local Postgres 18 (docker compose). Database tests need `TEST_DATABASE_URL`
+  (e.g. `postgres://jat:jat@127.0.0.1:5432/jat`); CI always sets it and fails if it is missing.
+- `DATABASE_URL_DIRECT=... npm run db:migrate` applies migrations over the direct (unpooled) Neon URL
+  (also the manual "Migrate" workflow). Never edit an applied migration: add a new one.
 
 ## Layout
 

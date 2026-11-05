@@ -121,3 +121,11 @@ What went wrong on the way, and what we learned (keep for Phase 12/13):
 Spike code still in the repo (delete or promote in Phase 2): `server/src/spike/*` (probe routes, pool, migration
 runner), the `spike_ping` table and its row(s) in Neon, `.github/workflows/spike-migrate.yml`. Keep the deploy
 plumbing: `api/index.ts` stub, `server/src/vercel.ts`, `build:api`, `vercel.json`.
+
+### Phase 2: spike code removed
+
+The probe routes, the spike migration runner, `spike_ping` migration and the "Spike migrate" workflow were
+deleted. The deploy plumbing stayed (`api/index.ts` stub, `server/src/vercel.ts`, `build:api`, `vercel.json`).
+**Still in Neon:** the `spike_ping` table (with 3 rows) and a `001_spike_ping.sql` row in `schema_migrations`.
+The real migrations (`0001_init.sql`) have not been applied to Neon yet; that happens in Phase 13, together with
+dropping `spike_ping`. The runner reports the old row as "applied but no longer on disk" and carries on.
