@@ -29,10 +29,13 @@ const PUBLIC_TEST_ROUTES = ['POST /api/test/login', 'POST /api/test/cleanup'].so
 
 /**
  * Signed-in routes that address a record by id, mapped to the test file proving
- * another user gets 404. Empty until Phase 4 adds the applications endpoints;
- * the check below then forces each one to be listed.
+ * another user gets 404. The check below fails for any id route not listed here.
  */
-const ISOLATION_COVERAGE: Record<string, string> = {};
+const ISOLATION_COVERAGE: Record<string, string> = {
+  'GET /api/applications/:id': 'server/src/routes/applications.test.ts',
+  'PATCH /api/applications/:id': 'server/src/routes/applications.test.ts',
+  'DELETE /api/applications/:id': 'server/src/routes/applications.test.ts',
+};
 
 const callRoute = (
   t: TestApp,

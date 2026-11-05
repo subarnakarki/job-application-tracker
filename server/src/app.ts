@@ -8,6 +8,7 @@ import type { Db } from './db/types';
 import { ApiError } from './http/errors';
 import { enforceRoutePolicy } from './http/policy';
 import { registerRequestPipeline } from './http/pipeline';
+import { registerApplicationRoutes } from './routes/applications';
 import { registerHealthRoutes } from './routes/health';
 import { registerMeRoutes } from './routes/me';
 import { registerSessionRoutes } from './routes/session';
@@ -62,6 +63,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   registerHealthRoutes(app, deps.db);
   registerSessionRoutes(app, { db: deps.db, clock, env });
   registerMeRoutes(app, deps.db);
+  registerApplicationRoutes(app, { db: deps.db, clock });
   if (testRoutes) registerTestRoutes(app, { db: deps.db, clock });
 
   return app;
