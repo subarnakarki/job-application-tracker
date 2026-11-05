@@ -12,7 +12,7 @@ This is the plan agreed before any code was written. Update it when a decision c
 | Database        | Neon Postgres via `pg`: pooled URL at runtime, direct URL for migrations. UUID keys, `timestamptz`/`date`, `CHECK` constraints, `ON DELETE CASCADE`. Real Postgres in tests |
 | Auth            | Google sign-in (OIDC + PKCE, `openid-client` or `jose`), open signup, `identities(provider, subject, user_id)` table. Cookie sessions (`__Host-`, hashed token in DB)       |
 | Demo            | Shared demo account, reset daily; cap about 30 applications; banner; export and deletion disabled                                                                           |
-| Hosting         | Vercel (static web + Fastify function), Neon free tier, region US East for both, free `*.vercel.app` domain                                                                 |
+| Hosting         | Vercel (static web + Fastify function), Neon free tier, region: Vercel `cle1` (Cleveland) next to Neon AWS us-east-2 (Ohio), free `*.vercel.app` domain                     |
 | Follow-up clock | `last_activity_at` (real user edits only). `updated_at` is audit only                                                                                                       |
 | List behaviour  | Closed applications shown, muted. CSV export respects filters. Pipeline counts respect search `q` but ignore the status filter                                              |
 | History         | `status_history(from_status, to_status, occurred_at, recorded_at, actor)`. No back-dating in the MVP. `date_applied` auto-fills when status first reaches Applied or later  |

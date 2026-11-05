@@ -8,7 +8,7 @@ and is deleted when the spike ends.
 | ------------------------------------------------------- | -------------------------------------------------- |
 | Fastify runs as a Vercel function, `/api/*` rewrites ok | `GET /api/health`, `GET /api/spike/info`           |
 | `@jat/shared` (TS source) resolves in the function      | `/api/spike/info` returns the app name             |
-| Function runs in `iad1`, Node 24                        | `/api/spike/info` -> `vercelRegion`, `nodeVersion` |
+| Function runs in `cle1`, Node 24                        | `/api/spike/info` -> `vercelRegion`, `nodeVersion` |
 | Neon pooled URL works with `pg` and a small pool        | `GET /api/spike/db`                                |
 | Transactions work through the pooler                    | `POST /api/spike/db/ping`                          |
 | Cold start vs warm latency incl. Neon wake-up           | `coldStart` and `queryMs` fields                   |
@@ -29,12 +29,12 @@ and is deleted when the spike ends.
    Environment variable `DATABASE_URL` = Neon **pooled** string (host contains `-pooler`),
    for Production and Preview. Deploy.
 5. **Vercel settings check.** Settings -> General: Node.js Version `24.x`.
-   Settings -> Functions: region is Washington D.C. (`iad1`).
+   Settings -> Functions: region is Cleveland (`cle1`, next to Neon AWS us-east-2 in Ohio).
 6. Tell Claude the production URL. Claude runs the checks above with `curl`.
 
 ## What "pass" looks like
 
-- `/api/health` -> `{"status":"ok"}`; `/api/spike/info` -> region `iad1`, Node `v24.*`, app name present.
+- `/api/health` -> `{"status":"ok"}`; `/api/spike/info` -> region `cle1`, Node `v24.*`, app name present.
 - `/api/spike/db` first call `coldStart: true`, second `coldStart: false`; record both `queryMs`.
 - `/api/spike/db/ping` total increases on each call.
 - Cookie: `Set-Cookie` has `__Host-spike=1; Path=/; Secure; HttpOnly; SameSite=Lax`, and
