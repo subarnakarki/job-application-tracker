@@ -52,37 +52,63 @@ export function reachedStages(statuses: readonly Status[]): StageFlags {
   return { applied, responded, interviewing, offer };
 }
 
-function emptyCounts(): StageCounts {
-  return { total: 0, applied: 0, responded: 0, interviewing: 0, offers: 0, responseRate: null };
-}
+/** Raw counts for one source, before rates and totals (what the SQL query returns). */
+export type SourceCounts = Omit<SourceStats, 'responseRate'>;
 
-function add(counts: StageCounts, flags: StageFlags): void {
-  counts.total += 1;
-  if (flags.applied) counts.applied += 1;
-  if (flags.responded) counts.responded += 1;
-  if (flags.interviewing) counts.interviewing += 1;
-  if (flags.offer) counts.offers += 1;
-}
-
-function withRate<T extends StageCounts>(counts: T): T {
+function withRate<T extends Omit<StageCounts, 'responseRate'>>(counts: T): T & StageCounts {
   return {
     ...counts,
     responseRate: counts.applied === 0 ? null : counts.responded / counts.applied,
   };
 }
 
+/** Fills in missing sources (as zeros), adds totals and response rates. */
+export function statsSummary(rows: readonly SourceCounts[]): StatsSummary {
+  const bySource = new Map(rows.map((row) => [row.source, row]));
+  const sources = SOURCES.map((source) =>
+    withRate(
+      bySource.get(source) ?? {
+        source,
+        total: 0,
+        applied: 0,
+        responded: 0,
+        interviewing: 0,
+        offers: 0,
+      },
+    ),
+  );
+  const sum = (key: keyof Omit<StageCounts, 'responseRate'>) =>
+    sources.reduce((total, row) => total + row[key], 0);
+  return {
+    sources,
+    totals: withRate({
+      total: sum('total'),
+      applied: sum('applied'),
+      responded: sum('responded'),
+      interviewing: sum('interviewing'),
+      offers: sum('offers'),
+    }),
+  };
+}
+
 export function summarizeBySource(subjects: readonly StatsSubject[]): StatsSummary {
-  const bySource = new Map<Source, StageCounts>(SOURCES.map((source) => [source, emptyCounts()]));
-  const totals = emptyCounts();
+  const counts = new Map<Source, SourceCounts>();
   for (const subject of subjects) {
     const flags = reachedStages(subject.statuses);
-    add(bySource.get(subject.source) ?? emptyCounts(), flags);
-    add(totals, flags);
+    const row = counts.get(subject.source) ?? {
+      source: subject.source,
+      total: 0,
+      applied: 0,
+      responded: 0,
+      interviewing: 0,
+      offers: 0,
+    };
+    row.total += 1;
+    if (flags.applied) row.applied += 1;
+    if (flags.responded) row.responded += 1;
+    if (flags.interviewing) row.interviewing += 1;
+    if (flags.offer) row.offers += 1;
+    counts.set(subject.source, row);
   }
-  return {
-    sources: SOURCES.map((source) =>
-      withRate({ source, ...(bySource.get(source) ?? emptyCounts()) }),
-    ),
-    totals: withRate(totals),
-  };
+  return statsSummary([...counts.values()]);
 }

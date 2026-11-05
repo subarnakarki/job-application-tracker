@@ -6,6 +6,7 @@ import {
   ListQuerySchema,
   localDateIn,
   PipelineSchema,
+  StatsSchema,
 } from '@jat/shared';
 import { z } from 'zod';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -24,6 +25,7 @@ import {
 } from '../repo/applications';
 import { toCsv } from '../repo/csv';
 import { presentApplication, presentDetail } from '../repo/present';
+import { statsBySource } from '../repo/stats';
 
 const PipelineQuery = z.strictObject({ q: ListQuerySchema.shape.q });
 
@@ -140,6 +142,20 @@ export function registerApplicationRoutes(app: FastifyInstance, deps: Applicatio
       const { q } = parseInput(PipelineQuery, { ...(request.query as object) });
       return pipelineCounts(db, owner, q, request.clock.now());
     },
+  );
+
+  app.get(
+    '/api/stats',
+    {
+      config: {
+        auth: 'user',
+        contract: {
+          summary: 'How far applications from each source got (responses, interviews, offers)',
+          responses: { 200: StatsSchema },
+        },
+      },
+    },
+    async (request) => statsBySource(requireDb(), ownerOf(request)),
   );
 
   app.get(
