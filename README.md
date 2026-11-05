@@ -13,6 +13,8 @@ Built by an SDET as a portfolio project, so the tests matter as much as the feat
   Tap a stage to filter.
 - Search, sort and a "needs follow-up" filter: Applied, Screening or Interviewing with no update for 7+ days and
   no upcoming next step, worked out in your own time zone. Filters live in the URL.
+- Board view: drag an application to another stage column (mouse, long-press on touch, or the keyboard), or
+  use the "Move to" menu on any card in the list or the board. Moves show at once and roll back if they fail.
 - Add, edit and delete, with status history. Edits send only changed fields and are guarded against overwriting
   someone else's change (`If-Match`, 412 on conflict).
 - CSV export (respects the filters), JSON download of everything, account deletion.
@@ -23,19 +25,19 @@ Built by an SDET as a portfolio project, so the tests matter as much as the feat
 
 ## Stack
 
-| Layer    | Choice                                                                   |
-| -------- | ------------------------------------------------------------------------ |
-| Frontend | React 19, TypeScript, Vite, Tailwind CSS 4, TanStack Query, React Router |
-| Backend  | Node 24, Fastify 5, zod (schemas shared with the frontend)               |
-| Data     | Neon Postgres (`pg`), plain SQL, numbered migrations with checksums      |
-| Auth     | Google OIDC (authorization code + PKCE, `jose`), cookie sessions         |
-| Hosting  | Vercel (static app + one serverless function), US East                   |
-| Tests    | Vitest, Testing Library, fast-check, Playwright                          |
-| CI       | GitHub Actions: lint, format, type-check, unit/API, e2e                  |
+| Layer    | Choice                                                                            |
+| -------- | --------------------------------------------------------------------------------- |
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS 4, TanStack Query, React Router, dnd-kit |
+| Backend  | Node 24, Fastify 5, zod (schemas shared with the frontend)                        |
+| Data     | Neon Postgres (`pg`), plain SQL, numbered migrations with checksums               |
+| Auth     | Google OIDC (authorization code + PKCE, `jose`), cookie sessions                  |
+| Hosting  | Vercel (static app + one serverless function), US East                            |
+| Tests    | Vitest, Testing Library, fast-check, Playwright                                   |
+| CI       | GitHub Actions: lint, format, type-check, unit/API, e2e                           |
 
 ## How it is tested
 
-About 800 unit and API tests and 14 end-to-end runs, all on every push.
+About 890 unit and API tests and 25 end-to-end runs (desktop and phone viewports), all on every push.
 
 - **API tests against real Postgres.** Every test gets a fresh, migrated schema; no mocks of the database.
 - **Contract checks on every response.** Each route declares its inputs and responses; in tests every response

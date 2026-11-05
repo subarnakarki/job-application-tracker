@@ -229,7 +229,7 @@ are applied automatically with Undo, and only the owner can use it (`GMAIL_IMPOR
   and the Anthropic spending limit caps the cost.
 - Not built: the opt-in classifier eval script from the plan (the prompt was checked with the unit tests only).
 
-## Phase 11 plan: board view and quick status change (proposed, awaiting approval)
+## Phase 11 plan: board view and quick status change (approved and built)
 
 **Goal:** change an application's status in one step, from the list or by dragging it on a board.
 
@@ -258,6 +258,22 @@ are applied automatically with Undo, and only the owner can use it (`GMAIL_IMPOR
 
 **Risks:** dnd-kit drags in Playwright need stepped mouse moves (known pattern); a wide board on small phones relies
 on the menu rather than dragging.
+
+## Phase 11 outcome
+
+Built as planned, with no API changes: a "Move to" menu on every card (list and board), a Board view with
+`@dnd-kit/core`, instant moves that roll back on failure, and a clear message on a 412 conflict. Differences and
+findings:
+
+- The board widens the page (and header) to fit seven columns on desktop; on phones columns keep a fixed width and
+  scroll sideways.
+- List cards were restructured: the company name is the link, stretched over the card, so the menu is not nested
+  inside a link.
+- Keyboard dragging moves exactly one stage per arrow key, counting stages rather than measuring columns, and drops
+  on the stage the keys aimed at. Measuring broke on phones (the board scrolls during the drag) and on quick key
+  presses (dnd-kit resolves the column under the card a render later); both were found by the e2e runs.
+- Tests: instant-move helpers (unit), the menu (component), and e2e for the list menu (desktop and phone), a mouse
+  drag (desktop), a keyboard move (both) and a conflict (both). The drag and keyboard tests passed 10 repeated runs.
 
 ## Planned but not built
 
