@@ -529,6 +529,51 @@ describe.skipIf(!TEST_DATABASE_URL)('schema (real Postgres, real migrations)', (
     });
   });
 
+  describe('status_history order (0003)', () => {
+    it('keeps insertion order for rows written at the same instant', async () => {
+      const userId = await insertUser({ email: 'order@example.com' });
+      const applicationId = await insertApplication(userId);
+      const moves: [string | null, string][] = [
+        [null, 'Saved'],
+        ['Saved', 'Applied'],
+        ['Applied', 'Screening'],
+        ['Screening', 'Rejected'],
+        ['Rejected', 'Interviewing'],
+      ];
+      for (const [from, to] of moves) {
+        await sql(
+          "insert into status_history (application_id, from_status, to_status, occurred_at, recorded_at) values ($1, $2, $3, '2026-11-05T12:00:00Z', '2026-11-05T12:00:00Z')",
+          [applicationId, from, to],
+        );
+      }
+
+      const { rows } = await sql(
+        'select to_status from status_history where application_id = $1 order by occurred_at, seq',
+        [applicationId],
+      );
+
+      expect(rows.map((row) => (row as { to_status: string }).to_status)).toEqual(
+        moves.map(([, to]) => to),
+      );
+    });
+
+    it('does not let a client choose the sequence', async () => {
+      const userId = await insertUser({ email: 'seq@example.com' });
+      const applicationId = await insertApplication(userId);
+
+      expect(
+        (
+          await violation(
+            sql(
+              "insert into status_history (application_id, to_status, seq) values ($1, 'Saved', 1)",
+              [applicationId],
+            ),
+          )
+        ).code,
+      ).toBe('428C9');
+    });
+  });
+
   it('has the indexes the queries will rely on', async () => {
     const { rows } = await sql(
       'select indexname from pg_indexes where schemaname = current_schema() order by indexname',
@@ -545,6 +590,7 @@ describe.skipIf(!TEST_DATABASE_URL)('schema (real Postgres, real migrations)', (
         'sessions_expires_idx',
         'identities_user_idx',
         'rate_limits_window_idx',
+        'status_history_application_order_idx',
       ]),
     );
   });
