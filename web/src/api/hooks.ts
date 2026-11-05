@@ -2,6 +2,7 @@ import {
   ApplicationDetailSchema,
   ApplicationListSchema,
   PipelineSchema,
+  StatsSchema,
   UserEnvelopeSchema,
   type ApplicationInput,
   type ApplicationPatch,
@@ -54,6 +55,13 @@ export function usePipeline(q: string | undefined) {
   });
 }
 
+export function useStats() {
+  return useQuery({
+    queryKey: ['stats'],
+    queryFn: () => apiRequest('/api/stats', StatsSchema),
+  });
+}
+
 export function useApplication(id: string) {
   return useQuery({
     queryKey: ['application', id],
@@ -69,6 +77,7 @@ function useRefresh() {
     Promise.all([
       client.invalidateQueries({ queryKey: ['applications'] }),
       client.invalidateQueries({ queryKey: ['pipeline'] }),
+      client.invalidateQueries({ queryKey: ['stats'] }),
       client.invalidateQueries({ queryKey: ['application'] }),
     ]);
 }
@@ -106,6 +115,7 @@ export function useDeleteApplication(id: string) {
       return Promise.all([
         client.invalidateQueries({ queryKey: ['applications'] }),
         client.invalidateQueries({ queryKey: ['pipeline'] }),
+        client.invalidateQueries({ queryKey: ['stats'] }),
         client.invalidateQueries({
           queryKey: ['application'],
           predicate: (query) => query.queryKey[1] !== id,

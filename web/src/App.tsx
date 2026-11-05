@@ -12,6 +12,7 @@ import { ApplicationsPage } from './pages/ApplicationsPage';
 import { AccountPage } from './pages/AccountPage';
 import { LoginPage } from './pages/LoginPage';
 import { PrivacyPage } from './pages/PrivacyPage';
+import { StatsPage } from './pages/StatsPage';
 
 export function AppRoutes() {
   return (
@@ -23,6 +24,7 @@ export function AppRoutes() {
         <Route path="applications/new" element={<NewApplicationPage />} />
         <Route path="applications/:id" element={<ApplicationDetailPage />} />
         <Route path="applications/:id/edit" element={<EditApplicationPage />} />
+        <Route path="stats" element={<StatsPage />} />
         <Route path="account" element={<AccountPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
