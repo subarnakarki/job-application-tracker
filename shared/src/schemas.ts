@@ -65,7 +65,11 @@ const fields = {
   contact: optionalText(LIMITS.contact),
   nextStep: optionalText(LIMITS.nextStep),
   nextStepDate: dateOnly.nullable(),
-  notes: z.string().max(LIMITS.notes),
+  // Multi-line is fine, but Postgres cannot store NUL in text.
+  notes: z
+    .string()
+    .max(LIMITS.notes)
+    .refine((value) => !value.includes('\u0000'), 'Must not contain NUL characters'),
 };
 
 export interface SalaryIssue {
@@ -164,6 +168,8 @@ export const ListQuerySchema = z.strictObject({
     .string()
     .trim()
     .max(LIMITS.search)
+    // Postgres cannot hold NUL in text, and a search term is one line anyway.
+    .refine(singleLine, SINGLE_LINE_MESSAGE)
     .transform((value) => (value === '' ? undefined : value))
     .optional(),
   sort: z.enum(SORTS).default('updated_desc'),
