@@ -44,6 +44,7 @@ Each phase ends with lint, type-check and all tests green, then stops for review
 | 2   | DB layer: `pg`, migration runner, schema, `identities`, migration and constraint tests                                |
 | 3   | Sessions, CSRF, test-login, per-user clock, demo login, 401s, route-registry meta-test                                |
 | 4   | User-scoped CRUD, status history, `version`, locked caps, account deletion, data export, isolation and contract tests |
+| 4.5 | Contracts and mutation testing: route response schemas, OpenAPI, oasdiff, Schemathesis, StrykerJS                     |
 | 5a  | Query API: filters, search, sort                                                                                      |
 | 5b  | Pipeline counts and CSV export                                                                                        |
 | 6   | Web shell, list page, E2E infrastructure with synthetic users, axe, CI e2e job                                        |
@@ -52,7 +53,7 @@ Each phase ends with lint, type-check and all tests green, then stops for review
 | 9   | Add, edit, delete                                                                                                     |
 | 10  | Detail page and status history                                                                                        |
 | 11  | Search, follow-up filter and export UI                                                                                |
-| 12  | Hardening: docs, privacy page, security headers, flake check                                                          |
+| 12  | Hardening: docs, privacy page, security headers, flake check, OWASP ZAP baseline scan                                 |
 | 13  | Production deploy: migrate job, backups, uptime check, smoke test, CD                                                 |
 
 ## Later phases (not built)
