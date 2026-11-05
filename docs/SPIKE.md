@@ -85,3 +85,39 @@ Next steps:
 Environment notes: the cloud session's network policy must allow
 `job-application-tracker-eta-one.vercel.app` (Settings of the cloud environment, Network access),
 or `curl` returns `403 CONNECT tunnel failed`.
+
+### 2026-11-05: outcome (spike passed)
+
+All checks pass on production (https://job-application-tracker-eta-one.vercel.app, commit `9105a38`):
+
+| Check                                | Result                                                                                  |
+| ------------------------------------ | --------------------------------------------------------------------------------------- |
+| Fastify as a Vercel function         | `/api/health` returns `{"status":"ok"}`; unknown `/api/*` returns Fastify's JSON 404    |
+| SPA and deep-link fallback           | `/` and `/applications/1` return the app shell                                          |
+| `@jat/shared` inside the function    | `/api/spike/info` returns the app name (bundled, so no `.ts`-in-`node_modules` problem) |
+| Region and Node                      | function region `cle1` (next to Neon `aws-us-east-2`), Node `v24.22.2`                  |
+| Neon pooled URL via `pg`, pool max 2 | works; Postgres `18.6`                                                                  |
+| Transactions through the pooler      | `BEGIN/INSERT/COUNT/COMMIT` on one client works (`total` 1, 2, 3; 12-25 ms)             |
+| Cold vs warm                         | first query on a fresh instance 621 ms (includes first connection); warm queries 3-4 ms |
+| `__Host-` cookie on the real domain  | set with `Secure; HttpOnly; SameSite=Lax; Path=/`; returned only when the jar is sent   |
+| Migrations from CI on the direct URL | `Applied: 001_spike_ping.sql`; tables confirmed in Neon via the connector               |
+
+What went wrong on the way, and what we learned (keep for Phase 12/13):
+
+1. **Vercel emits ESM without file extensions**, so `api/index.ts` importing `../server/src/app` crashed with
+   `ERR_MODULE_NOT_FOUND`. Fix: bundle with esbuild (`npm run build:api` -> `build/handler.mjs`).
+2. **Vercel only detects functions from files committed to git** before the build. A bundle generated at build
+   time into `api/` is never deployed (every `/api` route falls through to the SPA with a 200). Fix: a committed
+   stub `api/index.ts` that re-exports `build/handler.mjs`. Vercel builds API files after the build command.
+3. **`engines.node` must be pinned** (`24.x`). `>=22.12` let Vercel pick Node 26.
+4. **Always assert the response body, not just the status.** The SPA fallback returns 200 for unknown paths, so
+   a status-only health check passes while the function is missing.
+5. **Hobby runtime logs are kept for 1 hour**; read them promptly (Vercel connector: `get_runtime_logs`).
+6. **Neon runs Postgres 18**, so CI and docker compose now use 18. Neon's point-in-time history is 6 hours on this
+   plan, so nightly `pg_dump` backups (Phase 13) matter.
+7. The `pg` driver warns that `sslmode=require` is currently an alias for `verify-full`; set the SSL mode
+   explicitly in Phase 2.
+
+Spike code still in the repo (delete or promote in Phase 2): `server/src/spike/*` (probe routes, pool, migration
+runner), the `spike_ping` table and its row(s) in Neon, `.github/workflows/spike-migrate.yml`. Keep the deploy
+plumbing: `api/index.ts` stub, `server/src/vercel.ts`, `build:api`, `vercel.json`.

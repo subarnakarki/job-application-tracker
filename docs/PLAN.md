@@ -64,3 +64,13 @@ Each phase ends with lint, type-check and all tests green, then stops for review
 ## Deferred, with revisit triggers
 
 Search indexes (trigram or full-text), Redis or caching, precomputed stats, queue infrastructure, read replicas, partitioning, multi-region, status page. Revisit when measured latency or cost demands it.
+
+## Phase 0.5 outcome
+
+Passed on 2026-11-05; details and lessons in [SPIKE.md](SPIKE.md). Plan changes that came out of it:
+
+- Function is bundled with esbuild and exposed through a committed `api/index.ts` stub (see SPIKE.md).
+- `engines.node` is pinned to `24.x`.
+- Postgres is 18 everywhere (Neon, CI, docker compose).
+- Assert response bodies in smoke tests, never only status codes.
+- Phase 2 sets the `pg` SSL mode explicitly and replaces the spike migration runner and routes.
