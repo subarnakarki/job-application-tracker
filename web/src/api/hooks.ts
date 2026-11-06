@@ -5,6 +5,7 @@ import {
   ImportRunDetailSchema,
   ImportRunListSchema,
   ImportStatusSchema,
+  InterviewSchema,
   LeadDetailSchema,
   LeadListSchema,
   LeadNoteSchema,
@@ -15,6 +16,8 @@ import {
   type ApplicationInput,
   type ApplicationList,
   type ApplicationPatch,
+  type InterviewInput,
+  type InterviewPatch,
   type LeadInput,
   type LeadNoteInput,
   type LeadNotePatch,
@@ -383,6 +386,51 @@ export function useDeleteLeadNote(leadId: string) {
     mutationFn: (noteId: string) =>
       apiRequest(
         `/api/leads/${encodeURIComponent(leadId)}/notes/${encodeURIComponent(noteId)}`,
+        null,
+        { method: 'DELETE' },
+      ),
+    onSuccess: refresh,
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Interviews (each change is an edit of its application, so everything is refreshed)
+
+export function useAddInterview(applicationId: string) {
+  const refresh = useRefresh();
+  return useMutation({
+    mutationFn: (input: InterviewInput) =>
+      apiRequest(
+        `/api/applications/${encodeURIComponent(applicationId)}/interviews`,
+        InterviewSchema,
+        {
+          method: 'POST',
+          body: input,
+        },
+      ),
+    onSuccess: refresh,
+  });
+}
+
+export function useUpdateInterview(applicationId: string) {
+  const refresh = useRefresh();
+  return useMutation({
+    mutationFn: ({ interviewId, patch }: { interviewId: string; patch: InterviewPatch }) =>
+      apiRequest(
+        `/api/applications/${encodeURIComponent(applicationId)}/interviews/${encodeURIComponent(interviewId)}`,
+        InterviewSchema,
+        { method: 'PATCH', body: patch },
+      ),
+    onSuccess: refresh,
+  });
+}
+
+export function useDeleteInterview(applicationId: string) {
+  const refresh = useRefresh();
+  return useMutation({
+    mutationFn: (interviewId: string) =>
+      apiRequest(
+        `/api/applications/${encodeURIComponent(applicationId)}/interviews/${encodeURIComponent(interviewId)}`,
         null,
         { method: 'DELETE' },
       ),

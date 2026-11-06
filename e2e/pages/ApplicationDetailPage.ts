@@ -9,7 +9,7 @@ export class ApplicationDetailPage {
   constructor(private readonly page: Page) {
     this.editButton = page.getByRole('link', { name: 'Edit' });
     this.deleteButton = page.getByRole('button', { name: 'Delete' });
-    this.history = page.getByRole('region', { name: 'Status history' }).getByRole('listitem');
+    this.history = page.getByRole('region', { name: 'History', exact: true }).getByRole('listitem');
     this.confirmDialog = page.getByRole('dialog');
   }
 

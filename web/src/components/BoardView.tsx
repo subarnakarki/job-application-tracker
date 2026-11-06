@@ -18,6 +18,7 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import { FollowUpFlag } from './StatusBadge';
 import { StatusMenu } from './StatusMenu';
+import { interviewText } from '../timeline';
 
 interface Props {
   items: Application[];
@@ -261,6 +262,11 @@ function CardBody({
         {handle}
       </div>
       <p className="text-slate-600 dark:text-slate-300">{application.role}</p>
+      {interviewText(application) && (
+        <p className="text-xs font-medium text-violet-800 dark:text-violet-300">
+          {interviewText(application)}
+        </p>
+      )}
       {application.needsFollowUp && (
         <div>
           <FollowUpFlag />

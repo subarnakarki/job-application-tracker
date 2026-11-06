@@ -11,8 +11,10 @@ import {
 } from '../api/hooks';
 import { ApplicationForm } from '../components/ApplicationForm';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { InterviewsSection } from '../components/InterviewsSection';
 import { FollowUpFlag, StatusBadge } from '../components/StatusBadge';
 import { EMPTY_FORM, toFormValues, toPatch, type FieldErrors } from '../form';
+import { timeline } from '../timeline';
 
 function serverErrors(error: unknown): FieldErrors | undefined {
   return error instanceof ApiRequestError ? error.fieldErrors : undefined;
@@ -186,28 +188,47 @@ export function ApplicationDetailPage() {
         {application.notes && <span className="whitespace-pre-wrap">{application.notes}</span>}
       </Field>
 
+      <InterviewsSection application={application} />
+
       <section aria-labelledby="history-heading">
         <h2 id="history-heading" className="text-lg font-semibold">
-          Status history
+          History
         </h2>
         <ol className="mt-2 flex flex-col gap-2 border-l-2 border-slate-200 pl-4 dark:border-slate-700">
-          {[...application.history].reverse().map((entry) => (
-            <li key={entry.id} className="text-sm">
-              <span className="font-medium">
-                {entry.fromStatus
-                  ? `${entry.fromStatus} → ${entry.toStatus}`
-                  : `Created as ${entry.toStatus}`}
-              </span>
-              <time dateTime={entry.occurredAt} className="ml-2 text-slate-500 dark:text-slate-400">
-                {formatDateTime(entry.occurredAt)}
-              </time>
-              {entry.actor === 'gmail' && (
-                <span className="ml-2 rounded bg-sky-100 px-1.5 py-0.5 text-xs text-sky-900 dark:bg-sky-950 dark:text-sky-200">
-                  from Gmail
+          {timeline(application.history, application.interviews).map((item) =>
+            item.kind === 'status' ? (
+              <li key={item.key} className="text-sm">
+                <span className="font-medium">
+                  {item.entry.fromStatus
+                    ? `${item.entry.fromStatus} → ${item.entry.toStatus}`
+                    : `Created as ${item.entry.toStatus}`}
                 </span>
-              )}
-            </li>
-          ))}
+                <time
+                  dateTime={item.entry.occurredAt}
+                  className="ml-2 text-slate-500 dark:text-slate-400"
+                >
+                  {formatDateTime(item.entry.occurredAt)}
+                </time>
+                {item.entry.actor === 'gmail' && (
+                  <span className="ml-2 rounded bg-sky-100 px-1.5 py-0.5 text-xs text-sky-900 dark:bg-sky-950 dark:text-sky-200">
+                    from Gmail
+                  </span>
+                )}
+              </li>
+            ) : (
+              <li key={item.key} className="text-sm">
+                <span className="font-medium">
+                  Interview{item.interview.label ? `: ${item.interview.label}` : ''}
+                </span>
+                <time
+                  dateTime={item.interview.heldOn}
+                  className="ml-2 text-slate-500 dark:text-slate-400"
+                >
+                  {formatDate(item.interview.heldOn)}
+                </time>
+              </li>
+            ),
+          )}
         </ol>
       </section>
 

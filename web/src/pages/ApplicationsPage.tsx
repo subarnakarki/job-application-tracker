@@ -2,6 +2,7 @@ import { SORTS, STATUSES, type Sort, type Status } from '@jat/shared';
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { formatDate } from '../format';
+import { interviewText } from '../timeline';
 import {
   toQueryString,
   useApplications,
@@ -218,6 +219,7 @@ export function ApplicationsPage() {
                   : 'Not applied yet'}
                 {application.nextStep ? ` · Next: ${application.nextStep}` : ''}
                 {application.nextStepDate ? ` (${formatDate(application.nextStepDate)})` : ''}
+                {interviewText(application) ? ` · ${interviewText(application)}` : ''}
               </p>
             </li>
           ))}
