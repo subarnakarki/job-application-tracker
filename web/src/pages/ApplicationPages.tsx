@@ -194,6 +194,11 @@ export function ApplicationDetailPage() {
                 .filter(Boolean)
                 .join(' ')}
             </Field>
+            <Field label="Location">{application.location}</Field>
+            <Field label="Work mode">{application.workMode}</Field>
+            <Field label="Posted on">
+              {application.postedOn && formatDate(application.postedOn)}
+            </Field>
             <Field label="Job link" wide>
               {application.jobLink && (
                 <a

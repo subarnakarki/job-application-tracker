@@ -1,4 +1,4 @@
-import { SOURCES, STATUSES, type ApplicationInput } from '@jat/shared';
+import { SOURCES, STATUSES, WORK_MODES, type ApplicationInput } from '@jat/shared';
 import { useId, useState, type ReactNode } from 'react';
 import { ApiRequestError } from '../api/client';
 import { useLeads, usePostingPreview } from '../api/hooks';
@@ -252,6 +252,20 @@ export function ApplicationForm({
             <input {...props} />
           ))}
           {field('nextStepDate', 'Next step date', (props) => (
+            <input {...props} type="date" />
+          ))}
+          {field('location', 'Location', (props) => (
+            <input {...props} placeholder="e.g. Boston, MA or Remote (US)" />
+          ))}
+          {field('workMode', 'Work mode', (props) => (
+            <select {...props}>
+              <option value="">Not stated</option>
+              {WORK_MODES.map((mode) => (
+                <option key={mode}>{mode}</option>
+              ))}
+            </select>
+          ))}
+          {field('postedOn', 'Posted on', (props) => (
             <input {...props} type="date" />
           ))}
         </div>
