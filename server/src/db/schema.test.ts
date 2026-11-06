@@ -600,4 +600,103 @@ describe.skipIf(!TEST_DATABASE_URL)('schema (real Postgres, real migrations)', (
 
     expect(second).toEqual({ applied: [], unknown: [] });
   });
+
+  describe('leads, lead notes and interviews: data never crosses between users', () => {
+    async function insertLead(userId: string, name = 'Sam Recruiter'): Promise<string> {
+      const result = await sql('insert into leads (user_id, name) values ($1, $2) returning id', [
+        userId,
+        name,
+      ]);
+      return (result.rows[0] as { id: string }).id;
+    }
+
+    it('links an application only to a lead of the same user', async () => {
+      const owner = await insertUser({ email: 'lead-owner@example.com' });
+      const other = await insertUser({ email: 'lead-other@example.com' });
+      const theirLead = await insertLead(other);
+
+      const error = await violation(insertApplication(owner, { lead_id: theirLead }));
+      expect(error.constraint).toBe('applications_lead_fk');
+      await insertApplication(owner, { lead_id: await insertLead(owner) });
+    });
+
+    it('deleting a lead unlinks its applications (keeping them and their owner) and deletes its notes', async () => {
+      const owner = await insertUser({ email: 'unlink@example.com' });
+      const lead = await insertLead(owner);
+      const application = await insertApplication(owner, { lead_id: lead });
+      await sql(
+        "insert into lead_notes (lead_id, user_id, held_on, body) values ($1, $2, '2026-11-01', 'Coffee chat')",
+        [lead, owner],
+      );
+
+      await sql('delete from leads where id = $1', [lead]);
+
+      const { rows } = await sql('select user_id, lead_id from applications where id = $1', [
+        application,
+      ]);
+      expect(rows).toEqual([{ user_id: owner, lead_id: null }]);
+      expect((await sql('select 1 from lead_notes where lead_id = $1', [lead])).rowCount).toBe(0);
+    });
+
+    it("refuses a note on another user's lead, and an interview on another user's application", async () => {
+      const owner = await insertUser({ email: 'cross-owner@example.com' });
+      const other = await insertUser({ email: 'cross-other@example.com' });
+      const theirLead = await insertLead(other);
+      const theirApplication = await insertApplication(other);
+
+      const note = await violation(
+        sql(
+          "insert into lead_notes (lead_id, user_id, held_on, body) values ($1, $2, '2026-11-01', 'x')",
+          [theirLead, owner],
+        ),
+      );
+      expect(note.constraint).toBe('lead_notes_lead_fk');
+      const interview = await violation(
+        sql(
+          "insert into interviews (application_id, user_id, held_on) values ($1, $2, '2026-11-01')",
+          [theirApplication, owner],
+        ),
+      );
+      expect(interview.constraint).toBe('interviews_application_fk');
+    });
+
+    it('deleting an application deletes its interviews', async () => {
+      const owner = await insertUser({ email: 'interviews@example.com' });
+      const application = await insertApplication(owner);
+      await sql(
+        "insert into interviews (application_id, user_id, held_on) values ($1, $2, '2026-11-01')",
+        [application, owner],
+      );
+      await sql('delete from applications where id = $1', [application]);
+      expect(
+        (await sql('select 1 from interviews where application_id = $1', [application])).rowCount,
+      ).toBe(0);
+    });
+
+    it('rejects blank names and notes, and links that are not http(s)', async () => {
+      const owner = await insertUser({ email: 'checks@example.com' });
+      expect((await violation(insertLead(owner, '   '))).constraint).toBe('leads_name_check');
+      expect(
+        (
+          await violation(
+            sql(
+              "insert into leads (user_id, name, profile_link) values ($1, 'A', 'javascript:alert(1)')",
+              [owner],
+            ),
+          )
+        ).constraint,
+      ).toBe('leads_profile_link_check');
+      const lead = await insertLead(owner);
+      expect(
+        (
+          await violation(
+            sql(
+              "insert into lead_notes (lead_id, user_id, held_on, body) values ($1, $2, '2026-11-01', '  ')",
+              [lead, owner],
+            ),
+          )
+        ).constraint,
+      ).toBe('lead_notes_body_check');
+    });
+  });
 });
