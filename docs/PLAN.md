@@ -385,6 +385,22 @@ Tests (critical, per the conventions): parser unit tests for the new fields and 
 real-Postgres tests for the import filling a created application and saving a suggestion, API tests for applying
 and dismissing a suggestion (with isolation), and an e2e for "Fill from posting" with the preview mocked.
 
+## Phase 13 outcome
+
+Built as planned, with these changes from the table above:
+
+- **More boards.** The lookup covers Greenhouse, Lever, Ashby, Rippling, SmartRecruiters, Breezy HR, Recruitee,
+  Teamtailor and Personio, each checked against its real public API (saved as test fixtures). BambooHR and
+  Pinpoint were left out because their public endpoints could not be confirmed; Workable, Workday and Jobvite
+  are read by hand ("Fill from link") only, since they have no list endpoint that can be queried by company.
+- **Limits.** An import reads at most 20 postings and 8 board lookups, 3 at a time; boards' list responses may be
+  up to 10 MB.
+- **Role placeholder.** An import that finds no role saves "Role not stated"; every fill treats it as empty.
+- **Migration 0007** is applied to Neon (Migrate workflow) before the code that uses it.
+- **UI.** The application page shows the suggestion ("Use these details" or "Not this job") and a "Fill from
+  posting" button; the edit page has "Fill from link" with the job link already in. The privacy page has a Job
+  postings section. e2e covers both buttons and the suggestion card, with the server's answers mocked.
+
 ## Planned but not built
 
 | Item                                | Status                                                                                                    |

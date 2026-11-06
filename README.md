@@ -20,7 +20,11 @@ Built by an SDET as a portfolio project, so the tests matter as much as the feat
 - CSV export (respects the filters), JSON download of everything, account deletion.
 - Stats by source: applied, responded, interviewed and offers per source, with response rates.
 - Gmail import (owner only): reads recent job emails with read-only access, has Claude classify each one, applies
-  the clear-cut changes and lists the rest for review, with Undo on every change.
+  the clear-cut changes and lists the rest for review, with Undo on every change. A new application is filled in
+  from the job posting the email links to, or a likely posting on the company's job board is suggested.
+- Job details from the posting: "Fill from link" in the form and "Fill from posting" on an application read a
+  public posting (company career sites, Greenhouse, Lever, Ashby, Rippling and others) and fill only empty fields:
+  role, salary, location, work mode and posting date.
 - Mobile-first, keyboard and screen-reader friendly, with a dark design (Inter, self-hosted) and
   respect for reduced-motion settings. Colours are tokens, so a light theme can be added later.
 

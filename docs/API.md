@@ -45,6 +45,21 @@ schemas in `shared/src/responses.ts`; input shapes are in `shared/src/schemas.ts
 |        |                         |      | follow-up clock. A status change appends one history entry.                |
 | DELETE | `/api/applications/:id` | user | 204                                                                        |
 
+### Job postings
+
+| Method | Path                                     | Auth | Notes                                                                   |
+| ------ | ---------------------------------------- | ---- | ----------------------------------------------------------------------- |
+| POST   | `/api/postings/preview`                  | user | `{ url }`: reads a public job posting and returns what it found (job    |
+|        |                                          |      | link, company, role, salary, location, work mode, posted on); saves     |
+|        |                                          |      | nothing. 422 when the site cannot be read (sign-in sites, no details)   |
+| POST   | `/api/applications/:id/suggestion/apply` | user | Requires `If-Match`. Fills only the empty fields from the posting found |
+|        |                                          |      | on a job board, then removes the suggestion; 404 when there is none     |
+| DELETE | `/api/applications/:id/suggestion`       | user | 204; removes the suggestion and changes nothing else                    |
+
+`postingSuggestion` on the detail is a posting an import found on the company's public job board (Greenhouse,
+Lever, Ashby, Rippling, SmartRecruiters, Breezy HR, Recruitee, Teamtailor or Personio) when the email had no
+link, or `null`. It is never applied without the user.
+
 Writes are limited to 600/hour per user (120/hour for the demo account). `needsFollowUp` and `isClosed` are
 computed on every response, in the user's time zone (rules in [DOMAIN.md](DOMAIN.md)).
 
@@ -76,7 +91,9 @@ An import reads up to 50 job emails from the last 30 days (or since the last imp
 on its own into a fixed shape (kind, company, role, confidence, summary) and the server decides the change:
 a confident confirmation adds an application, a confident interview, assessment, offer or rejection moves the one
 matching open application forward. Anything uncertain, ambiguous, backwards or closed goes to review.
-Imported changes are recorded with actor `gmail`. Item actions answer 409 `import_conflict` when not possible.
+When a confirmation creates an application, the server also reads the job posting the email links to (known job
+boards only) and fills the empty fields; with no link, it looks for the role on the company's public job board
+and saves a match as a suggestion. Imported changes are recorded with actor `gmail`. Item actions answer 409 `import_conflict` when not possible.
 
 ## Health
 

@@ -39,6 +39,16 @@ export function PrivacyPage() {
           and undone. These are part of the data download and are deleted with the account.
         </p>
 
+        <h2 className="mt-6 text-xl font-semibold tracking-[-0.03em]">Job postings</h2>
+        <p>
+          When you use &ldquo;Fill from link&rdquo; or &ldquo;Fill from posting&rdquo;, the server
+          reads that public job posting to fill in empty fields. After a Gmail import, it may read
+          the posting an email links to, or look the company and role up on the company&apos;s
+          public job board (such as Greenhouse or Lever); a posting found that way is only a
+          suggestion until you use it. The job board is asked only for the company&apos;s list of
+          open jobs; nothing from the email is sent to it.
+        </p>
+
         <h2 className="mt-6 text-xl font-semibold tracking-[-0.03em]">Cookies</h2>
         <p>
           Strictly necessary cookies only: one keeps you signed in (30 days), and one holds a Google
