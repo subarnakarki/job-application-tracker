@@ -29,6 +29,11 @@ Built by an SDET as a portfolio project, so the tests matter as much as the feat
 - Resume match: upload a resume (PDF, Word or pasted text) and Claude reads it as a senior recruiter would,
   listing the 20 job titles it fits best with the keywords applicant tracking systems match for each, marked found
   or missing in the resume by plain code. "Check my resume" scores the resume against one application's posting.
+- Job search (owner only): a one-time setup, then on your schedule it runs your Google-style queries
+  (`site:job-boards.greenhouse.io "product manager"`) through Claude's web search, reads each new job from
+  Greenhouse, Lever, Ashby or Workday, keeps the past day's postings, sorts target roles from keyword-only
+  ones, and drafts every application. The apply queue lists every answer per job for Claude in Chrome (or you)
+  to fill in and submit, with go / go all, and Mark applied adds each one to the tracker.
 - Mobile-first, keyboard and screen-reader friendly, with a dark design (Inter, self-hosted) and
   respect for reduced-motion settings. Colours are tokens, so a light theme can be added later.
 

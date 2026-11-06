@@ -687,6 +687,37 @@ The results decide the resume-attach option and whether drafts need the question
 1. Owner-only first (`JOB_SEARCH_USER_IDS`).
 2. Only drafts marked **needs you** wait for review in the tracker; the go check happens in Chrome.
 
+## Phase 15 outcome
+
+Built as planned, with these changes and findings:
+
+- **Spike answered from the real APIs (2026-11-06):** Greenhouse's job API returns every application question
+  with `questions=true`, EEO questions included (`compliance`), so Greenhouse drafts answer the actual form.
+  Lever and Ashby publish no questions; their jobs carry the profile, standard answers, a cover letter and "why
+  this job". Ashby has no one-job API, so its job is read from the board list by id. Fixtures are the real
+  answers, trimmed.
+- **Not yet tried for real:** the web search tool (how many fresh postings it finds against Google `qdr:d`)
+  and Claude in Chrome on live forms (attaching the PDF, selects, location autocompletes, scheduling on the
+  owner's plan). Both need the owner's key and browser. The queue offers the resume file and its text, so the
+  prompt has a fallback when attaching fails.
+- **Profile answers by code, never the model:** contact details, authorization, sponsorship, salary,
+  relocation, start date, how you heard, age and every demographic/EEO question (`profileQuestionKind`). For a
+  choice question the exact option is picked, or the job needs you. An answer the user sends back counts as
+  theirs even if unchanged (a test caught this).
+- **Drafting within the time limit:** a run drafts until 240 s; what is left is drafted by the next hourly call
+  (or "Redraft"). A failed draft keeps the job undrafted with the reason.
+- **Search links are filtered by code:** the model only runs searches; links come from the search results and
+  its answer, and only individual job pages on the queried boards are kept (`jobRefOf`), each once per user.
+- **Schedule:** an hourly "Job search schedule" workflow (`.github/workflows/job-search.yml`) calls
+  `POST /api/cron/job-search` with `JOB_SEARCH_CRON_SECRET`; a run is due from its local hour, once per local
+  day, so a missed hour catches up.
+- **Test-only route** `POST /api/test/job-search` runs a real search for a synthetic user from given postings and
+  answers; with test routes on, synthetic users may use the feature. e2e reads the queue by role, as an agent
+  would, and found a duplicated "Email" field (now listed once).
+- **To turn it on in production:** migration 0009 (Migrate workflow) before the code; Vercel env
+  `JOB_SEARCH_USER_IDS` (your user id) and `JOB_SEARCH_CRON_SECRET`; repository secrets `APP_URL` and
+  `JOB_SEARCH_CRON_SECRET`; then the setup page, and paste the Claude in Chrome prompt from the overview.
+
 ## Planned but not built
 
 | Item                                | Status                                                                                                    |

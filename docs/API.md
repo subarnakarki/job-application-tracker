@@ -122,6 +122,40 @@ and saves a match as a suggestion. Imported changes are recorded with actor `gma
 The resume file and its text are kept until the user replaces or deletes them (or the account); the JSON export
 describes the resume and includes every analysis, never the text. Logs hold only outcomes, sizes and timings.
 
+## Job search (owner only)
+
+Open to the users in `JOB_SEARCH_USER_IDS` when `ANTHROPIC_API_KEY` is set; every route below answers 404
+`not_available` to anyone else (and to the demo account).
+
+| Method | Path                               | Auth   | Notes                                                                 |
+| ------ | ---------------------------------- | ------ | --------------------------------------------------------------------- |
+| GET    | `/api/job-search/profile`          | user   | `{ available, profile, confirmedAt, hasResume }`                      |
+| PUT    | `/api/job-search/profile`          | user   | The confirmed setup (`JobSearchProfileSchema`)                        |
+| POST   | `/api/job-search/runs`             | user   | Runs now: search, read, sort, draft for up to 240 s; 201 with the run |
+|        |                                    |        | and its jobs. 409 `not_set_up`, `no_resume` or `run_in_progress`.     |
+|        |                                    |        | 3 a day by hand; 50 runs a day in total                               |
+| GET    | `/api/job-search/runs`             | user   | The latest 10 runs with counts                                        |
+| GET    | `/api/job-search/runs/:id`         | user   | One run and every job it found                                        |
+| GET    | `/api/job-search/queue`            | user   | `{ ready, needsYou, finishYourself, keywordOnly, notDrafted }`        |
+| POST   | `/api/job-search/hits/:id/applied` | user   | Creates the application (Applied, Company site, job link) once        |
+| POST   | `/api/job-search/hits/:id/blocked` | user   | `{ reason }`                                                          |
+| POST   | `/api/job-search/hits/:id/skip`    | user   |                                                                       |
+| POST   | `/api/job-search/hits/:id/queue`   | user   | A keyword-only job becomes a target and is drafted (30 drafts a day)  |
+| POST   | `/api/job-search/hits/:id/redraft` | user   | Drafts again                                                          |
+| PUT    | `/api/job-search/hits/:id/draft`   | user   | `{ answers: [{ question, answer }], coverLetter }`; answers sent back |
+|        |                                    |        | count as the user's; ready once every required one has an answer      |
+| GET    | `/api/resume/text`                 | user   | The stored resume text, for forms without a file upload               |
+| POST   | `/api/cron/job-search`             | public | Needs `x-cron-secret` = `JOB_SEARCH_CRON_SECRET` (32+ characters),    |
+|        |                                    |        | else 404. Starts each due scheduled run (once per local day), then    |
+|        |                                    |        | keeps drafting. Called hourly by the "Job search schedule" workflow   |
+
+**Who answers what.** Contact details, work authorization, sponsorship, salary, relocation, start date, how you
+heard, age and every demographic or EEO question are answered from the profile by code
+(`profileQuestionKind` in `shared/`); the model never sees them. The model drafts the rest from the resume
+only, and anything it cannot support is marked `needs_you`. Greenhouse publishes each form's questions
+(`questions=true`); Lever and Ashby do not, so their jobs carry the profile, standard answers, a cover letter
+and "why this job".
+
 ## Health
 
 `GET /api/health` (never touches the database) and `GET /api/health/db` (proves the database answers).

@@ -59,6 +59,17 @@ export function PrivacyPage() {
           cannot upload one.
         </p>
 
+        <h2 className="mt-6 text-xl font-semibold tracking-[-0.03em]">Job search (owner only)</h2>
+        <p>
+          The job search setup (contact details, salary, work authorization, standard answers,
+          queries and schedule) is stored in your account. On each run, your queries go to
+          Anthropic&apos;s web search, the jobs found are read from the job boards&apos; public
+          pages, and your resume text, each posting and its questions are sent to Anthropic&apos;s
+          API to draft your answers. Demographic questions are never sent; they get the answer you
+          chose. The server never sends anything to an employer: you, or Claude in Chrome in your
+          own browser, submit each application.
+        </p>
+
         <h2 className="mt-6 text-xl font-semibold tracking-[-0.03em]">Cookies</h2>
         <p>
           Strictly necessary cookies only: one keeps you signed in (30 days), and one holds a Google
