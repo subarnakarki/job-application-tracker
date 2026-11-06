@@ -1,8 +1,7 @@
-import type { WorkMode } from '@jat/shared';
+import { UNKNOWN_ROLE, type WorkMode } from '@jat/shared';
 import type { Details } from './details';
 
-/** Placeholder when an email names no role: `role` is required on an application. */
-export const UNKNOWN_ROLE = 'Role not stated';
+export { UNKNOWN_ROLE };
 
 /** The fields a posting can fill. */
 export interface Fillable {

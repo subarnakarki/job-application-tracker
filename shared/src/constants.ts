@@ -44,6 +44,9 @@ export const DATE_APPLIED_STATUSES = [
 /** An application needs a follow-up after this many calendar days without activity. */
 export const FOLLOW_UP_AFTER_DAYS = 7;
 
+/** Placeholder when an imported email names no role: `role` is required on an application. */
+export const UNKNOWN_ROLE = 'Role not stated';
+
 /** Where the job is done. */
 export const WORK_MODES = ['Remote', 'Hybrid', 'On-site'] as const;
 export type WorkMode = (typeof WORK_MODES)[number];

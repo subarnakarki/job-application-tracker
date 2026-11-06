@@ -13,6 +13,7 @@ import { ApplicationForm } from '../components/ApplicationForm';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { InterviewsSection } from '../components/InterviewsSection';
 import { Glow } from '../components/ui/Glow';
+import { FillFromPostingButton, SuggestionCard } from '../components/PostingDetails';
 import { PageHeader, RevealHeading } from '../components/ui/PageHeader';
 import { Pill } from '../components/ui/Pill';
 import { interviewText } from '../timeline';
@@ -86,6 +87,8 @@ export function EditApplicationPage() {
         busy={update.isPending}
         serverErrors={serverErrors(update.error)}
         formError={formMessage(update.error)}
+        fillFromLink
+        postingLink={application.jobLink ?? ''}
         onCancel={() => void navigate(`/applications/${id}`)}
         onSubmit={(input) =>
           update.mutate(
@@ -153,7 +156,8 @@ export function ApplicationDetailPage() {
             {application.role}
           </p>
         </div>
-        <div className="rise rise-4 flex flex-wrap gap-3">
+        <div className="rise rise-4 flex flex-wrap items-start gap-3">
+          <FillFromPostingButton application={application} />
           <Link to={`/applications/${id}/edit`} className="btn-w min-h-12 px-6 text-[0.9375rem]">
             Edit
           </Link>
@@ -166,6 +170,8 @@ export function ApplicationDetailPage() {
           </button>
         </div>
       </div>
+
+      <SuggestionCard application={application} />
 
       <div className="grid items-start gap-3 lg:grid-cols-[1.25fr_1fr]">
         <Glow as="section" aria-labelledby="details-heading" className="rise rise-3 p-5">

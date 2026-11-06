@@ -7,6 +7,7 @@ import {
   type Source,
   type Status,
   type WorkMode,
+  UNKNOWN_ROLE,
 } from '@jat/shared';
 
 /** What the form inputs hold: always strings, '' meaning "empty". */
@@ -146,7 +147,9 @@ export function fillEmpty(
     field: 'company' | 'role' | 'jobLink' | 'location' | 'postedOn',
     value: string | null,
   ) => {
-    if (value && next[field].trim() === '') {
+    // The placeholder an import leaves when an email names no role counts as empty.
+    const empty = next[field].trim() === '' || (field === 'role' && next.role === UNKNOWN_ROLE);
+    if (value && empty) {
       next[field] = value;
       filled++;
     }

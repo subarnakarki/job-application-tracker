@@ -170,6 +170,31 @@ export function useUpdateApplication(id: string) {
   });
 }
 
+/** Fills the application's empty fields from its suggested posting (an edit: needs the version). */
+export function useApplySuggestion(id: string) {
+  const refresh = useRefresh();
+  return useMutation({
+    mutationFn: ({ version }: { version: number }) =>
+      apiRequest(
+        `/api/applications/${encodeURIComponent(id)}/suggestion/apply`,
+        ApplicationDetailSchema,
+        { method: 'POST', body: {}, version },
+      ),
+    onSuccess: refresh,
+  });
+}
+
+export function useDismissSuggestion(id: string) {
+  const refresh = useRefresh();
+  return useMutation({
+    mutationFn: () =>
+      apiRequest(`/api/applications/${encodeURIComponent(id)}/suggestion`, null, {
+        method: 'DELETE',
+      }),
+    onSuccess: refresh,
+  });
+}
+
 export function useDeleteApplication(id: string) {
   const client = useQueryClient();
   return useMutation({

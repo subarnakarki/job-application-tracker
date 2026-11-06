@@ -17,6 +17,8 @@ interface Props {
   onCancel: () => void;
   /** Show "Fill from link" (on Add application). */
   fillFromLink?: boolean;
+  /** The link the "Fill from link" box starts with (the application's job link when editing). */
+  postingLink?: string;
 }
 
 /**
@@ -33,6 +35,7 @@ export function ApplicationForm({
   onSubmit,
   onCancel,
   fillFromLink = false,
+  postingLink = '',
 }: Props) {
   const [values, setValues] = useState<FormValues>(initial);
   const [clientErrors, setClientErrors] = useState<FieldErrors>({});
@@ -43,7 +46,7 @@ export function ApplicationForm({
   const [flashed, setFlashed] = useState<ReadonlySet<string>>(new Set());
   const leads = useLeads();
   const preview = usePostingPreview();
-  const [postingUrl, setPostingUrl] = useState('');
+  const [postingUrl, setPostingUrl] = useState(postingLink);
   const [fillMessage, setFillMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
   const fill = () => {
@@ -169,8 +172,8 @@ export function ApplicationForm({
             )}
           </p>
           <p className="text-xs text-fg-3">
-            Works with most company career sites, Greenhouse, Lever and Ashby. Not LinkedIn. Only
-            empty fields are filled.
+            Works with most company career sites and job boards such as Greenhouse, Lever, Ashby and
+            Rippling. Not LinkedIn. Only empty fields are filled.
           </p>
         </div>
       )}
