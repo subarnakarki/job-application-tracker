@@ -1,3 +1,4 @@
+import './zodConfig'; // first: it must run before any schema is built
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
