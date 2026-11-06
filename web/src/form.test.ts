@@ -1,5 +1,5 @@
 import type { ApplicationDetail } from '@jat/shared';
-import { EMPTY_FORM, toFormValues, toPatch, validate, type FormValues } from './form';
+import { EMPTY_FORM, fillEmpty, toFormValues, toPatch, validate, type FormValues } from './form';
 
 function valid(values: FormValues) {
   const result = validate(values);
@@ -48,5 +48,36 @@ describe('application form', () => {
     } as unknown as ApplicationDetail;
     const input = valid({ ...toFormValues(original), status: 'Screening' });
     expect(toPatch(original, input)).toEqual({ status: 'Screening' });
+  });
+});
+
+describe('fill from link', () => {
+  const preview = {
+    jobLink: 'https://jobs.example.com/1',
+    company: 'Initech',
+    role: 'SDET',
+    salaryMin: 120000,
+    salaryMax: 150000,
+    salaryCurrency: 'EUR',
+  };
+
+  it('fills only empty fields and never overwrites what was typed', () => {
+    const typed = { ...EMPTY_FORM, company: 'My own name for it' };
+    const { values, filled } = fillEmpty(typed, preview);
+    expect(values).toMatchObject({
+      company: 'My own name for it',
+      role: 'SDET',
+      jobLink: 'https://jobs.example.com/1',
+      salaryMin: '120000',
+      salaryMax: '150000',
+      salaryCurrency: 'EUR',
+    });
+    expect(filled).toBe(4);
+  });
+
+  it('leaves the salary alone when either amount was typed', () => {
+    const typed = { ...EMPTY_FORM, salaryMax: '200000' };
+    const { values } = fillEmpty(typed, preview);
+    expect(values).toMatchObject({ salaryMin: '', salaryMax: '200000', salaryCurrency: 'USD' });
   });
 });

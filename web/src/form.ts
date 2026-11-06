@@ -3,6 +3,7 @@ import {
   type ApplicationDetail,
   type ApplicationInput,
   type ApplicationPatch,
+  type PostingPreview,
   type Source,
   type Status,
 } from '@jat/shared';
@@ -114,4 +115,39 @@ export function toPatch(original: ApplicationDetail, input: ApplicationInput): A
     if (original[key as keyof ApplicationDetail] !== value) patch[key] = value;
   }
   return patch;
+}
+
+/**
+ * "Fill from link": copies what the posting gave into the fields that are still empty, and never
+ * overwrites what the user typed. The salary goes in as a whole (from, to and currency) only when
+ * both amounts are empty. Returns the new values and how many fields were filled.
+ */
+export function fillEmpty(
+  values: FormValues,
+  preview: PostingPreview,
+): { values: FormValues; filled: number } {
+  const next = { ...values };
+  let filled = 0;
+  const put = (field: 'company' | 'role' | 'jobLink', value: string | null) => {
+    if (value && next[field].trim() === '') {
+      next[field] = value;
+      filled++;
+    }
+  };
+  put('company', preview.company);
+  put('role', preview.role);
+  put('jobLink', preview.jobLink);
+  if (
+    preview.salaryMin !== null &&
+    preview.salaryMax !== null &&
+    preview.salaryCurrency &&
+    next.salaryMin.trim() === '' &&
+    next.salaryMax.trim() === ''
+  ) {
+    next.salaryMin = String(preview.salaryMin);
+    next.salaryMax = String(preview.salaryMax);
+    next.salaryCurrency = preview.salaryCurrency;
+    filled += 2;
+  }
+  return { values: next, filled };
 }

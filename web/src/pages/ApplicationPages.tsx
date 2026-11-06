@@ -39,6 +39,7 @@ export function NewApplicationPage() {
       <ApplicationForm
         initial={EMPTY_FORM}
         submitLabel="Save application"
+        fillFromLink
         busy={create.isPending}
         serverErrors={serverErrors(create.error)}
         formError={formMessage(create.error)}

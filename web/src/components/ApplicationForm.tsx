@@ -1,7 +1,8 @@
 import { SOURCES, STATUSES, type ApplicationInput } from '@jat/shared';
 import { useId, useState, type ReactNode } from 'react';
-import { useLeads } from '../api/hooks';
-import { validate, type FieldErrors, type FormValues } from '../form';
+import { ApiRequestError } from '../api/client';
+import { useLeads, usePostingPreview } from '../api/hooks';
+import { fillEmpty, validate, type FieldErrors, type FormValues } from '../form';
 
 interface Props {
   initial: FormValues;
@@ -13,6 +14,8 @@ interface Props {
   formError?: string | null;
   onSubmit: (input: ApplicationInput) => void;
   onCancel: () => void;
+  /** Show "Fill from link" (on Add application). */
+  fillFromLink?: boolean;
 }
 
 /**
@@ -28,12 +31,41 @@ export function ApplicationForm({
   formError,
   onSubmit,
   onCancel,
+  fillFromLink = false,
 }: Props) {
   const [values, setValues] = useState<FormValues>(initial);
   const [clientErrors, setClientErrors] = useState<FieldErrors>({});
   const errors = { ...serverErrors, ...clientErrors };
   const id = useId();
   const leads = useLeads();
+  const preview = usePostingPreview();
+  const [postingUrl, setPostingUrl] = useState('');
+  const [fillMessage, setFillMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const fill = () => {
+    setFillMessage(null);
+    preview.mutate(postingUrl.trim(), {
+      onSuccess: (found) => {
+        const result = fillEmpty(values, found);
+        setValues(result.values);
+        setFillMessage({
+          ok: true,
+          text:
+            result.filled === 0
+              ? 'Nothing new to fill: those fields already have values.'
+              : `Filled ${result.filled} ${result.filled === 1 ? 'field' : 'fields'} from the posting. Check them, then save.`,
+        });
+      },
+      onError: (error) =>
+        setFillMessage({
+          ok: false,
+          text:
+            error instanceof ApiRequestError
+              ? (error.fieldErrors?.['url'] ?? error.message)
+              : "The link couldn't be read. Fill in the details by hand.",
+        }),
+    });
+  };
   const leadOptions = leads.data?.items ?? [];
 
   const set = (field: keyof FormValues) => (event: { target: { value: string } }) =>
@@ -89,6 +121,56 @@ export function ApplicationForm({
         onSubmit(result.input);
       }}
     >
+      {fillFromLink && (
+        <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900">
+          <label htmlFor={`${id}-posting`} className="text-sm font-medium">
+            Job posting link
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <input
+              id={`${id}-posting`}
+              type="url"
+              inputMode="url"
+              placeholder="https://"
+              className="input min-w-0 flex-1"
+              value={postingUrl}
+              onChange={(event) => setPostingUrl(event.target.value)}
+              onKeyDown={(event) => {
+                // Enter here fills from the link; it must not save the form.
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  if (postingUrl.trim()) fill();
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={preview.isPending || postingUrl.trim() === ''}
+              onClick={fill}
+            >
+              {preview.isPending ? 'Reading…' : 'Fill from link'}
+            </button>
+          </div>
+          <p aria-live="polite" className="text-sm">
+            {fillMessage && (
+              <span
+                className={
+                  fillMessage.ok
+                    ? 'text-emerald-800 dark:text-emerald-300'
+                    : 'text-rose-700 dark:text-rose-400'
+                }
+              >
+                {fillMessage.text}
+              </span>
+            )}
+          </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Works with most company career sites, Greenhouse, Lever and Ashby. Not LinkedIn. Only
+            empty fields are filled.
+          </p>
+        </div>
+      )}
       {formError && (
         <p
           role="alert"

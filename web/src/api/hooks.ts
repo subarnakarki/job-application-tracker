@@ -10,6 +10,7 @@ import {
   LeadListSchema,
   LeadNoteSchema,
   PipelineSchema,
+  PostingPreviewSchema,
   StatsSchema,
   UserEnvelopeSchema,
   type Application,
@@ -435,5 +436,13 @@ export function useDeleteInterview(applicationId: string) {
         { method: 'DELETE' },
       ),
     onSuccess: refresh,
+  });
+}
+
+/** "Fill from link": reads a posting on the server; stores nothing. */
+export function usePostingPreview() {
+  return useMutation({
+    mutationFn: (url: string) =>
+      apiRequest('/api/postings/preview', PostingPreviewSchema, { method: 'POST', body: { url } }),
   });
 }
