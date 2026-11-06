@@ -24,6 +24,7 @@ import { Glow } from '../components/ui/Glow';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Pill } from '../components/ui/Pill';
 import { Segmented } from '../components/ui/Segmented';
+import { SearchField } from '../components/ui/SearchField';
 
 const SORT_LABEL: Record<Sort, string> = {
   updated_desc: 'Recently updated',
@@ -180,35 +181,14 @@ export function ApplicationsPage() {
       </div>
 
       <div className="rise rise-5 flex flex-wrap items-center gap-2.5">
-        <div className="relative flex h-11 min-w-56 flex-1 items-center gap-2.5 rounded-xl bg-s1 px-3.5 shadow-line focus-within:shadow-[inset_0_0_0_1px_var(--color-blue),0_0_0_4px_rgb(10_139_255/0.18)]">
-          <svg viewBox="0 0 16 16" aria-hidden="true" className="size-4 flex-none text-fg-3">
-            <circle cx="7" cy="7" r="5.25" fill="none" stroke="currentColor" strokeWidth="1.6" />
-            <path
-              d="M11 11l3.5 3.5"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-            />
-          </svg>
-          <label htmlFor="search" className="sr-only">
-            Search
-          </label>
-          <input
-            id="search"
-            ref={searchField}
-            type="search"
-            className="h-full min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-fg-3"
-            placeholder="Company, role, contact or notes"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-          <kbd
-            aria-hidden="true"
-            className="hidden rounded-[5px] border border-line-2 px-1.5 text-[0.6875rem] leading-[18px] text-fg-3 md:inline"
-          >
-            /
-          </kbd>
-        </div>
+        <SearchField
+          id="search"
+          inputRef={searchField}
+          value={search}
+          onChange={setSearch}
+          placeholder="Company, role, contact or notes"
+          shortcut
+        />
         {!board && (
           <>
             <label htmlFor="sort" className="sr-only">
