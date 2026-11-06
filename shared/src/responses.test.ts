@@ -58,8 +58,12 @@ describe('response contracts', () => {
   it('accept the real shapes', () => {
     expect(ApplicationSchema.safeParse(application).success).toBe(true);
     expect(
-      ApplicationDetailSchema.safeParse({ ...application, history: [history], interviews: [] })
-        .success,
+      ApplicationDetailSchema.safeParse({
+        ...application,
+        history: [history],
+        interviews: [],
+        postingSuggestion: null,
+      }).success,
     ).toBe(true);
     expect(HistoryEntrySchema.safeParse(history).success).toBe(true);
     expect(UserSchema.safeParse(user).success).toBe(true);
@@ -67,7 +71,9 @@ describe('response contracts', () => {
       DataExportSchema.safeParse({
         exportedAt: '2026-11-05T12:00:00.000Z',
         user,
-        applications: [{ ...application, history: [history], interviews: [] }],
+        applications: [
+          { ...application, history: [history], interviews: [], postingSuggestion: null },
+        ],
         leads: [],
         imports: { runs: [], items: [] },
       }).success,
