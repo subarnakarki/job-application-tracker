@@ -363,6 +363,28 @@ Built as planned, on `main`, from the approved design. Differences and findings:
 - Toasts (`role="status"`), the `/` search shortcut, the board hint line and the static sign-in preview
   (`web/src/assets/signin-preview.webp`, a real screenshot with sample data) are in, as decided.
 
+## Phase 13: job details from the posting (approved: "do all of it")
+
+**Goal:** fill in more of an application from its job posting, after a Gmail import or by hand.
+
+| Area               | Decision                                                                                                                                                                                                                                                                                                                      |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| New fields         | Migration `0007`: `applications.location` (up to 200), `work_mode` (Remote / Hybrid / On-site), `posted_on` (date). Optional everywhere; in the form, detail page, CSV and JSON export                                                                                                                                        |
+| Posting reader     | Also returns location, work mode and posting date: from JSON-LD (`jobLocation`, `jobLocationType`, `datePosted`) and the Greenhouse, Lever and Ashby APIs                                                                                                                                                                     |
+| 1. Link from email | The classifier also returns the posting link when the email has one (never unsubscribe, tracking or sign-in links). A new application from Gmail gets it as its job link                                                                                                                                                      |
+| 1. Auto-fill       | For applications the import **creates**, the server reads that link and fills only empty fields (a "Role not stated" placeholder counts as empty), before creating it, so Undo still removes everything                                                                                                                       |
+| Which links        | Fetched automatically only on known job-board hosts (Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Workday). Other links are kept as the job link but read only by hand                                                                                                                                                |
+| 2. ATS lookup      | No link: look the company up on the Greenhouse, Lever and Ashby public job boards (slugs from the company name and the sender's domain) and match the role title. Never applied automatically: saved as a **suggestion** on the application (migration `0007`: `posting_suggestions`), shown on its page with Apply / Dismiss |
+| 3. By hand         | "Fill from link" on the edit form too (prefilled with the job link), and "Fill from posting" on the application page: reads the job link and fills empty fields in one save                                                                                                                                                   |
+| Limits             | Reads share the existing 60-an-hour preview budget for manual use; an import reads at most 20 postings and 10 board lookups, 5 at a time, each with the reader's 10 s and 2 MB caps                                                                                                                                           |
+| Safety             | The existing SSRF guard for every read; page content is parsed by code, never by the model; only the host and outcome are logged                                                                                                                                                                                              |
+| Privacy            | The privacy notice says the server may read the job posting an email links to, or the company's public job board                                                                                                                                                                                                              |
+| Deploy order       | `0007` is pushed and applied to Neon (Migrate workflow) before any code that uses it                                                                                                                                                                                                                                          |
+
+Tests (critical, per the conventions): parser unit tests for the new fields and the board lookup on saved fixtures,
+real-Postgres tests for the import filling a created application and saving a suggestion, API tests for applying
+and dismissing a suggestion (with isolation), and an e2e for "Fill from posting" with the preview mocked.
+
 ## Planned but not built
 
 | Item                                | Status                                                                                                    |
