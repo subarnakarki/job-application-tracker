@@ -1,24 +1,25 @@
-# UI redesign plan (proposed, awaiting approval)
+# UI redesign plan (owner's answers in; awaiting approval)
 
 **Goal:** rebuild the web app's look as the approved dark design, without changing what the app does, its API
 or its accessible names. Source of truth for the look: the design artifact
 (`https://claude.ai/artifact/7jrKLP7xLZKEvGC5EQ8ogQ`: `index.html` for exact CSS values, `screens/*.png` for
 every page at 1440px and 390px, `DESIGN-BRIEF.md` for the handoff notes, `fonts/` for Inter). No code has been
-written; this plan stops for review.
+written; this plan stops for review. The owner answered the twelve open questions on 2026-11-06; their
+answers are folded in below and listed in [Owner decisions](#owner-decisions).
 
-## Decisions (proposed)
+## Decisions
 
-| Area             | Decision                                                                                                                                                                                                                                            |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Scope            | `web/` only. No API, schema or migration changes. Every new tile ("This week", stats KPIs and bars, lead avatars) uses data the API already returns                                                                                                 |
-| Theme            | Dark only, as designed (open question 2). Tailwind's `dark:` variant is switched to "always on" in Phase R1, so pages not yet restyled still render coherently dark                                                                                 |
-| Tokens           | Defined once in `@theme` in `web/src/index.css` (`bg-s1`, `text-fg-2`, `shadow-line`, `--color-st-applied`…). No raw palette classes (`slate-*`, `blue-600`) left by the end                                                                        |
-| Shared pieces    | CSS in `@layer components` (`.btn-w`, `.btn-d`, `.btn-red`, `.glow`, `.pill`, `.inp`, `.seg`); small React parts in `web/src/components/ui/`                                                                                                        |
-| Font             | Inter variable (the provided `inter-latin.woff`, which has `fvar`/`gvar` tables) imported from CSS so Vite hashes it into `/assets/` (cached cache-first by the service worker). OFL licence shipped next to it at `web/public/fonts/Inter-OFL.txt` |
-| Motion           | CSS only where possible (keyframes, `@starting-style`, scroll-driven animation on sign-in). JS only for the pointer spotlight and count-up, both behind one `useReducedMotion()` check. `prefers-reduced-motion: reduce` turns all of it off        |
-| Accessible names | Unchanged everywhere (list below). Where the design would change one, the markup keeps the name and the look comes from CSS (`order`, `sr-only`, `aria-hidden` decoration)                                                                          |
-| Tests            | E2E page objects and specs should need **no** edits; if one is unavoidable it is called out in its phase. New logic gets unit tests; two new e2e checks (CSP, "This week")                                                                          |
-| Branch           | This plan is committed on the session branch. For the build: a `redesign` feature branch with a Vercel preview, merged to `main` once at the end (open question 3). Previews have Google sign-in off, but the demo login works there                |
+| Area             | Decision                                                                                                                                                                                                                                                                                            |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Scope            | `web/` only. No API, schema or migration changes. Every new tile ("This week", stats KPIs and bars, lead avatars) uses data the API already returns                                                                                                                                                 |
+| Theme            | Dark now, light later: only the dark theme is built, but every colour is a token (CSS variable) and components never hard-code colours, so a later light theme only redefines the tokens. Tailwind's `dark:` variant is "always on" from R1, so pages not yet restyled still render coherently dark |
+| Tokens           | Defined once in `@theme` in `web/src/index.css` (`bg-s1`, `text-fg-2`, `shadow-line`, `--color-st-applied`…). No raw palette classes (`slate-*`, `blue-600`) left by the end                                                                                                                        |
+| Shared pieces    | CSS in `@layer components` (`.btn-w`, `.btn-d`, `.btn-red`, `.glow`, `.pill`, `.inp`, `.seg`); small React parts in `web/src/components/ui/`                                                                                                                                                        |
+| Font             | Inter variable (the provided `inter-latin.woff`, which has `fvar`/`gvar` tables) imported from CSS so Vite hashes it into `/assets/` (cached cache-first by the service worker). OFL licence shipped next to it at `web/public/fonts/Inter-OFL.txt`                                                 |
+| Motion           | CSS only where possible (keyframes, `@starting-style`, scroll-driven animation on sign-in). JS only for the pointer spotlight and count-up, both behind one `useReducedMotion()` check. `prefers-reduced-motion: reduce` turns all of it off                                                        |
+| Accessible names | Unchanged everywhere (list below). Where the design would change one, the markup keeps the name and the look comes from CSS (`order`, `sr-only`, `aria-hidden` decoration)                                                                                                                          |
+| Tests            | E2E page objects keep their locators; three specs change on purpose (interview date format, stats "Total" row, the sign-in page's two demo buttons), each in its phase. New logic gets unit tests; new e2e checks for the CSP, "This week" and a toast                                              |
+| Branch           | Straight to `main`, per the standing instruction: every small green commit is pushed to `main` and redeploys production. Production shows the dark look from R1, with some pages less polished until their phase lands                                                                              |
 
 ## Phases
 
@@ -39,14 +40,14 @@ Tests: the new CSP spec (desktop and phone), green on the current UI before anyt
 
 ### R1. Foundations: tokens, font, base styles
 
-| Files                                         | Change                                                                                                                                                                                                                                                                                                      |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `web/src/index.css`                           | `@font-face` (Inter, `font-display: swap`), `@theme` tokens (colours, stage colours, radii, ease), `@custom-variant dark` always on, body type (15px, `-0.011em`, `cv11`, `ss01`, `font-optical-sizing:auto`), `:focus-visible` ring, `@layer components` classes, reduced-motion and forced-colours blocks |
-| `web/src/assets/fonts/inter-latin.woff` (new) | The provided font                                                                                                                                                                                                                                                                                           |
-| `web/public/fonts/Inter-OFL.txt` (new)        | Licence, required by the OFL to ship with the font                                                                                                                                                                                                                                                          |
-| `web/index.html`                              | `color-scheme: dark`, one `theme-color` `#000000`, status-bar style `black-translucent`                                                                                                                                                                                                                     |
-| `web/public/manifest.webmanifest`             | `background_color` and `theme_color` `#000000` (name, display and icons unchanged: the installable test checks them)                                                                                                                                                                                        |
-| `web/vite.config.ts`                          | `build.assetsInlineLimit` set so fonts are never inlined as `data:` (CSP `font-src 'self'` blocks `data:` fonts)                                                                                                                                                                                            |
+| Files                                         | Change                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `web/src/index.css`                           | `@font-face` (Inter, `font-display: swap`), `@theme` tokens (colours, stage colours, radii, ease; `fg-3` at 50% white for text, `fg-4` at 38% for decoration only; grouped under one `:root` block that a light theme can later override), `@custom-variant dark` always on, body type (15px, `-0.011em`, `cv11`, `ss01`, `font-optical-sizing:auto`), `:focus-visible` ring, `@layer components` classes, reduced-motion and forced-colours blocks |
+| `web/src/assets/fonts/inter-latin.woff` (new) | The provided font                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `web/public/fonts/Inter-OFL.txt` (new)        | Licence, required by the OFL to ship with the font                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `web/index.html`                              | `color-scheme: dark`, one `theme-color` `#000000`, status-bar style `black-translucent`                                                                                                                                                                                                                                                                                                                                                             |
+| `web/public/manifest.webmanifest`             | `background_color` and `theme_color` `#000000` (name, display and icons unchanged: the installable test checks them)                                                                                                                                                                                                                                                                                                                                |
+| `web/vite.config.ts`                          | `build.assetsInlineLimit` set so fonts are never inlined as `data:` (CSP `font-src 'self'` blocks `data:` fonts)                                                                                                                                                                                                                                                                                                                                    |
 
 The old classes (`.btn-primary`, `.btn-secondary`, `.btn-danger`, `.input`) are re-pointed at the new looks
 (`btn-w`, `btn-d`, `btn-red`, `inp`) so every page changes at once and stays usable; later phases replace them and
@@ -56,39 +57,46 @@ Tests: none new (CSS only); the R0 CSP spec covers the font loading.
 
 ### R2. Shell and shared components
 
-| Files                                         | Change                                                                                                                                                                                                                                                                 |
-| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `components/Layout.tsx`                       | Sticky blurred nav, logo mark, links **Applications**, Leads, Stats, Account with `aria-current="page"` on the active one, Sign out pill; phones: links on a second scrollable row (44px targets); demo and offline banners restyled, same text; board width rule kept |
-| `components/ConfirmDialog.tsx`                | Native `<dialog>` kept; blurred `::backdrop`, scale-in via `@starting-style`                                                                                                                                                                                           |
-| `pages/ApplicationPages.tsx` (`NotFoundPage`) | Large gradient "404" over a glow; "Page not found" stays the `h1`                                                                                                                                                                                                      |
-| `components/ui/` (new)                        | `Glow` (+ `useSpotlight`: sets `--mx/--my` with `style.setProperty`, pointer-fine devices only), `Pill`, `StageBars`, `Avatar`, `Segmented`, `PageHeader` with `RevealHeading`, `useCountUp`, `useReducedMotion`; `Toast` only if open question 4 is yes               |
-| `web/src/stage.ts` (new)                      | Pure helpers: stage index and fill for the bars (closed stages empty), stage colour token, `initials(name)`                                                                                                                                                            |
+| Files                                         | Change                                                                                                                                                                                                                                                                                                                                                                                                        |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `components/Layout.tsx`                       | Sticky blurred nav, logo mark, links **Applications**, Leads, Stats, Account with `aria-current="page"` on the active one, Sign out pill; phones: links on a second scrollable row (44px targets); demo and offline banners restyled, same text; board width rule kept                                                                                                                                        |
+| `components/ConfirmDialog.tsx`                | Native `<dialog>` kept; blurred `::backdrop`, scale-in via `@starting-style`                                                                                                                                                                                                                                                                                                                                  |
+| `pages/ApplicationPages.tsx` (`NotFoundPage`) | Large gradient "404" over a glow; "Page not found" stays the `h1`                                                                                                                                                                                                                                                                                                                                             |
+| `components/ui/` (new)                        | `Glow` (+ `useSpotlight`: sets `--mx/--my` with `style.setProperty`, pointer-fine devices only), `Pill`, `StageBars`, `Avatar`, `Segmented`, `PageHeader` with `RevealHeading`, `useCountUp`, `useReducedMotion`, `useSlashToFocus`                                                                                                                                                                           |
+| `components/Toast.tsx` (new)                  | White pill at the bottom, `role="status"` (polite, never `alert`), one at a time, gone after 4 s, kept while hovered or focused; a `ToastProvider` in `Layout` so a toast survives the navigation after a save. Used for: application saved or deleted, moved (list menu and board), lead saved, note added, interview saved, import Undo and Dismiss. Confirmations only, no undo button (Phase 11 decision) |
+| `web/src/stage.ts` (new)                      | Pure helpers: stage index and fill for the bars (closed stages empty), stage colour token, `initials(name)`                                                                                                                                                                                                                                                                                                   |
 
 `RevealHeading` splits words into spans **with real space text nodes between them**, so the heading's accessible
 name stays e.g. "Acme Robotics" (CSS gaps would make it "AcmeRobotics" and break `heading(company)`).
 
 Tests (unit/component): `stage.test.ts` (fill per stage, closed empty, initials for one word, several words,
 non-Latin and empty names); `RevealHeading` keeps its text content and name; `Layout` marks the current link
-with `aria-current`; `useCountUp` renders the final value at once under reduced motion.
+with `aria-current`; `useCountUp` renders the final value at once under reduced motion; `Toast` is a polite
+`status`, replaces the previous toast, and dismisses itself; `useSlashToFocus` focuses the search on "/" and does
+nothing while typing in a field, with a modifier key, or with a dialog open.
 
 ### R3. Applications list
 
-| Files                        | Change                                                                                                                                                                                                                                                                                                |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pages/ApplicationsPage.tsx` | Header with H1 "Applications" and the summary sentence ("2 need a follow-up and you have 1 interview this week"), Pipeline tile + This week tile, filter bar (search with icon, follow-up pill with count, List/Board segmented, plus sort and CSV export: open question 6), rows in one glow surface |
-| `components/PipelineBar.tsx` | Inside the Pipeline tile: big count over the dotted stage name, funnel bars that grow in. **Stage name stays first in the DOM** (count shown above it with CSS `order`) so button names still start with the stage                                                                                    |
-| `components/StatusBadge.tsx` | `Pill` variants; `FollowUpFlag` keeps the text "Needs follow-up" (the design says "Follow up": open question 5)                                                                                                                                                                                       |
-| `components/StatusMenu.tsx`  | The native `<select>` stays (combobox "Move X to"), styled as the Stage cell: stage bars + label + chevron; height raised from 36px to 44px                                                                                                                                                           |
-| `web/src/thisWeek.ts` (new)  | Pure: upcoming interviews (`nextInterviewOn`) and next-step dates in the window, in the user's time zone, open applications only, sorted by day                                                                                                                                                       |
-| `api/hooks.ts`               | The This week tile reads an unfiltered `useApplications({})` (cached by TanStack Query; at most 500 items), so a stage filter or search does not empty it                                                                                                                                             |
+| Files                        | Change                                                                                                                                                                                                                                                                                                                                                                          |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pages/ApplicationsPage.tsx` | Header with H1 "Applications" and the summary sentence ("2 need a follow-up and you have 1 interview this week"), Pipeline tile + This week tile, filter bar (search with icon and a desktop-only "/" hint, follow-up pill with count, List/Board segmented, a compact sort select and an "Export CSV" dark pill, wrapping to a second row on phones), rows in one glow surface |
+| `components/PipelineBar.tsx` | Inside the Pipeline tile: big count over the dotted stage name, funnel bars that grow in. **Stage name stays first in the DOM** (count shown above it with CSS `order`) so button names still start with the stage                                                                                                                                                              |
+| `components/StatusBadge.tsx` | `Pill` variants; `FollowUpFlag` keeps the text "Needs follow-up" (clearer than the design's "Follow up", and the same words as the filter)                                                                                                                                                                                                                                      |
+| `components/StatusMenu.tsx`  | The native `<select>` stays (combobox "Move X to"), styled as the Stage cell: stage bars + label + chevron; height raised from 36px to 44px                                                                                                                                                                                                                                     |
+| `web/src/thisWeek.ts` (new)  | Pure: upcoming interviews (`nextInterviewOn`) and next-step dates from today through the next 6 days ("next 7 days", so it is never empty just because it is Sunday), in the user's time zone, open applications only, sorted by day; tile subtitle e.g. "Nov 6 to 12"                                                                                                          |
+| `format.ts`, `timeline.ts`   | Interview dates read as on the design: "Interview Wed, Nov 12" for this year, "Interview Mon, Jan 4, 2027" for another year (today in the user's time zone)                                                                                                                                                                                                                     |
+| `api/hooks.ts`               | The This week tile reads an unfiltered `useApplications({})` (cached by TanStack Query; at most 500 items), so a stage filter or search does not empty it                                                                                                                                                                                                                       |
 
 Layout rules that protect the locators: the column headings (Company / Signals / Applied / Stage) are a
 decorative `aria-hidden` row **outside** the `<ul>`; the rows stay `<li>` in the **last** list on the page (the
 This week tile's list comes before it); the search keeps an `sr-only` label "Search"; the company link still
 covers the row and the menu sits above it; closed rows are muted without dropping text below 4.5:1.
 
-Tests: `thisWeek.test.ts` (window edges, today counts, time zone across midnight, closed excluded, interview
-and next step on the same day); update `App.test.tsx` PipelineBar test to `/^Applied/` (stricter, matching e2e);
+Tests: `thisWeek.test.ts` (window edges, today counts, day 7 does not, time zone across midnight, closed
+excluded, interview and next step on the same day); `format.test.ts`/`timeline.test.ts` for the new interview
+date (this year, next year, a date in late December seen from early January); update the regex in
+`e2e/tests/interviews.spec.ts` to `/Interview \w{3}, \w{3} \d{1,2}(, \d{4})?/` (its interview is 10 days out, so it
+can cross a year end); one e2e assertion that moving a card with the list menu shows the "Moved" toast; update `App.test.tsx` PipelineBar test to `/^Applied/` (stricter, matching e2e);
 new e2e `this-week.spec.ts` (seed an application with an interview in 3 days through the API, see it in the tile;
 needs an `Api.createInterview` helper in `e2e/fixtures.ts`).
 
@@ -101,7 +109,9 @@ needs an `Api.createInterview` helper in `e2e/fixtures.ts`).
 Unchanged on purpose: sensors and their activation constraints, `announcements`, `oneColumnPerArrow`, the
 phone breakpoint (`max-width: 639px`), column `region` names starting with the stage, "No applications", tab
 names "Stage N", `Drag {company}` handles. The drop pop is a CSS class added on the new column's card after a
-successful move, so it never delays the optimistic update.
+successful move, so it never delays the optimistic update. A one-line hint above the desktop board (`fg-2`):
+"Drag a card to another stage, or focus ⠿ and use Space and the arrow keys." Hidden on phones, where moves use
+the menu.
 
 Tests: no new ones; run `board.spec.ts` with `--repeat-each=10` once locally (as in Phase 11), because the drag
 look changes the overlay's size and the mouse-drag helper depends on bounding boxes.
@@ -139,8 +149,8 @@ Tests: `initials` is covered in R2; existing `leads.spec.ts`.
 | `pages/StatsPage.tsx` | KPI tiles (Applications, Applied, Responded, Response rate in gradient text) as a `dl`, from `totals`; "Response rate by source" bars (decorative bar + visible percentage); table and phone cards restyled |
 
 Watch: KPI tiles and bars stay **outside** the table and the phone list named "Applications by source"; the
-table keeps six cells per row in the same order; the footer row stays "All sources" (the design says "Total":
-open question 5); a `null` rate still shows "–" and a zero-width bar.
+table keeps six cells per row in the same order; the footer row and the last phone card are renamed "Total" (as
+designed, the usual word for a footer row), so `e2e/tests/stats.spec.ts` calls `figures('Total')`; a `null` rate still shows "–" and a zero-width bar.
 
 Tests: component test for the KPI tiles (values from `totals`, "–" for a null rate); existing `stats.spec.ts`.
 
@@ -156,18 +166,19 @@ Tests: existing `account.spec.ts` and `import.spec.ts`.
 
 ### R9. Sign-in page (last, because its copy needs approval and its screenshot shows the new list)
 
-| Files                                      | Change                                                                                                                                                                                                    |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pages/LoginPage.tsx`                      | Hero: "New" eyebrow, headline (open question 1), existing sub-copy, Google link + demo button, existing footnote with the Privacy link, error alert, tilted screenshot, three feature cards; drifting orb |
-| `web/src/assets/signin-preview.webp` (new) | A static screenshot of the restyled list with sample data, decorative (`alt=""`): not a live DOM copy, which would add a second "Applications" heading and extra links                                    |
+| Files                                      | Change                                                                                                                                                                                                                                                  |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pages/LoginPage.tsx`                      | Hero: "New" eyebrow, headline "Every application. One calm place." (approved), existing sub-copy, Google link + demo button, existing footnote with the Privacy link, error alert, tilted screenshot, the three feature cards as designed; drifting orb |
+| `components/Layout.tsx`                    | The header as designed for signed-out visitors too: app links (they lead to sign-in with `next=`, then to that page), "Try the demo" and "Sign in" (same Google link as the hero). Shared by the sign-in and privacy pages                              |
+| `web/src/assets/signin-preview.webp` (new) | A static screenshot of the restyled list with sample data, decorative (`alt=""`): not a live DOM copy, which would add a second "Applications" heading and extra links                                                                                  |
 
-The page header shows the logo only for signed-out visitors: the preview's header repeats "Try the demo" and
-the app links, which would break `getByRole('button', { name: 'Try the demo' })` (e2e and `App.test.tsx`) and
-link to pages a visitor cannot open (open question 8). The tilt-on-scroll uses CSS scroll-driven animation
+With two "Try the demo" buttons on the page, the unscoped `getByRole('button', { name: 'Try the demo' })`
+matches twice, so the tests target the hero's button: `getByRole('main').getByRole(...)` in
+`e2e/tests/auth.spec.ts` (both uses) and `within(screen.getByRole('main'))` in `App.test.tsx`. The tilt-on-scroll uses CSS scroll-driven animation
 (`animation-timeline: view()`), static where unsupported or with reduced motion.
 
-Tests: `App.test.tsx` adds "exactly one Try the demo button and one Privacy link"; existing `auth.spec.ts`
-and the privacy test.
+Tests: `App.test.tsx`: the header's demo button signs in too, and there is one Privacy link; the scoped
+`auth.spec.ts` and the privacy test.
 
 ### R10. Clean-up and wrap
 
@@ -175,42 +186,42 @@ and the privacy test.
 - Manual pass on a phone and a desktop: keyboard-only through every page, Windows forced-colours (emulated in
   Chrome DevTools), 200% zoom, reduced motion, VoiceOver on the board.
 - Docs: README screenshots and features, this plan's outcome in `docs/PLAN.md`, and `CLAUDE.md`'s convention
-  "light/dark mode" updated if the app is dark-only.
+  "light/dark mode" changed to "dark theme (tokens ready for a light theme later)".
 
 ## E2E locators that must stay stable
 
 From `e2e/pages/*.ts` and `e2e/tests/*.ts`, plus `web/src/*.test.tsx`. Playwright matches a string `name` as a
 case-insensitive substring unless `exact: true`; regexes as written.
 
-| Page               | Locator (role / text)                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Shell              | button "Sign out"; text "You are using the shared demo account."; text "You're offline. Your applications will load when you're back online."                                                                                                                                                                                                                                                                                                                           |
-| Sign-in            | **one** button "Try the demo"; link "Continue with Google" with its `href`; `alert` with the Google error text; **one** link "Privacy"                                                                                                                                                                                                                                                                                                                                  |
-| Applications       | heading "Applications" level 1; link "Add application"; searchbox "Search"; button `/Needs follow-up/`; `group` "Pipeline stages" → buttons `/^{Stage}/` with the count in their text and `aria-pressed`; `group` "View" → buttons "List", "Board"; `getByRole('list').last()` → `listitem` per application; text "No applications here yet."; card text contains the stage, "Needs follow-up" and `/Interview \w+ \d+, \d{4}/`; `alert` "… was changed somewhere else" |
-| Status menu        | combobox "Move {company} to" with stage values                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| Board              | `region` "Board" → `region` `/^{Stage}/`, `listitem` per card, text "No applications"; button "Drag {company}"; phones: `tablist` "Stages", tabs "{Stage} {count}" with `aria-selected`, `tabpanel`                                                                                                                                                                                                                                                                     |
-| Application form   | labels "Company", "Role", "Status" (exact), "Job posting link", "Salary from", "Lead" (exact, option "Name (Company)"); buttons `/^Save/`, "Fill from link"; text `/Filled 4 fields from the posting/`, `/needs a sign-in/`                                                                                                                                                                                                                                             |
-| Detail             | heading {company} level 1; link "Edit"; button "Delete"; `region` "History" (exact) → `listitem`s in order; `dialog` with "Cancel" and "Delete"; link to the lead by name                                                                                                                                                                                                                                                                                               |
-| Interviews         | `region` "Interviews"; buttons "Add interview", "Save interview", "Remove"; labels "Day", "Round"; `listitem` text `/Onsite\s*Upcoming/`; dialog button "Remove interview"; text "None yet"                                                                                                                                                                                                                                                                             |
-| Leads              | link "Add lead"; labels "Name *", "Company" (exact), "What was said"; buttons "Save lead", "Add note"; heading {name} level 1; `region` "Notes" → `listitem`s; `region` "Applications" → link "Globex · Senior SDET"; list item with the name contains "1 application"                                                                                                                                                                                                  |
-| Stats              | heading "Stats by source" level 1; `table` "Applications by source" → rows `/^{Source}/` and "All sources", six cells; phones: `list` "Applications by source" → items with a heading and six `definition`s; breakpoint 640px                                                                                                                                                                                                                                           |
-| Account and import | button "Delete my account" (page and dialog); `list` "Past imports" → link text "1 changed · 1 to review · 0 skipped"; heading "Gmail import" level 1; lists "Changes made", "Needs your review" → cards whose heading starts with the headline; buttons "Undo", "Dismiss"                                                                                                                                                                                              |
-| Privacy            | heading "Privacy" level 1                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| Installable        | manifest `name` "Job Application Tracker", `display` "standalone", a maskable icon, PNG icons                                                                                                                                                                                                                                                                                                                                                                           |
+| Page               | Locator (role / text)                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shell              | button "Sign out"; text "You are using the shared demo account."; text "You're offline. Your applications will load when you're back online."                                                                                                                                                                                                                                                                                                                                       |
+| Sign-in            | button "Try the demo" inside `main` (a second one sits in the header); link "Continue with Google" with its `href`; `alert` with the Google error text; **one** link "Privacy"                                                                                                                                                                                                                                                                                                      |
+| Applications       | heading "Applications" level 1; link "Add application"; searchbox "Search"; button `/Needs follow-up/`; `group` "Pipeline stages" → buttons `/^{Stage}/` with the count in their text and `aria-pressed`; `group` "View" → buttons "List", "Board"; `getByRole('list').last()` → `listitem` per application; text "No applications here yet."; card text contains the stage, "Needs follow-up" and the interview date (regex updated in R3); `alert` "… was changed somewhere else" |
+| Status menu        | combobox "Move {company} to" with stage values                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Board              | `region` "Board" → `region` `/^{Stage}/`, `listitem` per card, text "No applications"; button "Drag {company}"; phones: `tablist` "Stages", tabs "{Stage} {count}" with `aria-selected`, `tabpanel`                                                                                                                                                                                                                                                                                 |
+| Application form   | labels "Company", "Role", "Status" (exact), "Job posting link", "Salary from", "Lead" (exact, option "Name (Company)"); buttons `/^Save/`, "Fill from link"; text `/Filled 4 fields from the posting/`, `/needs a sign-in/`                                                                                                                                                                                                                                                         |
+| Detail             | heading {company} level 1; link "Edit"; button "Delete"; `region` "History" (exact) → `listitem`s in order; `dialog` with "Cancel" and "Delete"; link to the lead by name                                                                                                                                                                                                                                                                                                           |
+| Interviews         | `region` "Interviews"; buttons "Add interview", "Save interview", "Remove"; labels "Day", "Round"; `listitem` text `/Onsite\s*Upcoming/`; dialog button "Remove interview"; text "None yet"                                                                                                                                                                                                                                                                                         |
+| Leads              | link "Add lead"; labels "Name *", "Company" (exact), "What was said"; buttons "Save lead", "Add note"; heading {name} level 1; `region` "Notes" → `listitem`s; `region` "Applications" → link "Globex · Senior SDET"; list item with the name contains "1 application"                                                                                                                                                                                                              |
+| Stats              | heading "Stats by source" level 1; `table` "Applications by source" → rows `/^{Source}/` and "Total" (renamed in R7), six cells; phones: `list` "Applications by source" → items with a heading and six `definition`s; breakpoint 640px                                                                                                                                                                                                                                             |
+| Account and import | button "Delete my account" (page and dialog); `list` "Past imports" → link text "1 changed · 1 to review · 0 skipped"; heading "Gmail import" level 1; lists "Changes made", "Needs your review" → cards whose heading starts with the headline; buttons "Undo", "Dismiss"                                                                                                                                                                                                          |
+| Privacy            | heading "Privacy" level 1                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Installable        | manifest `name` "Job Application Tracker", `display` "standalone", a maskable icon, PNG icons                                                                                                                                                                                                                                                                                                                                                                                       |
 
-Where the design conflicts with a locator (handled in the phase, or an open question):
+Where the design conflicts with a locator, and what was decided:
 
 | Design shows                                   | Breaks                            | Plan                                              |
 | ---------------------------------------------- | --------------------------------- | ------------------------------------------------- |
 | Count before the stage name in Pipeline        | buttons `/^{Stage}/`              | DOM order name first, visual order by CSS (R3)    |
 | Search with only a placeholder                 | searchbox "Search"                | `sr-only` label (R3)                              |
 | Column headings row on the list                | `list().last()` item count        | `aria-hidden` row outside the `ul` (R3)           |
-| Pill text "Follow up"                          | card contains "Needs follow-up"   | keep the text (question 5)                        |
-| "Interview Wed, Nov 12" (no year)              | `/Interview \w+ \d+, \d{4}/`      | keep the year, or update the spec (question 5)    |
-| Stats footer row "Total"                       | `figures('All sources')`          | keep "All sources" (question 5)                   |
-| Sign-in header "Try the demo" + app links      | one "Try the demo" button         | logo-only header (question 8)                     |
+| Pill text "Follow up"                          | card contains "Needs follow-up"   | keep the text (owner: clearer for users)          |
+| "Interview Wed, Nov 12" (no year)              | `/Interview \w+ \d+, \d{4}/`      | design format; spec regex updated (R3)            |
+| Stats footer row "Total"                       | `figures('All sources')`          | "Total"; spec updated (R7)                        |
+| Sign-in header "Try the demo" + app links      | one "Try the demo" button         | header as designed; tests scoped to `main` (R9)   |
 | Lead page application row with avatar and pill | link "Globex · Senior SDET"       | keep the link text, decoration `aria-hidden` (R6) |
-| Toast after a move                             | `getByRole('alert')` strict match | toasts use `role="status"` (question 4)           |
+| Toast after a move                             | `getByRole('alert')` strict match | toasts use `role="status"` (R2)                   |
 
 ## CSP risks
 
@@ -232,7 +243,7 @@ data:; font-src 'self'; …`.
 ## Accessibility risks
 
 - **Contrast:** `fg-3` (white at 38%) on black is about 3.4:1, under 4.5:1 for the 12–13px labels it is
-  meant for. Proposed: 50% (about 5.3:1) for text, 38% only for decoration (question 11). Muted closed rows
+  meant for. Decided: 50% (about 5.3:1) for text, 38% only for decoration. Muted closed rows
   must stay at 4.5:1 or more. Stage colour `#3a3a40` is used for dots and bars only, never text.
 - **Forced colours (Windows high contrast):** borders drawn with `box-shadow: inset` and gradient text
   (`background-clip: text; color: transparent`) disappear. A `@media (forced-colors: active)` block gives
@@ -244,44 +255,37 @@ data:; font-src 'self'; …`.
 - **Headings that animate:** word spans keep space text nodes; `aria-hidden` must not be put on the spans.
 - **Reduced motion:** CSS covers keyframes and transitions; the count-up and spotlight check
   `matchMedia('(prefers-reduced-motion: reduce)')` themselves; the sign-in orb and tilt stop.
-- **Dark-only:** `color-scheme: dark` so native selects, date inputs and scrollbars are dark; it drops the
-  project convention of light and dark mode (question 2).
+- **Dark only, for now:** `color-scheme: dark` so native selects, date inputs and scrollbars are dark. Visitors
+  who prefer light get dark until the light theme is built (tokens make that a contained change).
+- **Toasts:** polite `status`, never moved focus, long enough to read (4 s, paused on hover and focus); toast
+  text must not repeat a company name where a test uses an unscoped `getByText(company)` (only
+  `installable.spec.ts` does, and it saves nothing through the UI).
 - **Keyboard:** visible focus on every glow surface and on the stretched row links (focus ring on the row via
-  `focus-within`); the board keeps its keyboard drag and announcements; the "/" search shortcut (shown in the
-  design) must not fire inside fields (question 9).
+  `focus-within`); the board keeps its keyboard drag and announcements; the "/" search shortcut must not fire inside
+  fields, with modifier keys or with a dialog open.
 - **Dialog:** native `<dialog>` keeps focus trapping and Escape; the scale-in respects reduced motion.
 
-## Open questions for the owner
+## Owner decisions
 
-From the brief:
+Asked one at a time on 2026-11-06.
 
-1. **New pieces:** keep the sign-in hero and feature cards (and approve the headline "Every application. One
-   calm place." and the three card texts), the "This week" tile, the stats KPI tiles and bars, and lead avatars?
-   Or restyle only?
-2. **Theme:** dark only (and update `CLAUDE.md`'s "light/dark mode" convention), or also a light theme?
-3. **Branch:** a `redesign` feature branch with a Vercel preview, merged to `main` at the end (recommended:
-   R1 changes every page at once), or straight to `main` phase by phase, per the standing instruction?
-4. **Toasts** for Saved, Moved and Undone: add them (as `role="status"`)? Phase 11 left out an undo toast on
-   purpose; these would be confirmations only.
-
-Found while planning:
-
-5. **Text the design changed:** keep "Needs follow-up" (design: "Follow up"), the year in interview dates
-   (design: "Interview Wed, Nov 12"), and "All sources" (design: "Total")? Recommended: keep all three, so the
-   e2e specs stay untouched.
-6. **Sort and CSV export** are missing from the design's filter bar. Keep both (recommended: a compact sort
-   select and an "Export CSV" dark pill at the end of the bar)?
-7. **"This week":** the next 7 days from today (brief) or the calendar week Monday to Sunday (preview: "Nov 9
-   to 15")? Interviews and next-step dates both, open applications only?
-8. **Sign-in header:** logo only for signed-out visitors (recommended), instead of the preview's app links and a
-   second "Try the demo"?
-9. **"/" to focus search:** add the shortcut shown in the design, or drop the hint?
-10. **Board hint line** above the desktop board explaining mouse and keyboard dragging: add it?
-11. **Contrast:** raise text in `fg-3` to 50% white so small labels pass 4.5:1?
-12. **Sign-in screenshot:** a static image of the real restyled list (recommended), rather than a live copy?
+| #   | Question                | Answer                                                                                                                                                                           |
+| --- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | New pieces              | Keep all: sign-in hero with the headline and three feature cards as designed, "This week" tile, stats KPI tiles and bars, lead avatars                                           |
+| 2   | Theme                   | Dark now, light later: build dark only, with tokens structured so a light theme is a later, contained phase                                                                      |
+| 3   | Branch                  | Straight to `main`, phase by phase                                                                                                                                               |
+| 4   | Toasts                  | Add them (confirmations only, `role="status"`)                                                                                                                                   |
+| 5   | Text the design changed | Owner: "do whatever makes sense for the end user". Chosen: keep "Needs follow-up"; interview dates as "Interview Wed, Nov 12" (year only when not this year); footer row "Total" |
+| 6   | Sort and CSV export     | Keep both in the filter bar                                                                                                                                                      |
+| 7   | "This week" window      | Next 7 days (today plus 6), interviews and next-step dates, open applications only                                                                                               |
+| 8   | Sign-in header          | As designed (app links, "Try the demo", "Sign in"); tests scoped to the hero                                                                                                     |
+| 9   | "/" to focus search     | Add it (Applications and Leads)                                                                                                                                                  |
+| 10  | Board hint line         | Add it (desktop only)                                                                                                                                                            |
+| 11  | `fg-3` contrast         | 50% white for text; 38% for decoration only                                                                                                                                      |
+| 12  | Sign-in screenshot      | Static image of the real restyled list                                                                                                                                           |
 
 ## Not included
 
-Light theme (unless question 2 says so), new features beyond the tiles above, API changes, visual regression
+Light theme (a later phase), new features beyond the tiles above, API changes, visual regression
 snapshots (not adopted in the main plan), axe checks (dropped in the scope change; could return cheaply here if
 wanted).
