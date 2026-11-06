@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { BOARDS } from './boards';
-import { dayOf, locationOf, workModeOf } from './details';
+import { dayOf, locationOf, salaryInText, workModeOf } from './details';
 import { FetchError, type PageFetcher } from './fetchPage';
 import { previewPosting } from './preview';
 
@@ -44,7 +44,66 @@ describe('posting details helpers', () => {
   });
 });
 
+describe('a salary written in the posting text', () => {
+  it('takes the range labelled as the salary range, not the ones by state below it', () => {
+    expect(
+      salaryInText(
+        '<p>Salary Range (unless otherwise noted below): $139,800.00 - $223,700.00</p>' +
+          '<p>Full Salary Range for position: California: $160,800.00 - $279,600.00&amp;#xa;' +
+          'Colorado: $139,800.00 - $246,100.00</p>',
+      ),
+    ).toEqual({ min: 139800, max: 223700, currency: 'USD' });
+    expect(salaryInText('Pay range: €55.000 – €70.000')).toBeNull(); // dots as thousands: not guessed
+    expect(salaryInText('Base pay range £60,000 to £75,000 a year')).toEqual({
+      min: 60000,
+      max: 75000,
+      currency: 'GBP',
+    });
+  });
+
+  it('takes an unlabelled range only when every range agrees, and never an hourly one', () => {
+    expect(salaryInText('We pay $120,000 - $150,000.')).toEqual({
+      min: 120000,
+      max: 150000,
+      currency: 'USD',
+    });
+    expect(salaryInText('NY: $150,000 - $180,000. TX: $130,000 - $160,000.')).toBeNull();
+    expect(salaryInText('Salary range: $25 - $32 per hour')).toBeNull();
+    expect(salaryInText('No pay here.')).toBeNull();
+  });
+});
+
 describe('reading a posting link on each job board', () => {
+  it('Workday: its pages are drawn by script, so the posting’s own JSON is read', async () => {
+    const api =
+      'https://alliancedata.wd5.myworkdayjobs.com/wday/cxs/alliancedata/breadfinancial_US/job/Senior-Staff---Quality-Assurance-Engineer_R1013353-1';
+    const fetcher = pages({ [api]: fixture('workday-job.json') });
+    const link =
+      'https://alliancedata.wd5.myworkdayjobs.com/en-US/breadfinancial_US/job/Senior-Staff---Quality-Assurance-Engineer_R1013353-1';
+    expect(await previewPosting(link, fetcher)).toEqual({
+      jobLink: link,
+      company: 'Bread Financial Payments, Inc',
+      role: 'Senior Staff - Quality Assurance Engineer',
+      salaryMin: 139800,
+      salaryMax: 223700,
+      salaryCurrency: 'USD',
+      location: 'Columbus, OH; Chadds Ford, PA; Frisco, TX (+2 more)',
+      workMode: null,
+      postedOn: '2026-10-30',
+    });
+    expect(fetcher.asked).toEqual([api]);
+
+    // The link with a place in it reads the same JSON path.
+    const withPlace = pages({});
+    await previewPosting(
+      'https://alliancedata.wd5.myworkdayjobs.com/breadfinancial_US/job/Columbus-OH/Senior-Staff---Quality-Assurance-Engineer_R1013353-1',
+      withPlace,
+    ).catch(() => null);
+    expect(withPlace.asked).toEqual([
+      'https://alliancedata.wd5.myworkdayjobs.com/wday/cxs/alliancedata/breadfinancial_US/job/Columbus-OH/Senior-Staff---Quality-Assurance-Engineer_R1013353-1',
+    ]);
+  });
+
   it('Greenhouse: title, company, place, posting date and a yearly salary (in cents)', async () => {
     const job = JSON.parse(fixture('greenhouse-job-pay.json')) as { id: number };
     const fetch = pages({

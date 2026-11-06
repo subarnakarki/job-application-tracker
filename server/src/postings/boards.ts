@@ -9,6 +9,7 @@ import {
   merge,
   onlySalary,
   parseJson,
+  salaryInText,
   salaryRange,
   workModeOf,
   type Details,
@@ -249,6 +250,22 @@ export function fromPersonio(position: string): Details {
   };
 }
 
+export function fromWorkday(body: unknown): Details {
+  const info = fieldOf(body, 'jobPostingInfo');
+  const description = fieldOf(info, 'jobDescription');
+  return {
+    company: text(fieldOf(fieldOf(body, 'hiringOrganization'), 'name'), LIMITS.company),
+    role: text(fieldOf(info, 'title')),
+    salary: typeof description === 'string' ? salaryInText(description) : null,
+    location: locationOf([
+      fieldOf(info, 'location'),
+      ...asArray(fieldOf(info, 'additionalLocations')),
+    ]),
+    workMode: workModeOf(fieldOf(info, 'remoteType')),
+    postedOn: dayOf(fieldOf(info, 'startDate')),
+  };
+}
+
 // ---------- Reading a posting link ----------
 
 /** A request to make for a link, and how to read what comes back. */
@@ -259,7 +276,8 @@ interface Read {
   parse: (body: string) => Partial<Details> | null;
 }
 
-export type Site = { kind: BoardSource; reads: Read[] } | { kind: 'page' };
+/** Workday has a public API for one posting, but none that lists a company's jobs by name. */
+export type Site = { kind: BoardSource | 'workday'; reads: Read[] } | { kind: 'page' };
 
 /** Links whose board has a public API, and what to read. Every id is validated before it is used in a URL. */
 export function siteOf(url: URL): Site {
@@ -392,6 +410,32 @@ export function siteOf(url: URL): Site {
         },
       ],
     };
+  }
+  // https://acme.wd5.myworkdayjobs.com/en-US/acme_careers/job/Boston-MA/QA-Engineer_R123: the page
+  // is drawn by script, so its own JSON is read instead (the same path under /wday/cxs/).
+  const workday = /^([a-z0-9-]+)\.wd\d{1,3}\.myworkdayjobs\.com$/.exec(host)?.[1];
+  if (workday && SUBDOMAIN.test(workday)) {
+    const rest = /^[a-z]{2}(-[A-Z]{2})?$/.test(parts[0] ?? '') ? parts.slice(1) : parts;
+    const [siteName, kind, ...path] = rest;
+    const segment = /^[A-Za-z0-9_.()~%-]{1,200}$/;
+    if (
+      siteName &&
+      SLUG.test(siteName) &&
+      kind === 'job' &&
+      path.length > 0 &&
+      path.length <= 3 &&
+      path.every((part) => segment.test(part))
+    )
+      return {
+        kind: 'workday',
+        reads: [
+          {
+            url: `https://${host}/wday/cxs/${workday}/${siteName}/job/${path.join('/')}`,
+            required: true,
+            parse: (body) => fromWorkday(parseJson(body)),
+          },
+        ],
+      };
   }
   return { kind: 'page' };
 }

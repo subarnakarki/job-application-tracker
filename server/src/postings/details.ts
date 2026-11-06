@@ -79,6 +79,33 @@ export function onlySalary(salaries: Details['salary'][]): Details['salary'] {
   return distinct.size === 1 ? (found[0] ?? null) : null;
 }
 
+const SYMBOLS: Record<string, string> = { $: 'USD', '€': 'EUR', '£': 'GBP' };
+const RANGE =
+  /([$€£])\s?(\d{1,3}(?:,\d{3})+|\d{4,7})(?:\.\d{1,2})?\s*(?:-|–|—|to)\s*\1?\s?(\d{1,3}(?:,\d{3})+|\d{4,7})(?:\.\d{1,2})?/g;
+
+/**
+ * A yearly salary written in a posting's text ("Salary Range: $139,800.00 - $223,700.00"). The
+ * range labelled as the salary or pay range wins; otherwise only one that every range agrees on
+ * (ranges by state or level are not guessed between). Figures under 10,000 are not yearly.
+ */
+export function salaryInText(html: string): Details['salary'] {
+  const plain = html
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&#x?[0-9a-f]+;|&[a-z]+;/gi, ' ')
+    .replace(/\s+/g, ' ');
+  const yearly = (match: RegExpMatchArray): Details['salary'] => {
+    const range = salaryRange(match[2], match[3], SYMBOLS[match[1] ?? '']);
+    return range && range.min >= 10_000 ? range : null;
+  };
+  const labelled = /\b(?:salary|pay|compensation) range\b[^$€£]{0,60}/i.exec(plain);
+  if (labelled) {
+    const first = [...plain.slice(labelled.index).matchAll(RANGE)][0];
+    if (first && first.index === labelled[0].length) return yearly(first);
+  }
+  return onlySalary([...plain.matchAll(RANGE)].map(yearly));
+}
+
 /**
  * A posting date as YYYY-MM-DD: an ISO date or timestamp keeps its own calendar day (no time zone
  * shift), "2026-01-02 14:22:42 UTC" too, and a number is milliseconds since 1970.

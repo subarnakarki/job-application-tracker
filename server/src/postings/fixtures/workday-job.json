@@ -1,0 +1,35 @@
+{
+  "jobPostingInfo": {
+    "id": "09fd37312bf91001f251eb1679350000",
+    "title": "Senior Staff - Quality Assurance Engineer",
+    "jobDescription": "<p><b>Job Summary</b></p>The Senior Staff Quality Assurance Engineer defines and drives enterprise-wide quality engineering strategy. Experienced with Cypress, Playwright, JavaScript or TypeScript.<p></p>erit\"></p><p style=\"text-align:left\"><b>Salary Range (unless otherwise noted below): </b></p>$139,800.00 - $223,700.00<h3></h3><h3></h3><h3></h3><p style=\"text-align:inherit\"></p><p style=\"text-align:left\"><b>Full Salary Range for position:</b></p><h3></h3><h3></h3><h3></h3><h3></h3>California: $160,800.00 - $279,600.00&amp;#xa;Colorado: $139,800.00 - $246,100.00&amp;#xa;New York: $153,800.00 - $279,600.00&amp;#xa;Washington: $153,800.00 - $257,300.00&amp;#xa;Maryland: $153,800.00 - $246,100.00&amp;#xa;Washington DC: $160,800.00 - $257,300.00&amp;#xa;Illinois: $139,800.00 - $246,100.00&amp;#xa;New Jersey: $160,800.00 - $257,300.00&amp;#xa;Vermont: $139,800.00 - $223,700.00&amp;#xa;Ohio: $139,800.00 - $223,700.00&amp;#xa;Maine: $139,800.00 - $223,700.00&amp;#xa;Connecticut: $153,800.00 - $246,100.00&amp;#xa;Virginia: $139,800.00 - $223,700.00<br /><br /><p style=\"text-align:left !important\"><i>The actual base pay within this ra",
+    "location": "Columbus, OH",
+    "additionalLocations": ["Chadds Ford, PA", "Frisco, TX", "Draper, UT", "New York, NY"],
+    "postedOn": "Posted 7 Days Ago",
+    "startDate": "2026-10-30",
+    "timeType": "Full time",
+    "jobReqId": "R1013353",
+    "jobPostingId": "Senior-Staff---Quality-Assurance-Engineer_R1013353-1",
+    "jobPostingSiteId": "breadfinancial_US",
+    "country": {
+      "descriptor": "United States of America",
+      "id": "bc33aa3152ec42d4995f4791a106ed09"
+    },
+    "canApply": true,
+    "posted": true,
+    "jobRequisitionLocation": {
+      "descriptor": "P1 - Easton Campus Building A",
+      "country": {
+        "descriptor": "United States of America",
+        "id": "bc33aa3152ec42d4995f4791a106ed09",
+        "alpha2Code": "US"
+      }
+    },
+    "externalUrl": "https://alliancedata.wd5.myworkdayjobs.com/breadfinancial_US/job/Columbus-OH/Senior-Staff---Quality-Assurance-Engineer_R1013353-1"
+  },
+  "hiringOrganization": {
+    "name": "Bread Financial Payments, Inc",
+    "url": ""
+  },
+  "userAuthenticated": false
+}

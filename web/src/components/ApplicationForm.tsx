@@ -172,8 +172,8 @@ export function ApplicationForm({
             )}
           </p>
           <p className="text-xs text-fg-3">
-            Works with most company career sites and job boards such as Greenhouse, Lever, Ashby and
-            Rippling. Not LinkedIn. Only empty fields are filled.
+            Works with most company career sites and job boards such as Greenhouse, Lever, Ashby,
+            Rippling and Workday. Not LinkedIn. Only empty fields are filled.
           </p>
         </div>
       )}

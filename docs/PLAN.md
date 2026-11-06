@@ -391,8 +391,9 @@ Built as planned, with these changes from the table above:
 
 - **More boards.** The lookup covers Greenhouse, Lever, Ashby, Rippling, SmartRecruiters, Breezy HR, Recruitee,
   Teamtailor and Personio, each checked against its real public API (saved as test fixtures). BambooHR and
-  Pinpoint were left out because their public endpoints could not be confirmed; Workable, Workday and Jobvite
-  are read by hand ("Fill from link") only, since they have no list endpoint that can be queried by company.
+  Pinpoint were left out because their public endpoints could not be confirmed. Workday links are read through
+  the posting's own JSON (`/wday/cxs/...`), since its pages only carry job data for browsers; Workday, Workable
+  and Jobvite are not in the lookup, as they have no list of jobs that can be queried by company name.
 - **Limits.** An import reads at most 20 postings and 8 board lookups, 3 at a time; boards' list responses may be
   up to 10 MB.
 - **Role placeholder.** An import that finds no role saves "Role not stated"; every fill treats it as empty.
