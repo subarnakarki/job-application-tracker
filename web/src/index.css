@@ -42,6 +42,7 @@
   --color-amber: #ffb224;
   --color-green: #2fd67a;
   --color-red: #ff3b4f;
+  --color-red-solid: #dc2640; /* button fill: white text on it is 4.8:1 */
 
   /* Stage colours: dots, bars and avatar tints. Always shown next to the stage name. */
   --color-st-saved: #7c7c85;
@@ -127,22 +128,148 @@
   }
 }
 
+/* ---------- Shared components ----------
+   The old names (btn-primary, btn-secondary, btn-danger, input) are aliases of the new ones so every
+   page changes at once; later phases switch pages to the new names and R10 deletes the aliases. */
 @layer components {
-  .input {
-    @apply min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-2 text-base focus:outline-2 focus:outline-offset-1 focus:outline-blue-600 dark:border-slate-700 dark:bg-slate-900;
-  }
+  .btn-w,
+  .btn-d,
+  .btn-red,
   .btn-primary,
   .btn-secondary,
   .btn-danger {
-    @apply inline-flex min-h-11 items-center justify-center rounded-lg px-4 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-60;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 2.75rem; /* 44px touch target */
+    padding: 0.5rem 1.25rem;
+    border-radius: 9999px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.25;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      transform 0.3s var(--ease-brand),
+      background-color 0.2s,
+      box-shadow 0.3s;
   }
+  .btn-w:active,
+  .btn-d:active,
+  .btn-red:active,
+  .btn-primary:active,
+  .btn-secondary:active,
+  .btn-danger:active {
+    transform: scale(0.97);
+  }
+  .btn-w:disabled,
+  .btn-d:disabled,
+  .btn-red:disabled,
+  .btn-primary:disabled,
+  .btn-secondary:disabled,
+  .btn-danger:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+    transform: none;
+  }
+
+  /* Primary: a white pill. */
+  .btn-w,
   .btn-primary {
-    @apply bg-blue-600 text-white hover:bg-blue-700;
+    background: #fff;
+    color: #000;
   }
+  .btn-w:hover:not(:disabled),
+  .btn-primary:hover:not(:disabled) {
+    box-shadow: 0 0 0 4px rgb(255 255 255 / 0.12);
+  }
+
+  /* Secondary: a translucent dark pill with an inset line. */
+  .btn-d,
   .btn-secondary {
-    @apply border border-slate-300 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800;
+    background: rgb(255 255 255 / 0.08);
+    color: var(--color-fg);
+    box-shadow: var(--shadow-line);
   }
+  .btn-d:hover:not(:disabled),
+  .btn-secondary:hover:not(:disabled) {
+    background: rgb(255 255 255 / 0.12);
+  }
+
+  /* Destructive. The fill is a touch deeper than the brand red so white text keeps 4.5:1. */
+  .btn-red,
   .btn-danger {
-    @apply bg-rose-600 text-white hover:bg-rose-700;
+    background: var(--color-red-solid);
+    color: #fff;
+  }
+  .btn-red:hover:not(:disabled),
+  .btn-danger:hover:not(:disabled) {
+    box-shadow: 0 0 0 4px rgb(255 59 79 / 0.22);
+  }
+
+  /* Inputs, selects and textareas: a filled field with an inset line; focus is a blue ring. */
+  .inp,
+  .input {
+    min-height: 2.75rem;
+    border-radius: var(--radius-input);
+    background: var(--color-s2);
+    color: var(--color-fg);
+    box-shadow: var(--shadow-line);
+    padding: 0.5rem 0.875rem;
+    font-size: 1rem; /* 16px: smaller text makes iOS zoom the page on focus */
+    outline: none;
+    transition:
+      box-shadow 0.25s,
+      background-color 0.25s;
+  }
+  .inp::placeholder,
+  .input::placeholder {
+    color: var(--color-fg-3);
+  }
+  .inp:focus,
+  .input:focus {
+    background: #15151a;
+    box-shadow:
+      inset 0 0 0 1px var(--color-blue),
+      0 0 0 4px rgb(10 139 255 / 0.18);
+  }
+  .inp[aria-invalid='true'],
+  .input[aria-invalid='true'] {
+    box-shadow: inset 0 0 0 1px var(--color-red);
+  }
+  .inp[aria-invalid='true']:focus,
+  .input[aria-invalid='true']:focus {
+    box-shadow:
+      inset 0 0 0 1px var(--color-red),
+      0 0 0 4px rgb(255 59 79 / 0.2);
+  }
+  .inp:disabled,
+  .input:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+  textarea.inp,
+  textarea.input {
+    resize: vertical;
+  }
+}
+
+/* Windows high contrast: shadows are dropped, so give these real borders and a real focus outline. */
+@media (forced-colors: active) {
+  .btn-w,
+  .btn-d,
+  .btn-red,
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger,
+  .inp,
+  .input {
+    border: 1px solid ButtonText;
+  }
+  .inp:focus,
+  .input:focus {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
   }
 }
