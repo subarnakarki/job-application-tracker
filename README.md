@@ -21,7 +21,8 @@ Built by an SDET as a portfolio project, so the tests matter as much as the feat
 - Stats by source: applied, responded, interviewed and offers per source, with response rates.
 - Gmail import (owner only): reads recent job emails with read-only access, has Claude classify each one, applies
   the clear-cut changes and lists the rest for review, with Undo on every change.
-- Mobile-first, keyboard and screen-reader friendly, light and dark mode.
+- Mobile-first, keyboard and screen-reader friendly, with a dark design (Inter, self-hosted) and
+  respect for reduced-motion settings. Colours are tokens, so a light theme can be added later.
 
 ## Stack
 

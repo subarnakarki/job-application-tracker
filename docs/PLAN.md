@@ -340,9 +340,28 @@ card and timeline, fill from link (posting preview mocked at the browser), and t
 
 Not included: meeting reminders, a calendar feed, posting deadlines, star ratings (possible later phases).
 
-## UI redesign (approved, not started)
+## UI redesign (built)
 
-A dark redesign of the web app, in phases R0 to R10, with no API changes: see [REDESIGN-PLAN.md](REDESIGN-PLAN.md).
+A dark redesign of the web app in phases R0 to R10, with no API changes: see [REDESIGN-PLAN.md](REDESIGN-PLAN.md).
+
+### Outcome
+
+Built as planned, on `main`, from the approved design. Differences and findings:
+
+- **New tests were skipped at the owner's request** (the plan lists a unit test per helper and some e2e additions).
+  The existing specs were only edited where the design changes visible text: interview dates
+  (`Interview Wed, Nov 12`), the stats footer row (`Total`), and the two "Try the demo" buttons (the header
+  offers the demo too, so tests look inside `main`).
+- **R0 found a real CSP problem:** zod probed `new Function`, which the policy blocks, on every page load.
+  `web/src/zodConfig.ts` turns the probe off (`jitless`) and is imported first.
+- **Keyboard drag on the board is timing-sensitive under automation:** dnd-kit attaches its key listener in a
+  `setTimeout(0)` after Space, and Chrome runs queued key events first. Two arrow presses sent with no gap can
+  be lost; a person (or a 100 ms pause) cannot trigger it. The existing e2e keyboard test presses with no gap
+  and may flake on a slow runner; if it does, add a short wait after Space there rather than changing the board.
+- **Red button fill** is `#dc2640`, not the design's `#ff3b4f`, so white text keeps 4.5:1; `fg-3` text is 50%
+  white (38% only for decoration).
+- Toasts (`role="status"`), the `/` search shortcut, the board hint line and the static sign-in preview
+  (`web/src/assets/signin-preview.webp`, a real screenshot with sample data) are in, as decided.
 
 ## Planned but not built
 

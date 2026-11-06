@@ -1,4 +1,4 @@
-# UI redesign plan (approved)
+# UI redesign plan (approved and built; see the outcome in PLAN.md)
 
 **Goal:** rebuild the web app's look as the approved dark design, without changing what the app does, its API
 or its accessible names. Source of truth for the look: the design artifact

@@ -35,7 +35,8 @@ and no upcoming next-step date or interview (an interview dated today or later c
 - Every feature ships with tests: unit for logic, API tests for endpoints,
   Playwright for user flows
 - Test data via API seeding or fixtures, never through the UI
-- Mobile-first, accessible UI (labels, keyboard focus, light/dark mode)
+- Mobile-first, accessible UI (labels, keyboard focus, reduced motion). Dark theme only for now: colours are
+  tokens in `web/src/index.css` (`@theme`), never raw palette classes, so a light theme stays a small change
 - Small, reviewable commits
 
 ## Workflow
