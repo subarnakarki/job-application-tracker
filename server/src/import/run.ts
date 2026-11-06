@@ -19,6 +19,7 @@ import {
 import type { Classification, EmailClassifier } from './classify';
 import { GmailError, gmailQuery, MAX_MESSAGES, type GmailClient, type GmailMessage } from './gmail';
 import { decide } from './verdict';
+import { UNKNOWN_ROLE } from '../postings/fill';
 
 export interface ImportDeps {
   db: Db;
@@ -77,8 +78,7 @@ export function importedDateApplied(
   );
 }
 
-/** Placeholder when an email names no role: `role` is required on an application. */
-export const UNKNOWN_ROLE = 'Role not stated';
+export { UNKNOWN_ROLE };
 
 /**
  * One Gmail import for one user: find new job emails, classify each one, and

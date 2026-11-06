@@ -19,6 +19,7 @@ import type { Db, Queryable } from '../db/types';
 import type { ValidationIssue } from '../http/errors';
 import { followUpPredicate } from './followUpSql';
 import { interviewsOf, type InterviewRecord } from './interviews';
+import { suggestionsOf, type SuggestionRecord } from './postingSuggestions';
 import { containsPattern, searchTerms } from './search';
 
 export type Actor = (typeof ACTORS)[number];
@@ -69,6 +70,8 @@ export interface ApplicationWithHistory {
   history: HistoryRecord[];
   /** Oldest first. */
   interviews: InterviewRecord[];
+  /** A posting found on the company's job board, waiting to be applied or dismissed. */
+  suggestion: SuggestionRecord | null;
 }
 
 type EditableField = keyof ApplicationPatch;
@@ -300,7 +303,7 @@ export async function createApplication(
     const history = await historyOf(tx, [record.id]);
     return {
       kind: 'created',
-      value: { record, history: history.get(record.id) ?? [], interviews: [] },
+      value: { record, history: history.get(record.id) ?? [], interviews: [], suggestion: null },
     };
   });
 }
@@ -316,14 +319,16 @@ export async function getApplication(
   );
   const row = found.rows[0];
   if (!row) return null;
-  const [history, interviews] = await Promise.all([
+  const [history, interviews, suggestions] = await Promise.all([
     historyOf(db, [row.id]),
     interviewsOf(db, [row.id]),
+    suggestionsOf(db, [row.id]),
   ]);
   return {
     record: toRecord(row),
     history: history.get(row.id) ?? [],
     interviews: interviews.get(row.id) ?? [],
+    suggestion: suggestions.get(row.id) ?? null,
   };
 }
 
@@ -376,12 +381,14 @@ export async function updateApplication(
     if (changes.length === 0) {
       const history = await historyOf(tx, [current.id]);
       const interviews = await interviewsOf(tx, [current.id]);
+      const suggestions = await suggestionsOf(tx, [current.id]);
       return {
         kind: 'unchanged',
         value: {
           record: current,
           history: history.get(current.id) ?? [],
           interviews: interviews.get(current.id) ?? [],
+          suggestion: suggestions.get(current.id) ?? null,
         },
       };
     }
@@ -422,12 +429,14 @@ export async function updateApplication(
       await recordHistory(tx, current.id, plan.fromStatus, plan.toStatus, now, actor);
     const history = await historyOf(tx, [current.id]);
     const interviews = await interviewsOf(tx, [current.id]);
+    const suggestions = await suggestionsOf(tx, [current.id]);
     return {
       kind: 'updated',
       value: {
         record: toRecord(updatedRow),
         history: history.get(current.id) ?? [],
         interviews: interviews.get(current.id) ?? [],
+        suggestion: suggestions.get(current.id) ?? null,
       },
     };
   });
@@ -462,11 +471,16 @@ export async function listAllWithHistory(
     [userId],
   );
   const ids = found.rows.map((row) => row.id);
-  const [history, interviews] = await Promise.all([historyOf(db, ids), interviewsOf(db, ids)]);
+  const [history, interviews, suggestions] = await Promise.all([
+    historyOf(db, ids),
+    interviewsOf(db, ids),
+    suggestionsOf(db, ids),
+  ]);
   return found.rows.map((row) => ({
     record: toRecord(row),
     history: history.get(row.id) ?? [],
     interviews: interviews.get(row.id) ?? [],
+    suggestion: suggestions.get(row.id) ?? null,
   }));
 }
 

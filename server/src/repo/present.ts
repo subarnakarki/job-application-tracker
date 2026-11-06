@@ -6,9 +6,11 @@ import {
   type Application,
   type ApplicationDetail,
   type HistoryEntry,
+  type PostingSuggestion,
 } from '@jat/shared';
 import type { ApplicationRecord, ApplicationWithHistory, HistoryRecord } from './applications';
 import type { InterviewRecord } from './interviews';
+import type { SuggestionRecord } from './postingSuggestions';
 
 export interface PresentContext {
   now: Date;
@@ -78,6 +80,22 @@ export function presentDetail(
     ...presentApplication(value.record, context),
     history: value.history.map(presentHistory),
     interviews: value.interviews.map(presentInterview),
+    postingSuggestion: value.suggestion && presentSuggestion(value.suggestion),
+  };
+}
+
+export function presentSuggestion(suggestion: SuggestionRecord): PostingSuggestion {
+  return {
+    source: suggestion.source,
+    jobLink: suggestion.jobLink,
+    role: suggestion.role,
+    salaryMin: suggestion.salaryMin,
+    salaryMax: suggestion.salaryMax,
+    salaryCurrency: suggestion.salaryCurrency,
+    location: suggestion.location,
+    workMode: suggestion.workMode,
+    postedOn: suggestion.postedOn,
+    createdAt: suggestion.createdAt.toISOString(),
   };
 }
 

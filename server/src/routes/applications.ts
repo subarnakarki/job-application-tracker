@@ -24,6 +24,8 @@ import {
   type Owner,
 } from '../repo/applications';
 import { toCsv } from '../repo/csv';
+import { deleteSuggestion } from '../repo/postingSuggestions';
+import { fillEmpty } from '../postings/fill';
 import { presentApplication, presentDetail } from '../repo/present';
 import { statsBySource } from '../repo/stats';
 
@@ -299,6 +301,119 @@ export function registerApplicationRoutes(app: FastifyInstance, deps: Applicatio
           void reply.header('etag', etag(result.value.record.version));
           return presentDetail(result.value, context(request, owner));
       }
+    },
+  );
+
+  // A posting found on the company's job board: Apply fills only the empty fields from it (one edit,
+  // so it needs If-Match like any edit), Dismiss drops it. Either way the suggestion is gone after.
+  app.post(
+    '/api/applications/:id/suggestion/apply',
+    {
+      config: {
+        auth: 'user',
+        contract: {
+          summary: "Fill an application's empty fields from its suggested posting (needs If-Match)",
+          errors: {
+            404: 'No such application, or it has no suggestion (or not yours)',
+            412: 'The version is stale; ETag holds the current one',
+            428: 'If-Match is required',
+            429: 'Too many changes',
+          },
+          params: IdParams,
+          headers: IfMatchHeaders,
+          responses: { 200: ApplicationDetailSchema },
+        },
+      },
+    },
+    async (request, reply) => {
+      const db = requireDb();
+      const owner = ownerOf(request);
+      const id = idOf(request);
+      const expected = parseIfMatch(request.headers['if-match']);
+      if (expected === null) {
+        throw new ApiError(
+          428,
+          'precondition_required',
+          'Send If-Match with the version you are editing',
+        );
+      }
+      if (expected === 'invalid')
+        throw new ApiError(400, 'invalid_if_match', 'If-Match must look like "3"');
+      const found = await getApplication(db, owner.userId, id);
+      if (!found?.suggestion) throw notFound();
+      if (found.record.version !== expected) {
+        void reply.header('etag', etag(found.record.version));
+        throw new ApiError(
+          412,
+          'version_conflict',
+          'This application was changed elsewhere. Reload and try again.',
+        );
+      }
+      await spendWrite(db, owner, reply);
+
+      const { suggestion } = found;
+      const { patch } = fillEmpty(found.record, {
+        role: suggestion.role,
+        jobLink: suggestion.jobLink,
+        salary:
+          suggestion.salaryMin !== null &&
+          suggestion.salaryMax !== null &&
+          suggestion.salaryCurrency !== null
+            ? {
+                min: suggestion.salaryMin,
+                max: suggestion.salaryMax,
+                currency: suggestion.salaryCurrency,
+              }
+            : null,
+        location: suggestion.location,
+        workMode: suggestion.workMode,
+        postedOn: suggestion.postedOn,
+      });
+      const result = await updateApplication(db, owner, id, expected, patch, request.clock.now());
+      switch (result.kind) {
+        case 'not_found':
+          throw notFound();
+        case 'version_conflict':
+          void reply.header('etag', etag(result.currentVersion));
+          throw new ApiError(
+            412,
+            'version_conflict',
+            'This application was changed elsewhere. Reload and try again.',
+          );
+        case 'invalid':
+          throw new ApiError(400, 'validation_error', 'The suggestion does not fit', result.issues);
+        case 'unchanged':
+        case 'updated':
+          await deleteSuggestion(db, owner.userId, id);
+          void reply.header('etag', etag(result.value.record.version));
+          return presentDetail({ ...result.value, suggestion: null }, context(request, owner));
+      }
+    },
+  );
+
+  app.delete(
+    '/api/applications/:id/suggestion',
+    {
+      config: {
+        auth: 'user',
+        contract: {
+          summary: "Dismiss an application's suggested posting",
+          errors: {
+            404: 'No such application, or it has no suggestion (or not yours)',
+            429: 'Too many changes',
+          },
+          params: IdParams,
+          responses: { 204: null },
+        },
+      },
+    },
+    async (request, reply) => {
+      const db = requireDb();
+      const owner = ownerOf(request);
+      const id = idOf(request);
+      await spendWrite(db, owner, reply);
+      if (!(await deleteSuggestion(db, owner.userId, id))) throw notFound();
+      return reply.code(204).send();
     },
   );
 

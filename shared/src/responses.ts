@@ -65,10 +65,30 @@ export const InterviewSchema = z.strictObject({
 });
 export type Interview = z.infer<typeof InterviewSchema>;
 
+/**
+ * A posting found on the company's public job board that may be this application's (when an
+ * imported email had no link). The user applies it (filling only empty fields) or dismisses it.
+ */
+export const PostingSuggestionSchema = z.strictObject({
+  /** The job board it was found on, e.g. "greenhouse". */
+  source: z.string(),
+  jobLink: z.string(),
+  role: z.string().nullable(),
+  salaryMin: z.number().int().nullable(),
+  salaryMax: z.number().int().nullable(),
+  salaryCurrency: z.string().nullable(),
+  location: z.string().nullable(),
+  workMode: z.enum(WORK_MODES).nullable(),
+  postedOn: calendarDate.nullable(),
+  createdAt: instant,
+});
+export type PostingSuggestion = z.infer<typeof PostingSuggestionSchema>;
+
 export const ApplicationDetailSchema = ApplicationSchema.extend({
   history: z.array(HistoryEntrySchema),
   /** Oldest first. */
   interviews: z.array(InterviewSchema),
+  postingSuggestion: PostingSuggestionSchema.nullable(),
 });
 export type ApplicationDetail = z.infer<typeof ApplicationDetailSchema>;
 
