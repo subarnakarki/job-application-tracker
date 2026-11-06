@@ -92,7 +92,7 @@ function Tile({
         danger ? 'danger-tile' : ''
       }`}
     >
-      <div className="flex gap-3.5">
+      <div className="flex w-full min-w-0 gap-3.5">
         <span
           aria-hidden="true"
           className={`grid size-10 flex-none place-items-center rounded-xl bg-white/[0.06] shadow-line ${
@@ -111,7 +111,7 @@ function Tile({
             {ICONS[icon]}
           </svg>
         </span>
-        <div className="min-w-0 max-w-[60ch]">
+        <div className="min-w-0 max-w-[60ch] flex-1">
           <h2 id={id} className="text-[1.0625rem] font-semibold tracking-[-0.025em]">
             {title}
           </h2>
@@ -159,7 +159,7 @@ export function AccountPage() {
             <div>
               <button
                 type="button"
-                className="btn-d"
+                className="btn-d h-auto max-w-full py-2.5 text-left whitespace-normal"
                 disabled={updateZone.isPending}
                 onClick={() => updateZone.mutate(device)}
               >
