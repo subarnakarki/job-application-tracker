@@ -16,7 +16,8 @@ Flagged when **all** of these hold:
 
 1. status is `Applied`, `Screening` or `Interviewing`;
 2. **7 or more calendar days** have passed since the last activity;
-3. there is **no upcoming next step**: `nextStepDate` is empty or before today.
+3. there is **no upcoming next step**: `nextStepDate` is empty or before today, and no interview is dated today
+   or later (Phase 12).
 
 "Days" are calendar days in the **user's time zone**, compared as dates (not 24-hour spans), so activity at 23:59
 a week ago counts the same as activity at 00:00 that day. A next-step date of **today counts as upcoming**.

@@ -50,15 +50,17 @@ describe.skipIf(!TEST_DATABASE_URL)('follow-up: SQL and TypeScript agree (real P
 
   /** Evaluates the SQL predicate on one synthetic row. */
   async function sqlSays(subject: FollowUpSubject, context: FollowUpContext): Promise<boolean> {
-    const predicate = followUpPredicate(context, 1);
+    const predicate = followUpPredicate(context, 1, 'a.latest_interview_on');
     const result = await testDb.db.query<{ flagged: boolean }>(
       `select ${predicate.sql} as flagged
-         from (select $5::text as status, $6::timestamptz as last_activity_at, $7::date as next_step_date) a`,
+         from (select $5::text as status, $6::timestamptz as last_activity_at, $7::date as next_step_date,
+                      $8::date as latest_interview_on) a`,
       [
         ...predicate.params,
         subject.status,
         new Date(subject.lastActivityAt).toISOString(),
         subject.nextStepDate,
+        subject.latestInterviewOn ?? null,
       ],
     );
     return result.rows[0]?.flagged ?? false;
@@ -102,6 +104,18 @@ describe.skipIf(!TEST_DATABASE_URL)('follow-up: SQL and TypeScript agree (real P
       ['2026-11-06', false],
     ])('next step %s -> %s', async (nextStepDate, expected) => {
       const subject = applied({ nextStepDate });
+
+      expect(await sqlSays(subject, UTC)).toBe(expected);
+      expect(needsFollowUp(subject, UTC)).toBe(expected);
+    });
+
+    it.each([
+      [null, true],
+      ['2026-11-04', true], // the interview is over: follow up
+      ['2026-11-05', false], // today
+      ['2026-11-20', false], // scheduled
+    ])('latest interview %s -> %s', async (latestInterviewOn, expected) => {
+      const subject = applied({ latestInterviewOn });
 
       expect(await sqlSays(subject, UTC)).toBe(expected);
       expect(needsFollowUp(subject, UTC)).toBe(expected);
@@ -174,13 +188,19 @@ describe.skipIf(!TEST_DATABASE_URL)('follow-up: SQL and TypeScript agree (real P
           instant,
           fc.constantFrom(...zones),
           fc.option(fc.integer({ min: -40, max: 40 }), { nil: null }),
-          async (status, lastActivityAt, now, timeZone, nextStepOffset) => {
+          fc.option(fc.integer({ min: -40, max: 40 }), { nil: null }),
+          async (status, lastActivityAt, now, timeZone, nextStepOffset, interviewOffset) => {
             const context = { now, timeZone };
-            const nextStepDate =
-              nextStepOffset === null
+            const dayFrom = (offset: number | null) =>
+              offset === null
                 ? null
-                : new Date(now.getTime() + nextStepOffset * 86_400_000).toISOString().slice(0, 10);
-            const subject: FollowUpSubject = { status, lastActivityAt, nextStepDate };
+                : new Date(now.getTime() + offset * 86_400_000).toISOString().slice(0, 10);
+            const subject: FollowUpSubject = {
+              status,
+              lastActivityAt,
+              nextStepDate: dayFrom(nextStepOffset),
+              latestInterviewOn: dayFrom(interviewOffset),
+            };
 
             expect(await sqlSays(subject, context)).toBe(needsFollowUp(subject, context));
           },
@@ -212,7 +232,12 @@ describe.skipIf(!TEST_DATABASE_URL)('follow-up: SQL and TypeScript agree (real P
             '2026-11-04T10:00:00Z',
           ]) {
             for (const nextStepDate of [null, '2026-11-04', '2026-11-05']) {
-              rows.push({ userId, subject: { status, lastActivityAt, nextStepDate } });
+              for (const latestInterviewOn of [null, '2026-11-03', '2026-11-05']) {
+                rows.push({
+                  userId,
+                  subject: { status, lastActivityAt, nextStepDate, latestInterviewOn },
+                });
+              }
             }
           }
         }
@@ -224,7 +249,16 @@ describe.skipIf(!TEST_DATABASE_URL)('follow-up: SQL and TypeScript agree (real P
            values ($1, 'Acme', 'SDET', $2, $3, $4) returning id`,
           [userId, subject.status, subject.lastActivityAt, subject.nextStepDate],
         );
-        ids.set(result.rows[0]?.id as string, subject);
+        const id = result.rows[0]?.id as string;
+        if (subject.latestInterviewOn) {
+          // An earlier interview too, so the rule must use the latest one.
+          await testDb.db.query(
+            `insert into interviews (application_id, user_id, held_on)
+             values ($1, $2, '2026-10-01'), ($1, $2, $3)`,
+            [id, userId, subject.latestInterviewOn],
+          );
+        }
+        ids.set(id, subject);
       }
 
       const predicate = followUpPredicate(context, 2);

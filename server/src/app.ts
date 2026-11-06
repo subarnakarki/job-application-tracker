@@ -12,6 +12,7 @@ import { registerRequestPipeline } from './http/pipeline';
 import { googleProviderFromEnv, type GoogleProvider } from './auth/google';
 import { registerApplicationRoutes } from './routes/applications';
 import { registerGoogleRoutes } from './routes/google';
+import { registerInterviewRoutes } from './routes/interviews';
 import { registerLeadRoutes } from './routes/leads';
 import { registerHealthRoutes } from './routes/health';
 import { registerImportRoutes } from './routes/import';
@@ -85,6 +86,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   registerMeRoutes(app, deps.db);
   registerApplicationRoutes(app, { db: deps.db, clock });
   registerLeadRoutes(app, { db: deps.db, clock });
+  registerInterviewRoutes(app, { db: deps.db, clock });
   registerImportRoutes(app, {
     db: deps.db,
     clock,

@@ -7,6 +7,8 @@ export interface FollowUpSubject {
   lastActivityAt: Date | string;
   /** `YYYY-MM-DD` or null. */
   nextStepDate: string | null;
+  /** The day of the application's latest interview (`YYYY-MM-DD`), or null/absent for none. */
+  latestInterviewOn?: string | null;
 }
 
 export interface FollowUpContext {
@@ -34,7 +36,8 @@ export function followUpWindow(context: FollowUpContext): FollowUpWindow {
 /**
  * "Needs follow-up" = Applied / Screening / Interviewing, with no activity for
  * 7 or more calendar days, and no upcoming next step. A next-step date of today
- * or later is upcoming; a past date is not.
+ * or later is upcoming; a past date is not. An interview dated today or later
+ * also counts as an upcoming next step.
  *
  * Calendar-day semantics: activity at 23:59 a week ago counts the same as at
  * 00:00 that day, because only dates in the user's zone are compared.
@@ -48,6 +51,10 @@ export function needsFollowUp(subject: FollowUpSubject, context: FollowUpContext
   const lastActivityDate = localDateIn(subject.lastActivityAt, context.timeZone);
   if (lastActivityDate > staleOnOrBefore) return false; // active within the last 6 days
 
-  const hasUpcomingNextStep = subject.nextStepDate !== null && subject.nextStepDate >= today;
+  const latestInterview = subject.latestInterviewOn ?? null;
+  if (latestInterview !== null) dayNumber(latestInterview); // throws on a malformed date
+  const hasUpcomingNextStep =
+    (subject.nextStepDate !== null && subject.nextStepDate >= today) ||
+    (latestInterview !== null && latestInterview >= today);
   return !hasUpcomingNextStep;
 }

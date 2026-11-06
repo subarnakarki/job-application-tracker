@@ -70,6 +70,9 @@ export const LIMITS = {
   phone: 50,
   profileLink: 2000,
   leadNote: 5000,
+  interviewsPerApplication: 20,
+  interviewLabel: 200,
+  interviewNotes: 5000,
 } as const;
 
 export function isClosed(status: Status): boolean {

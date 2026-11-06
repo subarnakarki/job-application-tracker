@@ -17,6 +17,7 @@ import {
 import type { Db, Queryable } from '../db/types';
 import type { ValidationIssue } from '../http/errors';
 import { followUpPredicate } from './followUpSql';
+import { interviewsOf, type InterviewRecord } from './interviews';
 import { containsPattern, searchTerms } from './search';
 
 export type Actor = (typeof ACTORS)[number];
@@ -47,6 +48,8 @@ export interface ApplicationRecord {
   version: number;
   leadId: string | null;
   leadName: string | null;
+  /** Every interview day, oldest first. */
+  interviewDates: string[];
 }
 
 export interface HistoryRecord {
@@ -60,6 +63,8 @@ export interface HistoryRecord {
 export interface ApplicationWithHistory {
   record: ApplicationRecord;
   history: HistoryRecord[];
+  /** Oldest first. */
+  interviews: InterviewRecord[];
 }
 
 type EditableField = keyof ApplicationPatch;
@@ -85,7 +90,9 @@ const COLUMN = {
 const SELECT_COLUMNS = `id, company, role, status, date_applied, source, salary_min, salary_max,
   salary_currency, job_link, contact, next_step, next_step_date, notes, created_at, updated_at,
   last_activity_at, version, lead_id,
-  (select l.name from leads l where l.id = lead_id) as lead_name`;
+  (select l.name from leads l where l.id = a.lead_id) as lead_name,
+  (select coalesce(array_agg(i.held_on::text order by i.held_on), '{}') from interviews i
+    where i.application_id = a.id) as interview_dates`;
 
 interface ApplicationRow {
   id: string;
@@ -108,6 +115,7 @@ interface ApplicationRow {
   version: number;
   lead_id: string | null;
   lead_name: string | null;
+  interview_dates: string[];
 }
 
 function toRecord(row: ApplicationRow): ApplicationRecord {
@@ -132,6 +140,7 @@ function toRecord(row: ApplicationRow): ApplicationRecord {
     version: row.version,
     leadId: row.lead_id,
     leadName: row.lead_name,
+    interviewDates: row.interview_dates,
   };
 }
 
@@ -242,7 +251,7 @@ export async function createApplication(
       today: localDateIn(now, owner.timeZone),
     });
     const inserted = await tx.query<ApplicationRow>(
-      `insert into applications (user_id, company, role, status, date_applied, source, salary_min,
+      `insert into applications as a (user_id, company, role, status, date_applied, source, salary_min,
          salary_max, salary_currency, job_link, contact, next_step, next_step_date, notes,
          created_at, updated_at, last_activity_at, lead_id)
        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $15, $15, $16)
@@ -272,7 +281,10 @@ export async function createApplication(
     const plan = planStatusChange(null, record.status);
     await recordHistory(tx, record.id, plan.fromStatus, plan.toStatus, now, actor);
     const history = await historyOf(tx, [record.id]);
-    return { kind: 'created', value: { record, history: history.get(record.id) ?? [] } };
+    return {
+      kind: 'created',
+      value: { record, history: history.get(record.id) ?? [], interviews: [] },
+    };
   });
 }
 
@@ -282,13 +294,20 @@ export async function getApplication(
   id: string,
 ): Promise<ApplicationWithHistory | null> {
   const found = await db.query<ApplicationRow>(
-    `select ${SELECT_COLUMNS} from applications where id = $1 and user_id = $2`,
+    `select ${SELECT_COLUMNS} from applications a where id = $1 and user_id = $2`,
     [id, userId],
   );
   const row = found.rows[0];
   if (!row) return null;
-  const history = await historyOf(db, [row.id]);
-  return { record: toRecord(row), history: history.get(row.id) ?? [] };
+  const [history, interviews] = await Promise.all([
+    historyOf(db, [row.id]),
+    interviewsOf(db, [row.id]),
+  ]);
+  return {
+    record: toRecord(row),
+    history: history.get(row.id) ?? [],
+    interviews: interviews.get(row.id) ?? [],
+  };
 }
 
 export type UpdateResult =
@@ -315,7 +334,7 @@ export async function updateApplication(
 ): Promise<UpdateResult> {
   return db.transaction(async (tx) => {
     const locked = await tx.query<ApplicationRow>(
-      `select ${SELECT_COLUMNS} from applications where id = $1 and user_id = $2 for update`,
+      `select ${SELECT_COLUMNS} from applications a where id = $1 and user_id = $2 for update`,
       [id, owner.userId],
     );
     const row = locked.rows[0];
@@ -339,9 +358,14 @@ export async function updateApplication(
     const changes = changedFields(current, pick(merged, Object.keys(COLUMN) as EditableField[]));
     if (changes.length === 0) {
       const history = await historyOf(tx, [current.id]);
+      const interviews = await interviewsOf(tx, [current.id]);
       return {
         kind: 'unchanged',
-        value: { record: current, history: history.get(current.id) ?? [] },
+        value: {
+          record: current,
+          history: history.get(current.id) ?? [],
+          interviews: interviews.get(current.id) ?? [],
+        },
       };
     }
 
@@ -364,7 +388,7 @@ export async function updateApplication(
       (field, index) => `${COLUMN[field as EditableField]} = $${index + 3}`,
     );
     const updated = await tx.query<ApplicationRow>(
-      `update applications
+      `update applications a
           set ${assignments.join(', ')},
               updated_at = $${changes.length + 3},
               last_activity_at = $${changes.length + 3},
@@ -380,9 +404,14 @@ export async function updateApplication(
     if (plan.changed)
       await recordHistory(tx, current.id, plan.fromStatus, plan.toStatus, now, actor);
     const history = await historyOf(tx, [current.id]);
+    const interviews = await interviewsOf(tx, [current.id]);
     return {
       kind: 'updated',
-      value: { record: toRecord(updatedRow), history: history.get(current.id) ?? [] },
+      value: {
+        record: toRecord(updatedRow),
+        history: history.get(current.id) ?? [],
+        interviews: interviews.get(current.id) ?? [],
+      },
     };
   });
 }
@@ -412,14 +441,16 @@ export async function listAllWithHistory(
   userId: string,
 ): Promise<ApplicationWithHistory[]> {
   const found = await db.query<ApplicationRow>(
-    `select ${SELECT_COLUMNS} from applications where user_id = $1 order by created_at, id`,
+    `select ${SELECT_COLUMNS} from applications a where user_id = $1 order by created_at, id`,
     [userId],
   );
-  const history = await historyOf(
-    db,
-    found.rows.map((row) => row.id),
-  );
-  return found.rows.map((row) => ({ record: toRecord(row), history: history.get(row.id) ?? [] }));
+  const ids = found.rows.map((row) => row.id);
+  const [history, interviews] = await Promise.all([historyOf(db, ids), interviewsOf(db, ids)]);
+  return found.rows.map((row) => ({
+    record: toRecord(row),
+    history: history.get(row.id) ?? [],
+    interviews: interviews.get(row.id) ?? [],
+  }));
 }
 
 /** Account deletion: the user and, by cascade, every session, identity, application and history row. */

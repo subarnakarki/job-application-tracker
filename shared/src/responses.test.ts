@@ -32,6 +32,8 @@ const application = {
   isClosed: false,
   leadId: null,
   leadName: null,
+  interviewCount: 0,
+  nextInterviewOn: null,
 };
 const history = {
   id: ID,
@@ -52,16 +54,17 @@ const user = {
 describe('response contracts', () => {
   it('accept the real shapes', () => {
     expect(ApplicationSchema.safeParse(application).success).toBe(true);
-    expect(ApplicationDetailSchema.safeParse({ ...application, history: [history] }).success).toBe(
-      true,
-    );
+    expect(
+      ApplicationDetailSchema.safeParse({ ...application, history: [history], interviews: [] })
+        .success,
+    ).toBe(true);
     expect(HistoryEntrySchema.safeParse(history).success).toBe(true);
     expect(UserSchema.safeParse(user).success).toBe(true);
     expect(
       DataExportSchema.safeParse({
         exportedAt: '2026-11-05T12:00:00.000Z',
         user,
-        applications: [{ ...application, history: [history] }],
+        applications: [{ ...application, history: [history], interviews: [] }],
         leads: [],
         imports: { runs: [], items: [] },
       }).success,

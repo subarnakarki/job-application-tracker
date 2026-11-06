@@ -263,3 +263,27 @@ export type LeadNotePatch = z.output<typeof LeadNotePatchSchema>;
 export function noteDateProblem(heldOn: string, today: string): string | null {
   return heldOn > today ? 'A note cannot be dated in the future' : null;
 }
+
+// ---------------------------------------------------------------------------------------------
+// Interviews: past or scheduled, logged against an application.
+
+const interviewNotes = z
+  .string()
+  .max(LIMITS.interviewNotes)
+  .refine(noNul, 'Must not contain NUL characters');
+
+/** Any day, past or future, so scheduled interviews can be logged ahead. */
+export const InterviewInputSchema = z.strictObject({
+  heldOn: dateOnly,
+  /** For example "Hiring manager". */
+  label: optionalText(LIMITS.interviewLabel).default(null),
+  notes: interviewNotes.default(''),
+});
+export type InterviewInput = z.output<typeof InterviewInputSchema>;
+
+export const InterviewPatchSchema = z.strictObject({
+  heldOn: dateOnly.optional(),
+  label: optionalText(LIMITS.interviewLabel).optional(),
+  notes: interviewNotes.optional(),
+});
+export type InterviewPatch = z.output<typeof InterviewPatchSchema>;

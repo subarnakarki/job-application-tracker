@@ -46,11 +46,26 @@ export const ApplicationSchema = z.strictObject({
   leadId: z.uuid().nullable(),
   /** The linked lead's name, for display. */
   leadName: z.string().nullable(),
+  interviewCount: z.number().int().min(0),
+  /** The next interview from today on, in the user's time zone, or null. */
+  nextInterviewOn: calendarDate.nullable(),
 });
 export type Application = z.infer<typeof ApplicationSchema>;
 
+export const InterviewSchema = z.strictObject({
+  id: z.uuid(),
+  heldOn: calendarDate,
+  label: z.string().nullable(),
+  notes: z.string(),
+  createdAt: instant,
+  updatedAt: instant,
+});
+export type Interview = z.infer<typeof InterviewSchema>;
+
 export const ApplicationDetailSchema = ApplicationSchema.extend({
   history: z.array(HistoryEntrySchema),
+  /** Oldest first. */
+  interviews: z.array(InterviewSchema),
 });
 export type ApplicationDetail = z.infer<typeof ApplicationDetailSchema>;
 

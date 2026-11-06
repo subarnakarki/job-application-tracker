@@ -1,11 +1,14 @@
 import {
   isClosed,
+  localDateIn,
+  type Interview,
   needsFollowUp,
   type Application,
   type ApplicationDetail,
   type HistoryEntry,
 } from '@jat/shared';
 import type { ApplicationRecord, ApplicationWithHistory, HistoryRecord } from './applications';
+import type { InterviewRecord } from './interviews';
 
 export interface PresentContext {
   now: Date;
@@ -17,6 +20,7 @@ export function presentApplication(
   record: ApplicationRecord,
   context: PresentContext,
 ): Application {
+  const today = localDateIn(context.now, context.timeZone);
   return {
     id: record.id,
     company: record.company,
@@ -41,12 +45,15 @@ export function presentApplication(
         status: record.status,
         lastActivityAt: record.lastActivityAt,
         nextStepDate: record.nextStepDate,
+        latestInterviewOn: record.interviewDates.at(-1) ?? null,
       },
       context,
     ),
     isClosed: isClosed(record.status),
     leadId: record.leadId,
     leadName: record.leadName,
+    interviewCount: record.interviewDates.length,
+    nextInterviewOn: record.interviewDates.find((day) => day >= today) ?? null,
   };
 }
 
@@ -67,5 +74,17 @@ export function presentDetail(
   return {
     ...presentApplication(value.record, context),
     history: value.history.map(presentHistory),
+    interviews: value.interviews.map(presentInterview),
+  };
+}
+
+export function presentInterview(entry: InterviewRecord): Interview {
+  return {
+    id: entry.id,
+    heldOn: entry.heldOn,
+    label: entry.label,
+    notes: entry.notes,
+    createdAt: entry.createdAt.toISOString(),
+    updatedAt: entry.updatedAt.toISOString(),
   };
 }

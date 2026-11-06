@@ -26,7 +26,7 @@ created/updated timestamps, status history.
 Statuses: Saved, Applied, Screening, Interviewing, Offer, Rejected, Withdrawn.
 "Closed" = Rejected or Withdrawn.
 "Needs follow-up" = Applied/Screening/Interviewing with no update in 7+ days
-and no upcoming next-step date.
+and no upcoming next-step date or interview (an interview dated today or later counts as upcoming).
 
 ## Conventions
 

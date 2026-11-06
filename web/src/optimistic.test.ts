@@ -28,6 +28,8 @@ function app(id: string, overrides: Partial<Application> = {}): Application {
     isClosed: false,
     leadId: null,
     leadName: null,
+    interviewCount: 0,
+    nextInterviewOn: null,
     ...overrides,
   };
 }
