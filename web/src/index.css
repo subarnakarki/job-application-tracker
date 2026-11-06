@@ -63,23 +63,6 @@
   --ease-brand: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* The app is dark only for now, so `dark:` is always on. Pages that still use the old
-   `bg-white dark:bg-slate-950` pairs therefore render dark until their phase restyles them. */
-@custom-variant dark (&);
-
-/* Temporary: the old pages' dark: pairs use these slate steps. Pointing them at the neutral
-   tokens keeps those pages the same black as the new ones. Delete with the last slate-* class (R10). */
-@theme {
-  --color-slate-100: #f2f2f3;
-  --color-slate-200: #e4e4e6;
-  --color-slate-300: #a8a8ad;
-  --color-slate-400: #8a8a8f;
-  --color-slate-700: #2c2c30;
-  --color-slate-800: #1f1f23;
-  --color-slate-900: #121214;
-  --color-slate-950: #000;
-}
-
 @layer base {
   :root {
     color-scheme: dark;
@@ -128,16 +111,11 @@
   }
 }
 
-/* ---------- Shared components ----------
-   The old names (btn-primary, btn-secondary, btn-danger, input) are aliases of the new ones so every
-   page changes at once; later phases switch pages to the new names and R10 deletes the aliases. */
+/* ---------- Shared components ---------- */
 @layer components {
   .btn-w,
   .btn-d,
-  .btn-red,
-  .btn-primary,
-  .btn-secondary,
-  .btn-danger {
+  .btn-red {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -157,60 +135,47 @@
   }
   .btn-w:active,
   .btn-d:active,
-  .btn-red:active,
-  .btn-primary:active,
-  .btn-secondary:active,
-  .btn-danger:active {
+  .btn-red:active {
     transform: scale(0.97);
   }
   .btn-w:disabled,
   .btn-d:disabled,
-  .btn-red:disabled,
-  .btn-primary:disabled,
-  .btn-secondary:disabled,
-  .btn-danger:disabled {
+  .btn-red:disabled {
     cursor: not-allowed;
     opacity: 0.6;
     transform: none;
   }
 
   /* Primary: a white pill. */
-  .btn-w,
-  .btn-primary {
+  .btn-w {
     background: #fff;
     color: #000;
   }
-  .btn-w:hover:not(:disabled),
-  .btn-primary:hover:not(:disabled) {
+  .btn-w:hover:not(:disabled) {
     box-shadow: 0 0 0 4px rgb(255 255 255 / 0.12);
   }
 
   /* Secondary: a translucent dark pill with an inset line. */
-  .btn-d,
-  .btn-secondary {
+  .btn-d {
     background: rgb(255 255 255 / 0.08);
     color: var(--color-fg);
     box-shadow: var(--shadow-line);
   }
-  .btn-d:hover:not(:disabled),
-  .btn-secondary:hover:not(:disabled) {
+  .btn-d:hover:not(:disabled) {
     background: rgb(255 255 255 / 0.12);
   }
 
   /* Destructive. The fill is a touch deeper than the brand red so white text keeps 4.5:1. */
-  .btn-red,
-  .btn-danger {
+  .btn-red {
     background: var(--color-red-solid);
     color: #fff;
   }
-  .btn-red:hover:not(:disabled),
-  .btn-danger:hover:not(:disabled) {
+  .btn-red:hover:not(:disabled) {
     box-shadow: 0 0 0 4px rgb(255 59 79 / 0.22);
   }
 
   /* Inputs, selects and textareas: a filled field with an inset line; focus is a blue ring. */
-  .inp,
-  .input {
+  .inp {
     min-height: 2.75rem;
     border-radius: var(--radius-input);
     background: var(--color-s2);
@@ -223,34 +188,28 @@
       box-shadow 0.25s,
       background-color 0.25s;
   }
-  .inp::placeholder,
-  .input::placeholder {
+  .inp::placeholder {
     color: var(--color-fg-3);
   }
-  .inp:focus,
-  .input:focus {
+  .inp:focus {
     background: #15151a;
     box-shadow:
       inset 0 0 0 1px var(--color-blue),
       0 0 0 4px rgb(10 139 255 / 0.18);
   }
-  .inp[aria-invalid='true'],
-  .input[aria-invalid='true'] {
+  .inp[aria-invalid='true'] {
     box-shadow: inset 0 0 0 1px var(--color-red);
   }
-  .inp[aria-invalid='true']:focus,
-  .input[aria-invalid='true']:focus {
+  .inp[aria-invalid='true']:focus {
     box-shadow:
       inset 0 0 0 1px var(--color-red),
       0 0 0 4px rgb(255 59 79 / 0.2);
   }
-  .inp:disabled,
-  .input:disabled {
+  .inp:disabled {
     cursor: not-allowed;
     opacity: 0.6;
   }
-  textarea.inp,
-  textarea.input {
+  textarea.inp {
     resize: vertical;
   }
 }
@@ -260,15 +219,10 @@
   .btn-w,
   .btn-d,
   .btn-red,
-  .btn-primary,
-  .btn-secondary,
-  .btn-danger,
-  .inp,
-  .input {
+  .inp {
     border: 1px solid ButtonText;
   }
-  .inp:focus,
-  .input:focus {
+  .inp:focus {
     outline: 2px solid Highlight;
     outline-offset: 2px;
   }
@@ -427,6 +381,8 @@
   .seg > button {
     position: relative;
     z-index: 1;
+    min-height: 2.75rem; /* the whole control's height, so the touch target is 44px */
+    margin-block: -4px;
     padding: 0 1rem;
     border-radius: 8px;
     font-size: 0.875rem;
