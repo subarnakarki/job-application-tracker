@@ -480,6 +480,94 @@ Tests, per the conventions:
 3. Are 5 a day per user and 200 a day in total right, or should it be owner-only at first, as Gmail import was?
 4. Build 14c now or as a later phase?
 
+## Phase 15 plan: scheduled job search and apply kit (proposed, awaiting approval)
+
+**Goal:** after the resume analysis, the app runs the owner's recurring job-search workflow: a one-time setup,
+then on a schedule it searches Greenhouse job boards with a Google-style query (default
+`site:job-boards.greenhouse.io "product manager"`, past 24 hours), lists what it found, drafts every
+application, and reports what was applied, skipped and blocked.
+
+**What changes from the workflow as written, and why:**
+
+| Workflow step                    | Problem                                                                                                                                                                                                                                                          | Plan                                                                                                                                                                                                                            |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Run the Google query in Chrome   | A server cannot drive Google: scraping it breaks Google's terms and gets CAPTCHAs from cloud IPs. Google's Custom Search JSON API is closed to new customers and shuts down on 2027-01-01                                                                        | Keep the query in Google `site:` syntax, but run it through Claude's web search tool, with `site:` turned into `allowed_domains`. Each run also offers **Open in Google** (the same query with `&tbs=qdr:d`) for a manual check |
+| Google's `tbs=qdr:d` time filter | Search engines' dates are rough, and the web search tool has no time filter                                                                                                                                                                                      | Each hit is read through Greenhouse's public job API, and the posting's own `first_published`/`updated_at` decides whether it is inside the timeframe (24 hours by default; 3 or 7 days selectable)                             |
+| Submit each application          | Greenhouse accepts API applications only with the **employer's** Job Board API key, and its form is protected by reCAPTCHA. Getting past that would mean evading bot protection, which this app will not do. AI answers sent under your name also need your eyes | **Apply kit:** the app drafts everything, you review each draft and give a "go" (or "go all"), then submit it yourself on Greenhouse with copy buttons for every field. One click marks it applied and tracks it                |
+| "Remember" setup, scheduled task | The app has no agent memory; Vercel Hobby crons run at most once a day, up to 59 minutes late                                                                                                                                                                    | Setup is saved to a profile in the database. An hourly GitHub Actions schedule calls a secret-protected endpoint that runs the users whose local time has come                                                                  |
+
+### 15a. Setup (first run only)
+
+- A **Job search setup** page, shown until it is completed, then never asked again (edit it in settings):
+  resume (from Phase 14), full name, email, phone, city and state, work authorization, salary (number or range),
+  LinkedIn, portfolio and website, work mode (remote / hybrid / on-site), search queries (default above, and the
+  top titles from the resume analysis offered as one-click queries), titles to include and to skip, timeframe,
+  and cadence (daily, weekdays or weekly, at a local time).
+- A **confirm** step shows everything back before it is saved, then the first run starts.
+- Migration `0009`: `job_search_profiles` (one per user, zod-validated, URLs http(s) only) and
+  `job_search_runs`, `job_search_hits` (unique per user and Greenhouse board and job id, so a job is never shown
+  twice).
+- **Resume text must now be stored** (a scheduled run has no file), which reverses Phase 14's "never stored":
+  the extracted text only, deletable, removed with the account. The file itself stays on your device for upload.
+
+### 15b. Every run
+
+1. **Search:** each saved query through `web_search_20260209` (at most 3 queries and 5 searches per query a
+   run), keeping only Greenhouse job URLs, parsed into board token and job id.
+2. **Check:** read each job from `boards-api.greenhouse.io` (title, location, dates, where you apply), drop
+   those outside the timeframe or already tracked as an application.
+3. **Sort:** code in `shared/` splits the list into **target roles** (title matches an include term and no skip
+   term) and **keyword only** (the word appears in the posting but not the title), with work mode and location
+   checked against the profile.
+4. **List:** the run page shows the full list first: company, role, time posted, direct URL, in the two groups.
+5. **Draft:** for each target role, Claude (`claude-opus-5-5`) drafts answers to the posting's application
+   questions from the resume text and profile. Rules: never invent facts; work authorization, salary,
+   relocation and sponsorship come from the profile only; demographic and EEO questions are always left to you;
+   anything the resume cannot answer is marked **needs you**.
+6. **Review:** each draft waits for your **go** (edit, go, or skip). **Go all** approves the rest of the run.
+   Approved ones get **Open application** plus copy buttons; **I applied** creates the application (Applied,
+   source Company site, job link, today's date) and fills it from the posting as Phase 13 does.
+7. **Blocked:** a job whose apply link leaves Greenhouse (a company careers site, Workday and the like) or needs
+   an account or sign-in is listed separately for you to finish yourself.
+8. **Summary:** at the end of each run: found, target, keyword-only, drafted, applied, skipped, blocked, each
+   with its reason. An email digest is a possible later phase.
+
+### Limits, cost, safety
+
+- Web search costs $10 per 1,000 searches plus tokens: a run is about 5 to 15 searches and $0.05 a draft, so
+  roughly $0.50 to $1.50 a run at most. At most 25 drafts a run, one scheduled run a day per user, and a global
+  daily cap. **Owner-only at first** (`JOB_SEARCH_USER_IDS`), as Gmail import was.
+- Greenhouse reads go through the existing SSRF guard, timeouts and size caps. Posting text and search results
+  are untrusted data in the prompt, with the same "never follow instructions in it" rule.
+- The cron endpoint is `auth: 'public'` but needs a secret header (constant-time compare), so it is added to
+  the public allowlist in `registry.test.ts`. The run and hit routes with ids go into `ISOLATION_COVERAGE`.
+- Nothing is ever sent to an employer by the app.
+
+### Spike first (half a day, throwaway)
+
+Before building: check that the web search tool, restricted to the Greenhouse domains, finds postings from the
+last 24 hours, and how many compared to Google with `qdr:d`; and check whether Greenhouse's public job endpoint
+returns the application questions. If it does not, the drafts cover the standard fields and the questions
+pasted from the page.
+
+### Tests
+
+- **Unit:** `site:` query parsing, Greenhouse URL parsing (both board hosts and embedded `gh_jid` links), the
+  timeframe filter on the test clock, the target vs keyword-only split (a truth table), the blocked rules, and
+  the answer rules (a fabricated fact or an answered EEO question fails).
+- **API (real Postgres):** setup profile save and confirm, a run with stub search and Greenhouse clients
+  (dedupe, already tracked, outside the timeframe), go / go all / skip, I applied creating the application, the
+  cron secret, the owner-only gate and isolation.
+- **E2E:** setup and confirm, then a stubbed run: the list in two groups, approve one draft, go all, mark one
+  applied and see it on the board, and the summary counts.
+
+### Open questions for the owner
+
+1. Is the apply kit (you press submit) acceptable, given that automatic submission is not possible?
+2. Store the resume text (needed for scheduled runs)?
+3. Owner-only first, or open to every user with the caps above?
+4. Is an hourly GitHub Actions schedule fine, or is "once a day at about this time" (Vercel cron) enough?
+
 ## Planned but not built
 
 | Item                                | Status                                                                                                    |
