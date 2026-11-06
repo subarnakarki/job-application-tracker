@@ -387,3 +387,6 @@ export function matchPosting(
   const found = keywords.filter((keyword) => keyword.found).length;
   return { keywords, found, matchPercent: Math.round((found / keywords.length) * 100) };
 }
+
+/** `GET /api/resume/text`: the user's own resume text. */
+export const ResumeTextSchema = z.strictObject({ text: z.string() });

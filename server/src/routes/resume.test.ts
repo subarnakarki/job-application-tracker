@@ -194,6 +194,16 @@ describe.skipIf(!TEST_DATABASE_URL)('resume API (real app, real database)', () =
       expect(response.statusCode).toBe(413);
     });
 
+    it('gives the stored text back to its owner only', async () => {
+      const owner = await t.login();
+      const text = pasted('text route');
+      await upload(owner.cookie, { kind: 'text', text });
+      const response = await send('GET', '/api/resume/text', owner.cookie);
+      expect(response.json()).toEqual({ text: text.trim() });
+      const other = await t.login();
+      expect((await send('GET', '/api/resume/text', other.cookie)).statusCode).toBe(404);
+    });
+
     it('deletes the resume', async () => {
       const { cookie } = await t.login();
       await uploadFile(cookie, 'resume.pdf');

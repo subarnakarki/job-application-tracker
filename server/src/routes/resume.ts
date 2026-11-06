@@ -7,6 +7,7 @@ import {
   ResumeAnalysisSchema,
   ResumeEnvelopeSchema,
   ResumeSchema,
+  ResumeTextSchema,
   ResumeUploadSchema,
 } from '@jat/shared';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -261,6 +262,26 @@ export function registerResumeRoutes(app: FastifyInstance, deps: ResumeRouteDeps
           `attachment; filename="${plain}"; filename*=UTF-8''${encodeURIComponent(stored.fileName)}`,
         )
         .send(stored.file);
+    },
+  );
+
+  app.get(
+    '/api/resume/text',
+    {
+      config: {
+        auth: 'user',
+        contract: {
+          summary: "The stored resume's text (for pasting into a form that has no file upload)",
+          errors: { 404: 'No resume stored' },
+          responses: { 200: ResumeTextSchema },
+        },
+      },
+    },
+    async (request) => {
+      const user = userOf(request);
+      const resume = await getResumeText(requireDb(), user.id);
+      if (!resume) throw new ApiError(404, 'not_found', 'No resume stored');
+      return { text: resume.text };
     },
   );
 
