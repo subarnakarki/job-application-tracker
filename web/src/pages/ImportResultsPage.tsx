@@ -2,6 +2,9 @@ import type { ImportItem } from '@jat/shared';
 import { Link, useParams } from 'react-router';
 import { useImportAction, useImportRun, type ImportAction } from '../api/hooks';
 import { formatDay } from '../format';
+import { useToast } from '../components/Toast';
+import { Glow } from '../components/ui/Glow';
+import { PageHeader } from '../components/ui/PageHeader';
 
 const CHANGED = new Set<ImportItem['outcome']>(['created', 'status_changed', 'undone']);
 const REVIEW = new Set<ImportItem['outcome']>(['needs_review', 'dismissed']);
@@ -26,17 +29,25 @@ function headline(item: ImportItem): string {
 
 function ItemCard({ item, runId }: { item: ImportItem; runId: string }) {
   const action = useImportAction(runId);
-  const act = (name: ImportAction) => action.mutate({ itemId: item.id, action: name });
+  const toast = useToast();
+  const act = (name: ImportAction) =>
+    action.mutate(
+      { itemId: item.id, action: name },
+      {
+        onSuccess: () =>
+          toast(name === 'undo' ? 'Undone' : name === 'apply' ? 'Applied' : 'Dismissed'),
+      },
+    );
   const date = item.emailDate ? formatDay(item.emailDate) : null;
   const linkable = item.applicationId && item.outcome !== 'undone';
 
   return (
-    <li className="flex flex-col gap-2 rounded-lg border border-line-2 p-3">
-      <h3 className="font-semibold">
+    <li className="flex flex-col gap-2 border-t border-line py-4 first:border-t-0">
+      <h3 className="font-medium tracking-[-0.01em]">
         {linkable ? (
           <Link
             to={`/applications/${item.applicationId ?? ''}`}
-            className="underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-blue"
+            className="link underline-offset-2 hover:underline"
           >
             {headline(item)}
           </Link>
@@ -44,8 +55,8 @@ function ItemCard({ item, runId }: { item: ImportItem; runId: string }) {
           headline(item)
         )}
       </h3>
-      {item.summary && <p className="text-sm">{item.summary}</p>}
-      <p className="text-sm text-fg-2">
+      {item.summary && <p className="text-sm text-fg-2">{item.summary}</p>}
+      <p className="text-[0.8125rem] text-fg-3">
         {item.reason && <span>{item.reason} · </span>}
         <span>
           &quot;{item.emailSubject || '(no subject)'}&quot; from {item.emailFrom || 'unknown'}
@@ -56,7 +67,7 @@ function ItemCard({ item, runId }: { item: ImportItem; runId: string }) {
         <div>
           <button
             type="button"
-            className="btn-secondary"
+            className="btn-d"
             disabled={action.isPending}
             onClick={() => act('undo')}
           >
@@ -69,7 +80,7 @@ function ItemCard({ item, runId }: { item: ImportItem; runId: string }) {
           {item.proposedStatus && (
             <button
               type="button"
-              className="btn-primary"
+              className="btn-w"
               disabled={action.isPending}
               onClick={() => act('apply')}
             >
@@ -78,7 +89,7 @@ function ItemCard({ item, runId }: { item: ImportItem; runId: string }) {
           )}
           <button
             type="button"
-            className="btn-secondary"
+            className="btn-d"
             disabled={action.isPending}
             onClick={() => act('dismiss')}
           >
@@ -100,7 +111,7 @@ export function ImportResultsPage() {
   const { runId = '' } = useParams();
   const run = useImportRun(runId);
 
-  if (run.isPending) return <p className="text-sm">Loading…</p>;
+  if (run.isPending) return <p className="text-sm text-fg-2">Loading…</p>;
   if (run.isError)
     return (
       <p role="alert" className="text-sm text-red">
@@ -114,60 +125,59 @@ export function ImportResultsPage() {
   const ignored = items.filter((item) => item.outcome === 'ignored');
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Gmail import</h1>
-        <p className="mt-1 text-sm text-fg-2">
-          {details.emailsScanned} emails matched · {changed.length} changed · {review.length} to
-          review · {ignored.length} skipped
-        </p>
-      </div>
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+      <PageHeader
+        title="Gmail import"
+        subtitle={`${details.emailsScanned} emails matched · ${changed.length} changed · ${review.length} to review · ${ignored.length} skipped`}
+      />
 
-      <section aria-labelledby="changed-heading" className="flex flex-col gap-3">
-        <h2 id="changed-heading" className="text-lg font-semibold">
+      <Glow as="section" aria-labelledby="changed-heading" className="rise rise-3 p-5">
+        <h2 id="changed-heading" className="text-[0.8125rem] font-medium text-fg-2">
           Changes made
         </h2>
         {changed.length === 0 ? (
-          <p className="text-sm text-fg-2">Nothing was changed.</p>
+          <p className="mt-3 text-sm text-fg-2">Nothing was changed.</p>
         ) : (
-          <ul className="flex flex-col gap-3" aria-label="Changes made">
+          <ul className="mt-2 flex flex-col" aria-label="Changes made">
             {changed.map((item) => (
               <ItemCard key={item.id} item={item} runId={runId} />
             ))}
           </ul>
         )}
-      </section>
+      </Glow>
 
-      <section aria-labelledby="review-heading" className="flex flex-col gap-3">
-        <h2 id="review-heading" className="text-lg font-semibold">
+      <Glow as="section" aria-labelledby="review-heading" className="review-tile rise rise-4 p-5">
+        <h2 id="review-heading" className="text-[0.8125rem] font-medium text-fg-2">
           Needs your review
         </h2>
         {review.length === 0 ? (
-          <p className="text-sm text-fg-2">Nothing to review.</p>
+          <p className="mt-3 text-sm text-fg-2">Nothing to review.</p>
         ) : (
-          <ul className="flex flex-col gap-3" aria-label="Needs your review">
+          <ul className="mt-2 flex flex-col" aria-label="Needs your review">
             {review.map((item) => (
               <ItemCard key={item.id} item={item} runId={runId} />
             ))}
           </ul>
         )}
-      </section>
+      </Glow>
 
       {ignored.length > 0 && (
-        <details className="text-sm">
-          <summary className="cursor-pointer font-semibold">
-            Skipped ({ignored.length}): not about an application, or nothing to change
-          </summary>
-          <ul className="mt-3 flex flex-col gap-3" aria-label="Skipped">
-            {ignored.map((item) => (
-              <ItemCard key={item.id} item={item} runId={runId} />
-            ))}
-          </ul>
-        </details>
+        <Glow className="rise rise-5 p-5">
+          <details className="text-sm">
+            <summary className="flex min-h-11 cursor-pointer items-center font-medium text-fg-2">
+              Skipped ({ignored.length}): not about an application, or nothing to change
+            </summary>
+            <ul className="mt-2 flex flex-col" aria-label="Skipped">
+              {ignored.map((item) => (
+                <ItemCard key={item.id} item={item} runId={runId} />
+              ))}
+            </ul>
+          </details>
+        </Glow>
       )}
 
       <p className="text-sm">
-        <Link to="/" className="text-blue-link underline">
+        <Link to="/" className="link underline">
           Back to applications
         </Link>
       </p>
