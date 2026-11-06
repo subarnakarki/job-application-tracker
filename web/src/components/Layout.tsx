@@ -30,7 +30,9 @@ export function Layout() {
   if (me.isPending) return <p className="p-6 text-sm">Loading…</p>;
   if (me.isError)
     return (
-      <p className="p-6 text-sm text-rose-700">Could not reach the server. Try again shortly.</p>
+      <p className="p-6 text-sm text-rose-700 dark:text-rose-400">
+        Could not reach the server. Try again shortly.
+      </p>
     );
   if (!me.data) {
     return (

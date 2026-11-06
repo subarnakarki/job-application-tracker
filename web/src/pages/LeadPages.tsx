@@ -87,7 +87,9 @@ export function LeadsPage() {
         />
       </div>
       {leads.isPending && <p>Loading…</p>}
-      {leads.isError && <p className="text-rose-700">Could not load your leads.</p>}
+      {leads.isError && (
+        <p className="text-rose-700 dark:text-rose-400">Could not load your leads.</p>
+      )}
       {leads.isSuccess && leads.data.total === 0 && (
         <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center dark:border-slate-700">
           <p className="font-medium">{q ? 'No leads match.' : 'No leads yet.'}</p>

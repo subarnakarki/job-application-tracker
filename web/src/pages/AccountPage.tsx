@@ -74,7 +74,7 @@ export function AccountPage() {
           </div>
         )}
         {updateZone.isError && (
-          <p role="alert" className="text-sm text-rose-700">
+          <p role="alert" className="text-sm text-rose-700 dark:text-rose-400">
             Could not change the time zone. Try again.
           </p>
         )}

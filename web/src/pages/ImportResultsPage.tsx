@@ -103,7 +103,7 @@ export function ImportResultsPage() {
   if (run.isPending) return <p className="text-sm">Loading…</p>;
   if (run.isError)
     return (
-      <p role="alert" className="text-sm text-rose-700">
+      <p role="alert" className="text-sm text-rose-700 dark:text-rose-400">
         This import could not be found.
       </p>
     );

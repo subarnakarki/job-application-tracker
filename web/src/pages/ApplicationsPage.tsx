@@ -168,7 +168,9 @@ export function ApplicationsPage() {
       )}
 
       {applications.isPending && <p>Loading…</p>}
-      {applications.isError && <p className="text-rose-700">Could not load your applications.</p>}
+      {applications.isError && (
+        <p className="text-rose-700 dark:text-rose-400">Could not load your applications.</p>
+      )}
       {applications.isSuccess && items.length === 0 && (
         <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center dark:border-slate-700">
           <p className="font-medium">No applications here yet.</p>
