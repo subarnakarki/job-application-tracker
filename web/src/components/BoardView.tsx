@@ -15,6 +15,7 @@ import {
 } from '@dnd-kit/core';
 import { CLOSED_STATUSES, STATUSES, type Application, type Status } from '@jat/shared';
 import { useState } from 'react';
+import { useMediaQuery } from '../useMediaQuery';
 import { Link } from 'react-router';
 import { FollowUpFlag } from './StatusBadge';
 import { StatusMenu } from './StatusMenu';
@@ -65,6 +66,11 @@ const isClosed = (status: Status) => (CLOSED_STATUSES as readonly Status[]).incl
  */
 export function BoardView({ items, onMove }: Props) {
   const [dragging, setDragging] = useState<Application | null>(null);
+  // Phones get one stage at a time, as tabs; moves there use each card's Move to menu.
+  const phone = useMediaQuery('(max-width: 639px)');
+  const [tab, setTab] = useState<Status | null>(null);
+  const selected: Status =
+    tab ?? STATUSES.find((status) => items.some((item) => item.status === status)) ?? 'Saved';
   // Where the last arrow key aimed, during a keyboard drag (null for mouse and touch drags).
   // Written only from key and drag events, never during render.
   const [keyboard] = useState(() => {
@@ -132,22 +138,105 @@ export function BoardView({ items, onMove }: Props) {
       onDragEnd={handleEnd}
       onDragCancel={() => setDragging(null)}
     >
-      <div
-        role="region"
-        aria-label="Board"
-        className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-4"
-      >
-        {STATUSES.map((status) => (
-          <Column
-            key={status}
-            status={status}
-            items={items.filter((item) => item.status === status)}
-            onMove={onMove}
-          />
-        ))}
-      </div>
+      {phone ? (
+        <div role="region" aria-label="Board" className="flex flex-col gap-3">
+          <StageTabs items={items} selected={selected} onSelect={setTab} />
+          <div
+            role="tabpanel"
+            id={`board-panel-${selected}`}
+            aria-labelledby={`board-tab-${selected}`}
+          >
+            <Column
+              status={selected}
+              items={items.filter((item) => item.status === selected)}
+              onMove={onMove}
+              fullWidth
+              draggable={false}
+            />
+          </div>
+        </div>
+      ) : (
+        <div
+          role="region"
+          aria-label="Board"
+          className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-4"
+        >
+          {STATUSES.map((status) => (
+            <Column
+              key={status}
+              status={status}
+              items={items.filter((item) => item.status === status)}
+              onMove={onMove}
+            />
+          ))}
+        </div>
+      )}
       <DragOverlay>{dragging && <CardBody application={dragging} preview />}</DragOverlay>
     </DndContext>
+  );
+}
+
+/** One tab per stage with its count. Left/Right/Home/End move between tabs (the ARIA tabs pattern). */
+function StageTabs({
+  items,
+  selected,
+  onSelect,
+}: {
+  items: Application[];
+  selected: Status;
+  onSelect: (status: Status) => void;
+}) {
+  const choose = (status: Status) => {
+    onSelect(status);
+    document.getElementById(`board-tab-${status}`)?.focus();
+  };
+  return (
+    <div
+      role="tablist"
+      aria-label="Stages"
+      className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1"
+    >
+      {STATUSES.map((status, index) => {
+        const active = status === selected;
+        const count = items.filter((item) => item.status === status).length;
+        return (
+          <button
+            key={status}
+            id={`board-tab-${status}`}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            aria-controls={`board-panel-${status}`}
+            tabIndex={active ? 0 : -1}
+            onClick={() => onSelect(status)}
+            onKeyDown={(event) => {
+              const last = STATUSES.length - 1;
+              const target =
+                event.key === 'ArrowRight'
+                  ? STATUSES[index === last ? 0 : index + 1]
+                  : event.key === 'ArrowLeft'
+                    ? STATUSES[index === 0 ? last : index - 1]
+                    : event.key === 'Home'
+                      ? STATUSES[0]
+                      : event.key === 'End'
+                        ? STATUSES[last]
+                        : undefined;
+              if (target) {
+                event.preventDefault();
+                choose(target);
+              }
+            }}
+            className={`min-h-11 shrink-0 snap-start rounded-lg border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${
+              active
+                ? 'border-blue-600 bg-blue-600 text-white'
+                : 'border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900'
+            }`}
+          >
+            {status} <span className="tabular-nums">{count}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -155,10 +244,14 @@ function Column({
   status,
   items,
   onMove,
+  fullWidth = false,
+  draggable = true,
 }: {
   status: Status;
   items: Application[];
   onMove: Props['onMove'];
+  fullWidth?: boolean;
+  draggable?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
   const headingId = `column-${status}`;
@@ -166,7 +259,7 @@ function Column({
     <section
       ref={setNodeRef}
       aria-labelledby={headingId}
-      className={`flex w-64 shrink-0 snap-start flex-col lg:w-auto lg:min-w-40 lg:flex-1 lg:shrink gap-2 rounded-xl border p-2 ${
+      className={`flex flex-col ${fullWidth ? 'w-full' : 'w-64 shrink-0 snap-start lg:w-auto lg:min-w-40 lg:flex-1 lg:shrink'} gap-2 rounded-xl border p-2 ${
         isOver
           ? 'border-blue-600 bg-blue-50 dark:bg-blue-950'
           : 'border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900'
@@ -182,9 +275,15 @@ function Column({
         </p>
       )}
       <ul className="flex flex-col gap-2">
-        {items.map((application) => (
-          <DraggableCard key={application.id} application={application} onMove={onMove} />
-        ))}
+        {items.map((application) =>
+          draggable ? (
+            <DraggableCard key={application.id} application={application} onMove={onMove} />
+          ) : (
+            <li key={application.id}>
+              <CardBody application={application} onMove={onMove} />
+            </li>
+          ),
+        )}
       </ul>
     </section>
   );

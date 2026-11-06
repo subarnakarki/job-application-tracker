@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#2563eb"/>
+  <!-- briefcase -->
+  <rect x="116" y="176" width="280" height="200" rx="28" fill="#ffffff"/>
+  <path d="M206 176v-26a22 22 0 0 1 22-22h56a22 22 0 0 1 22 22v26" fill="none" stroke="#ffffff" stroke-width="24" stroke-linecap="round"/>
+  <!-- tick -->
+  <path d="M196 276l40 40 80-84" fill="none" stroke="#2563eb" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -25,7 +25,13 @@ test('drag a card to another column on the board', async ({ api, applicationsPag
   await expect.poll(async () => (await api.getApplication(created.id)).status).toBe('Offer');
 });
 
-test('move a card with the keyboard on the board', async ({ page, api, applicationsPage }) => {
+test('move a card with the keyboard on the board', async ({
+  page,
+  api,
+  applicationsPage,
+  isMobile,
+}) => {
+  test.skip(isMobile, 'Phones show one stage at a time as tabs; moves there use the Move to menu');
   const created = await api.createApplication({
     company: 'Initech',
     role: 'SDET',
@@ -63,4 +69,31 @@ test('a move that conflicts with an edit made elsewhere is explained and correct
   await expect(page.getByRole('alert')).toContainText('Hooli was changed somewhere else');
   await expect(applicationsPage.moveMenu('Hooli')).toHaveValue('Screening');
   expect((await api.getApplication(created.id)).status).toBe('Screening');
+});
+
+test('on a phone the board is one tab per stage, and the menu moves a card between tabs', async ({
+  page,
+  api,
+  applicationsPage,
+  isMobile,
+}) => {
+  test.skip(!isMobile, 'Desktop shows every column at once');
+  await api.createApplication({ company: 'Acme', role: 'SDET', status: 'Applied' });
+  await api.createApplication({ company: 'Globex', role: 'QA', status: 'Screening' });
+  await page.goto('/?view=board');
+
+  const tabs = page.getByRole('tablist', { name: 'Stages' });
+  await expect(tabs.getByRole('tab', { name: 'Applied 1' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await expect(page.getByRole('tabpanel')).toContainText('Acme');
+  await expect(page.getByRole('tabpanel')).not.toContainText('Globex');
+
+  await tabs.getByRole('tab', { name: 'Screening 1' }).click();
+  await expect(page.getByRole('tabpanel')).toContainText('Globex');
+  await applicationsPage.moveMenu('Globex').selectOption('Offer');
+
+  await expect(tabs.getByRole('tab', { name: 'Offer 1' })).toBeVisible();
+  await expect(tabs.getByRole('tab', { name: 'Screening 0' })).toBeVisible();
 });

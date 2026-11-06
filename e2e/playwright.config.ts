@@ -49,5 +49,14 @@ export default defineConfig({
       url: 'http://localhost:5173',
       reuseExistingServer: !ci,
     },
+    {
+      // The production build, for the installable-app tests: the service worker only registers
+      // there. Vite's preview forwards /api to the same API server.
+      command: 'npx vite build && npx vite preview --host 127.0.0.1 --port 4173 --strictPort',
+      cwd: '../web',
+      url: 'http://localhost:4173',
+      reuseExistingServer: !ci,
+      timeout: 120_000,
+    },
   ],
 });
