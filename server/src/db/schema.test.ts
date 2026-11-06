@@ -700,6 +700,95 @@ describe.skipIf(!TEST_DATABASE_URL)('schema (real Postgres, real migrations)', (
     });
   });
 
+  describe('job search (0009)', () => {
+    const startRun = (userId: string) =>
+      sql(
+        "insert into job_search_runs (user_id, trigger, local_day) values ($1, 'manual', '2026-11-06') returning id",
+        [userId],
+      ).then((result) => (result.rows[0] as { id: string }).id);
+    const insertHit = (userId: string, runId: string, overrides: Record<string, unknown> = {}) => {
+      const values = {
+        user_id: userId,
+        run_id: runId,
+        source: 'greenhouse',
+        board: 'acme',
+        job_id: '42',
+        job_link: 'https://job-boards.greenhouse.io/acme/jobs/42',
+        apply_link: 'https://job-boards.greenhouse.io/acme/jobs/42',
+        company: 'Acme',
+        role: 'SDET',
+        kind: 'target',
+        reason: 'Matches your titles',
+        ...overrides,
+      };
+      const columns = Object.keys(values);
+      return sql(
+        `insert into job_search_hits (${columns.join(', ')}) values (${columns.map((_, index) => `$${index + 1}`).join(', ')}) returning id`,
+        Object.values(values),
+      );
+    };
+
+    it('allows one running run per user at a time', async () => {
+      const owner = await insertUser({ email: 'search-running@example.com' });
+      const first = await startRun(owner);
+      expect((await violation(startRun(owner))).constraint).toBe('job_search_runs_one_running');
+      await sql("update job_search_runs set status = 'done' where id = $1", [first]);
+      await startRun(owner);
+    });
+
+    it('keeps each job once per user, but another user may have the same job', async () => {
+      const owner = await insertUser({ email: 'search-once@example.com' });
+      const run = await startRun(owner);
+      await insertHit(owner, run);
+      expect((await violation(insertHit(owner, run))).constraint).toBe('job_search_hits_job_key');
+
+      const other = await insertUser({ email: 'search-other@example.com' });
+      await insertHit(other, await startRun(other));
+    });
+
+    it.each([
+      ['an unknown board', { source: 'indeed' }, 'job_search_hits_source_check'],
+      ['an unknown kind', { kind: 'maybe' }, 'job_search_hits_kind_check'],
+      ['an unknown state', { state: 'sent' }, 'job_search_hits_state_check'],
+    ])('rejects %s', async (_label, overrides, constraint) => {
+      const owner = await insertUser({ email: `search-${constraint}@example.com` });
+      expect((await violation(insertHit(owner, await startRun(owner), overrides))).constraint).toBe(
+        constraint,
+      );
+    });
+
+    it("never links a hit to someone else's application, and keeps it when the application goes", async () => {
+      const owner = await insertUser({ email: 'search-link@example.com' });
+      const other = await insertUser({ email: 'search-link-other@example.com' });
+      const theirs = await insertApplication(other);
+      const run = await startRun(owner);
+      expect((await violation(insertHit(owner, run, { application_id: theirs }))).constraint).toBe(
+        'job_search_hits_application_fk',
+      );
+
+      const mine = await insertApplication(owner);
+      const { rows } = await insertHit(owner, run, { application_id: mine, state: 'applied' });
+      const hitId = (rows[0] as { id: string }).id;
+      await sql('delete from applications where id = $1', [mine]);
+      expect(
+        (await sql('select state, application_id from job_search_hits where id = $1', [hitId]))
+          .rows[0],
+      ).toEqual({ state: 'applied', application_id: null });
+    });
+
+    it('goes when the user is deleted', async () => {
+      const owner = await insertUser({ email: 'search-cascade@example.com' });
+      await sql("insert into job_search_profiles (user_id, profile) values ($1, '{}')", [owner]);
+      await insertHit(owner, await startRun(owner));
+      await sql('delete from users where id = $1', [owner]);
+      for (const table of ['job_search_profiles', 'job_search_runs', 'job_search_hits'])
+        expect(
+          (await sql(`select count(*)::int as n from ${table} where user_id = $1`, [owner]))
+            .rows[0],
+        ).toEqual({ n: 0 });
+    });
+  });
+
   describe('resumes and resume analyses (0008)', () => {
     const SHA = 'a'.repeat(64);
     const insertResume = (userId: string, overrides: Record<string, unknown> = {}) => {
