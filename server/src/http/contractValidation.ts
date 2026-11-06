@@ -1,7 +1,7 @@
 import { ErrorSchema } from '@jat/shared';
 import type { FastifyInstance } from 'fastify';
 import type { z } from 'zod';
-import { isTextResponse, type TextResponse } from './contract';
+import { isFileResponse, isTextResponse, type FileResponse, type TextResponse } from './contract';
 
 export interface ContractViolation {
   method: string;
@@ -36,18 +36,33 @@ export function registerContractValidation(app: FastifyInstance): void {
     if (request.method === 'HEAD') return payload;
     const status = reply.statusCode;
     const declared = request.routeOptions.config.contract?.responses;
-    let schema: z.ZodType | TextResponse | null | undefined = declared?.[status];
+    let schema: z.ZodType | TextResponse | FileResponse | null | undefined = declared?.[status];
     if (schema === undefined && status >= 400) schema = ErrorSchema;
 
-    const problem = isTextResponse(schema)
-      ? describeTextProblem(schema, String(reply.getHeader('content-type') ?? ''), payload)
-      : describeProblem(schema, payload);
+    const contentType = String(reply.getHeader('content-type') ?? '');
+    const problem = isFileResponse(schema)
+      ? describeFileProblem(schema, contentType, payload)
+      : isTextResponse(schema)
+        ? describeTextProblem(schema, contentType, payload)
+        : describeProblem(schema, payload);
     if (!problem) return payload;
 
     app.contractViolations.push({ method: request.method, url: request.url, status, problem });
     void reply.code(500).header('content-type', 'application/json; charset=utf-8');
     return JSON.stringify({ error: 'contract_violation', message: `${status}: ${problem}` });
   });
+}
+
+function describeFileProblem(
+  spec: FileResponse,
+  contentType: string,
+  payload: unknown,
+): string | null {
+  if (!spec.file.includes(contentType))
+    return `expected one of ${spec.file.join(', ')}, got "${contentType}"`;
+  return Buffer.isBuffer(payload) && payload.length > 0
+    ? null
+    : 'the file body is empty or not bytes';
 }
 
 function describeTextProblem(

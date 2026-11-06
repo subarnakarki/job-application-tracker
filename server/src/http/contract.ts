@@ -20,13 +20,22 @@ export function isTextResponse(value: unknown): value is TextResponse {
   return typeof value === 'object' && value !== null && !('_zod' in value) && 'text' in value;
 }
 
+/** A file download (for example the stored resume): bytes in one of the listed media types. */
+export interface FileResponse {
+  file: readonly string[];
+}
+
+export function isFileResponse(value: unknown): value is FileResponse {
+  return typeof value === 'object' && value !== null && !('_zod' in value) && 'file' in value;
+}
+
 export interface RouteContract {
   summary: string;
   params?: z.ZodType;
   query?: z.ZodType;
   headers?: z.ZodType;
   body?: z.ZodType;
-  responses: Partial<Record<number, z.ZodType | null | TextResponse>>;
+  responses: Partial<Record<number, z.ZodType | null | TextResponse | FileResponse>>;
   /**
    * Error statuses the route returns on purpose, with what they mean. Their bodies use the shared
    * ErrorSchema. 400 for a malformed request, 401 on signed-in routes and 403/415 on writes are

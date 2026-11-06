@@ -13,6 +13,7 @@ import type { Db } from '../db/types';
 import { ApiError, parseInput } from '../http/errors';
 import { deleteUser, listAllWithHistory } from '../repo/applications';
 import { listAllImports } from '../repo/imports';
+import { getResume, listAllAnalyses } from '../repo/resumes';
 import { presentDetail } from '../repo/present';
 import { presentImportItem, presentImportRun } from './import';
 
@@ -81,6 +82,8 @@ export function registerMeRoutes(app: FastifyInstance, db: Db | undefined): void
       const applications = await listAllWithHistory(db, user.id);
       const imports = await listAllImports(db, user.id);
       const leads = await listAllLeadDetails(db, user.id);
+      const resume = await getResume(db, user.id);
+      const resumeAnalyses = await listAllAnalyses(db, user.id);
       void reply.header(
         'content-disposition',
         `attachment; filename="job-applications-${localDateIn(now, user.timeZone)}.json"`,
@@ -97,6 +100,8 @@ export function registerMeRoutes(app: FastifyInstance, db: Db | undefined): void
           // Unfinished claims are internal bookkeeping, not data about the user.
           items: imports.items.filter((item) => item.outcome !== 'pending').map(presentImportItem),
         },
+        resume,
+        resumeAnalyses,
       };
     },
   );

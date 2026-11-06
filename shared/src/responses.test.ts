@@ -76,6 +76,8 @@ describe('response contracts', () => {
         ],
         leads: [],
         imports: { runs: [], items: [] },
+        resume: null,
+        resumeAnalyses: [],
       }).success,
     ).toBe(true);
   });

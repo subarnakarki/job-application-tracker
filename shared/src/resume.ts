@@ -287,11 +287,12 @@ export const ResumeUploadSchema = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('file'),
     fileName: z.string().trim().min(1).max(RESUME_LIMITS.fileName),
-    // 2 MB of file is at most 2,796,204 base64 characters; the exact size is checked once decoded.
+    // Room for a little over 2 MB, so a file just over the cap gets the "too large" answer once
+    // decoded rather than a schema error.
     dataBase64: z
       .string()
       .min(1)
-      .max(Math.ceil((RESUME_LIMITS.fileBytes * 4) / 3) + 4)
+      .max(Math.ceil(((RESUME_LIMITS.fileBytes + 64 * 1024) * 4) / 3))
       .regex(/^[A-Za-z0-9+/]+={0,2}$/, 'Must be base64'),
   }),
   z.strictObject({

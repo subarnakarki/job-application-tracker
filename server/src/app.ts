@@ -25,6 +25,8 @@ import { classifierFromEnv, type EmailClassifier } from './import/classify';
 import { gmailRestClient, type GmailClient } from './import/gmail';
 import { gmailAuthorizerFromEnv, type GmailAuthorizer } from './import/gmailAuth';
 import { registerMeRoutes } from './routes/me';
+import { registerResumeRoutes } from './routes/resume';
+import { analyzerFromEnv, type ResumeAnalyzer } from './resume/analyze';
 import { registerSessionRoutes } from './routes/session';
 import { registerTestRoutes, registerTestSecretGuard } from './routes/testSupport';
 import { resolveTestRoutes } from './test-support/config';
@@ -42,6 +44,8 @@ export interface AppDeps {
   gmailAuthorizer?: GmailAuthorizer | null;
   gmail?: GmailClient;
   classifier?: EmailClassifier | null;
+  /** Resume analysis (Claude as a recruiter). Defaults to the real one when ANTHROPIC_API_KEY is set. */
+  resumeAnalyzer?: ResumeAnalyzer | null;
   /** Reads pasted posting links. Defaults to the guarded real fetcher; tests pass a stub. */
   fetchPage?: PageFetcher;
   /** Validate every response against its route contract (tests). */
@@ -110,6 +114,11 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       // A company's whole job board (every open job) can be several MB.
       fetchBoard,
     },
+  });
+  registerResumeRoutes(app, {
+    db: deps.db,
+    clock,
+    analyzer: deps.resumeAnalyzer === undefined ? analyzerFromEnv(env) : deps.resumeAnalyzer,
   });
   if (testRoutes) registerTestRoutes(app, { db: deps.db, clock });
 

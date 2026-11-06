@@ -1,6 +1,6 @@
 import { ErrorSchema } from '@jat/shared';
 import { z } from 'zod';
-import { isTextResponse } from '../http/contract';
+import { isFileResponse, isTextResponse } from '../http/contract';
 import type { RegisteredRoute } from '../http/policy';
 
 /**
@@ -50,14 +50,21 @@ function operation(route: RegisteredRoute): JsonSchema {
   const responses: Record<string, JsonSchema> = {};
   for (const [status, schema] of Object.entries(contract.responses)) {
     if (schema === undefined) continue;
-    responses[status] = isTextResponse(schema)
-      ? { description: `${status}`, content: { [schema.text]: { schema: { type: 'string' } } } }
-      : schema === null
-        ? { description: `${status} (no body)` }
-        : {
-            description: `${status}`,
-            content: { 'application/json': { schema: toJsonSchema(schema, 'output') } },
-          };
+    responses[status] = isFileResponse(schema)
+      ? {
+          description: `${status}`,
+          content: Object.fromEntries(
+            schema.file.map((type) => [type, { schema: { type: 'string', format: 'binary' } }]),
+          ),
+        }
+      : isTextResponse(schema)
+        ? { description: `${status}`, content: { [schema.text]: { schema: { type: 'string' } } } }
+        : schema === null
+          ? { description: `${status} (no body)` }
+          : {
+              description: `${status}`,
+              content: { 'application/json': { schema: toJsonSchema(schema, 'output') } },
+            };
   }
   for (const [status, description] of Object.entries(contract.errors ?? {})) {
     if (description !== undefined) responses[status] ??= errorResponse(description);

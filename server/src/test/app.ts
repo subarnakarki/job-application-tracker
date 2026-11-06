@@ -4,6 +4,7 @@ import { SESSION_COOKIE } from '../auth/cookies';
 import type { GoogleProvider } from '../auth/google';
 import { FetchError, type PageFetcher } from '../postings/fetchPage';
 import type { EmailClassifier } from '../import/classify';
+import type { ResumeAnalyzer } from '../resume/analyze';
 import type { GmailClient } from '../import/gmail';
 import type { GmailAuthorizer } from '../import/gmailAuth';
 import { createSession } from '../auth/sessions';
@@ -57,6 +58,8 @@ export interface TestAppOptions {
   gmailAuthorizer?: GmailAuthorizer | null;
   gmail?: GmailClient;
   classifier?: EmailClassifier | null;
+  /** Resume analyzer stub (default: not configured). */
+  resumeAnalyzer?: ResumeAnalyzer | null;
   /** Add extra routes (a probe) before the app starts. */
   configure?: (app: FastifyInstance) => void;
 }
@@ -77,6 +80,7 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     gmailAuthorizer: options.gmailAuthorizer ?? null,
     ...(options.gmail ? { gmail: options.gmail } : {}),
     classifier: options.classifier ?? null,
+    resumeAnalyzer: options.resumeAnalyzer ?? null,
     validateResponses: true,
   });
   options.configure?.(app);

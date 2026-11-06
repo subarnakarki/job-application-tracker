@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { SOURCES, STATUSES, WORK_MODES } from './constants';
+import { ResumeAnalysisSchema, ResumeSchema } from './resume';
 
 /**
  * What the API returns. These are strict: an unexpected field (a leaked
@@ -277,6 +278,9 @@ export const DataExportSchema = z.strictObject({
   /** Networking leads, each with its notes and linked applications. */
   leads: z.array(LeadDetailSchema),
   imports: z.strictObject({ runs: z.array(ImportRunSchema), items: z.array(ImportItemSchema) }),
+  /** The stored resume, described (its file is a separate download: GET /api/resume/file). */
+  resume: ResumeSchema.nullable(),
+  resumeAnalyses: z.array(ResumeAnalysisSchema),
 });
 export type DataExport = z.infer<typeof DataExportSchema>;
 
