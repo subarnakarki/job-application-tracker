@@ -287,3 +287,13 @@ export const InterviewPatchSchema = z.strictObject({
   notes: interviewNotes.optional(),
 });
 export type InterviewPatch = z.output<typeof InterviewPatchSchema>;
+
+/** "Fill from link": the posting to read. */
+export const PostingPreviewRequestSchema = z.strictObject({
+  url: z
+    .string()
+    .trim()
+    .min(1, 'Paste a link to a job posting')
+    .max(LIMITS.jobLink)
+    .refine(isHttpUrl, 'Must be an http(s) link'),
+});

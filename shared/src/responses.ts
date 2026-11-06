@@ -256,3 +256,14 @@ export const DataExportSchema = z.strictObject({
   imports: z.strictObject({ runs: z.array(ImportRunSchema), items: z.array(ImportItemSchema) }),
 });
 export type DataExport = z.infer<typeof DataExportSchema>;
+
+/** What "Fill from link" found. Every field may be missing; the form fills only empty fields. */
+export const PostingPreviewSchema = z.strictObject({
+  jobLink: z.string(),
+  company: z.string().nullable(),
+  role: z.string().nullable(),
+  salaryMin: z.number().int().min(0).nullable(),
+  salaryMax: z.number().int().min(0).nullable(),
+  salaryCurrency: z.string().nullable(),
+});
+export type PostingPreview = z.infer<typeof PostingPreviewSchema>;

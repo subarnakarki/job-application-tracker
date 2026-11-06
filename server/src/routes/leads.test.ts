@@ -152,6 +152,13 @@ describe.skipIf(!TEST_DATABASE_URL)('leads API (real app, real database)', () =>
     expect([byNote.total, byCompany.total]).toEqual([1, 1]);
   });
 
+  it('rejects a search with control characters (Postgres cannot hold NUL): 400, never 500', async () => {
+    const { cookie } = await t.login();
+    for (const q of ['%00', 'a%00b', 'line%0Abreak']) {
+      expect((await call(cookie, 'GET', `/api/leads?q=${q}`)).statusCode, q).toBe(400);
+    }
+  });
+
   it('stops at the demo quota', async () => {
     const { cookie } = await t.login({ isDemo: true });
     for (let index = 0; index < LIMITS.leadsPerDemoUser; index++) {

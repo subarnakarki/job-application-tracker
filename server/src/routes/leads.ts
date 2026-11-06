@@ -6,6 +6,7 @@ import {
   LeadNotePatchSchema,
   LeadNoteSchema,
   LeadPatchSchema,
+  ListQuerySchema,
   localDateIn,
   noteDateProblem,
 } from '@jat/shared';
@@ -31,7 +32,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Path parameters as received: any string (a non-uuid simply answers 404). */
 const LeadParams = z.object({ id: z.string() });
 const NoteParams = z.object({ id: z.string(), noteId: z.string() });
-const ListQuery = z.strictObject({ q: z.string().max(200).optional() });
+/** The same search term rules as applications: one line, no NUL (Postgres cannot store it). */
+const ListQuery = z.strictObject({ q: ListQuerySchema.shape.q });
 
 export interface LeadRouteDeps {
   db: Db | undefined;

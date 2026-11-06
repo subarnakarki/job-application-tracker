@@ -2,6 +2,7 @@ import type { FastifyInstance, LightMyRequestResponse } from 'fastify';
 import { buildApp } from '../app';
 import { SESSION_COOKIE } from '../auth/cookies';
 import type { GoogleProvider } from '../auth/google';
+import { FetchError, type PageFetcher } from '../postings/fetchPage';
 import type { EmailClassifier } from '../import/classify';
 import type { GmailClient } from '../import/gmail';
 import type { GmailAuthorizer } from '../import/gmailAuth';
@@ -48,6 +49,8 @@ export interface TestApp {
 /** The real app on a fresh, fully migrated schema. */
 export interface TestAppOptions {
   env?: Record<string, string | undefined>;
+  /** Posting fetcher; the default fails like an unreachable site, so no test touches the network. */
+  fetchPage?: PageFetcher;
   /** Google sign-in stub (defaults to none: Google not configured). */
   google?: GoogleProvider | null;
   /** Gmail import stubs (default: not configured). */
@@ -68,6 +71,9 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     clock,
     env: options.env ?? {},
     google: options.google ?? null,
+    fetchPage:
+      options.fetchPage ??
+      (() => Promise.reject(new FetchError('network', 'tests never reach the network'))),
     gmailAuthorizer: options.gmailAuthorizer ?? null,
     ...(options.gmail ? { gmail: options.gmail } : {}),
     classifier: options.classifier ?? null,

@@ -12,7 +12,9 @@ import { registerRequestPipeline } from './http/pipeline';
 import { googleProviderFromEnv, type GoogleProvider } from './auth/google';
 import { registerApplicationRoutes } from './routes/applications';
 import { registerGoogleRoutes } from './routes/google';
+import { createPageFetcher, type PageFetcher } from './postings/fetchPage';
 import { registerInterviewRoutes } from './routes/interviews';
+import { registerPostingRoutes } from './routes/postings';
 import { registerLeadRoutes } from './routes/leads';
 import { registerHealthRoutes } from './routes/health';
 import { registerImportRoutes } from './routes/import';
@@ -37,6 +39,8 @@ export interface AppDeps {
   gmailAuthorizer?: GmailAuthorizer | null;
   gmail?: GmailClient;
   classifier?: EmailClassifier | null;
+  /** Reads pasted posting links. Defaults to the guarded real fetcher; tests pass a stub. */
+  fetchPage?: PageFetcher;
   /** Validate every response against its route contract (tests). */
   validateResponses?: boolean;
 }
@@ -87,6 +91,11 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   registerApplicationRoutes(app, { db: deps.db, clock });
   registerLeadRoutes(app, { db: deps.db, clock });
   registerInterviewRoutes(app, { db: deps.db, clock });
+  registerPostingRoutes(app, {
+    db: deps.db,
+    clock,
+    fetchPage: deps.fetchPage ?? createPageFetcher(),
+  });
   registerImportRoutes(app, {
     db: deps.db,
     clock,
