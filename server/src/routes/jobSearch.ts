@@ -71,7 +71,19 @@ export interface JobSearchRouteDeps {
   claude: JobSearchClaude | null;
   fetchPage: PageFetcher;
   fetchBoard: PageFetcher;
+  /**
+   * Test routes on (never in production): synthetic test users may use the job search, and
+   * without an Anthropic key a stand-in that finds nothing is used, so e2e tests can drive the
+   * pages with runs seeded through /api/test/job-search.
+   */
+  openToTestUsers?: boolean;
 }
+
+/** Finds nothing and drafts nothing: the stand-in for test users when there is no key. */
+const NO_CLAUDE: JobSearchClaude = {
+  search: () => Promise.resolve({ links: [], searches: 0 }),
+  draft: () => Promise.resolve(null),
+};
 
 /** Owner-only at first: the users listed in JOB_SEARCH_USER_IDS (comma-separated ids). */
 export function allowedUserIds(env: Record<string, string | undefined>): Set<string> {
@@ -105,13 +117,26 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
     if (!user) throw new ApiError(401, 'unauthenticated', 'Sign in to continue');
     return user;
   };
-  const canUse = (user: { id: string; isDemo: boolean }) =>
-    deps.claude !== null && !user.isDemo && allowedUserIds(deps.env).has(user.id.toLowerCase());
+  const isTestUser = async (userId: string) =>
+    deps.openToTestUsers === true &&
+    deps.db !== undefined &&
+    (
+      await deps.db.query("select 1 from identities where user_id = $1 and provider = 'test'", [
+        userId,
+      ])
+    ).rowCount > 0;
+  /** The Claude this user's job search uses, or null when it is not open to them. */
+  const claudeFor = async (user: { id: string; isDemo: boolean }) => {
+    if (user.isDemo) return null;
+    if (deps.claude && allowedUserIds(deps.env).has(user.id.toLowerCase())) return deps.claude;
+    return (await isTestUser(user.id)) ? (deps.claude ?? NO_CLAUDE) : null;
+  };
   /** The signed-in user, when the feature is open to them; 404 otherwise (it is not theirs). */
-  const memberOf = (request: FastifyRequest) => {
+  const memberOf = async (request: FastifyRequest) => {
     const user = userOf(request);
-    if (!canUse(user) || !deps.claude) throw notAvailable();
-    return { user, claude: deps.claude };
+    const claude = await claudeFor(user);
+    if (!claude) throw notAvailable();
+    return { user, claude };
   };
   const spend = async (db: Db, rule: RateLimitRule, subject: string, reply: FastifyReply) => {
     const result = await consumeRateLimit(
@@ -166,7 +191,7 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
     async (request) => {
       const db = requireDb();
       const user = userOf(request);
-      const available = canUse(user);
+      const available = (await claudeFor(user)) !== null;
       const saved = available ? await getProfile(db, user.id) : null;
       return {
         available,
@@ -192,7 +217,7 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
     },
     async (request) => {
       const db = requireDb();
-      const { user } = memberOf(request);
+      const { user } = await memberOf(request);
       const profile = parseInput(JobSearchProfileSchema, request.body);
       const confirmedAt = await saveProfile(db, user.id, profile, deps.clock.now());
       return {
@@ -224,7 +249,7 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
     async (request, reply) => {
       const started = Date.now();
       const db = requireDb();
-      const { user, claude } = memberOf(request);
+      const { user, claude } = await memberOf(request);
       const profile = await requireProfile(db, user.id);
       if (!(await getResumeText(db, user.id)))
         throw new ApiError(409, 'no_resume', 'Upload your resume first');
@@ -262,7 +287,7 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
       },
     },
     async (request) => {
-      const { user } = memberOf(request);
+      const { user } = await memberOf(request);
       return { items: await listRuns(requireDb(), user.id) };
     },
   );
@@ -282,7 +307,7 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
     },
     async (request) => {
       const db = requireDb();
-      const { user } = memberOf(request);
+      const { user } = await memberOf(request);
       const run = await getRun(db, user.id, idOf(request, runNotFound));
       if (!run) throw runNotFound();
       return { run, hits: await listRunHits(db, user.id, run.id) };
@@ -302,7 +327,7 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
       },
     },
     async (request) => {
-      const { user } = memberOf(request);
+      const { user } = await memberOf(request);
       const open = await listOpenHits(requireDb(), user.id);
       return {
         ready: open.filter((hit) => hit.kind === 'target' && hit.state === 'ready'),
@@ -344,7 +369,7 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
       },
       handler: async (request, reply) => {
         const db = requireDb();
-        const { user, claude } = memberOf(request);
+        const { user, claude } = await memberOf(request);
         const hit = await hitOf(db, user.id, request);
         await handle({ db, user, claude, hit, request, reply });
         const updated = await getHit(db, user.id, hit.id);

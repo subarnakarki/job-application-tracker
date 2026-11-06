@@ -16,6 +16,12 @@ import { EditLeadPage, LeadPage, LeadsPage, NewLeadPage } from './pages/LeadPage
 import { LoginPage } from './pages/LoginPage';
 import { PrivacyPage } from './pages/PrivacyPage';
 import { ResumePage } from './pages/ResumePage';
+import {
+  ApplyQueuePage,
+  JobSearchPage,
+  JobSearchRunPage,
+  JobSearchSetupPage,
+} from './pages/JobSearchPages';
 import { StatsPage } from './pages/StatsPage';
 
 export function AppRoutes() {
@@ -34,6 +40,10 @@ export function AppRoutes() {
         <Route path="leads/:id/edit" element={<EditLeadPage />} />
         <Route path="stats" element={<StatsPage />} />
         <Route path="resume" element={<ResumePage />} />
+        <Route path="job-search" element={<JobSearchPage />} />
+        <Route path="job-search/setup" element={<JobSearchSetupPage />} />
+        <Route path="job-search/runs/:id" element={<JobSearchRunPage />} />
+        <Route path="apply-queue" element={<ApplyQueuePage />} />
         <Route path="import/:runId" element={<ImportResultsPage />} />
         <Route path="account" element={<AccountPage />} />
         <Route path="*" element={<NotFoundPage />} />

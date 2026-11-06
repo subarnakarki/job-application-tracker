@@ -132,6 +132,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     claude: deps.jobSearchClaude === undefined ? jobSearchClaudeFromEnv(env) : deps.jobSearchClaude,
     fetchPage,
     fetchBoard,
+    openToTestUsers: testRoutes !== null,
   });
   if (testRoutes) registerTestRoutes(app, { db: deps.db, clock });
 

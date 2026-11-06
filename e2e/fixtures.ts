@@ -1,4 +1,4 @@
-import type { ApplicationDetail, ApplicationInput } from '@jat/shared';
+import type { ApplicationDetail, ApplicationInput, JobSearchProfile } from '@jat/shared';
 import { test as base, expect, type APIRequestContext } from '@playwright/test';
 import { ApplicationDetailPage } from './pages/ApplicationDetailPage';
 import { ApplicationFormPage } from './pages/ApplicationFormPage';
@@ -34,6 +34,28 @@ export class Api {
     const response = await this.request.post('/api/applications', { data: input });
     expect(response.status(), await response.text()).toBe(201);
     return (await response.json()) as ApplicationDetail;
+  }
+
+  /**
+   * Saves the job search setup and runs a real search (test-only route) that "finds" the given
+   * postings; `answers` is what the model drafts for each question, the rest need the candidate.
+   */
+  async seedJobSearch(seed: {
+    profile: JobSearchProfile;
+    jobs: {
+      board: string;
+      company: string;
+      title: string;
+      location: string;
+      hoursAgo: number;
+      content: string;
+      questions: { label: string; required: boolean; options: string[] }[];
+    }[];
+    answers: Record<string, string>;
+  }) {
+    const response = await this.request.post('/api/test/job-search', { data: seed });
+    expect(response.ok(), await response.text()).toBe(true);
+    return ((await response.json()) as { runId: string }).runId;
   }
 
   /** Stores pasted resume text for the signed-in user. */

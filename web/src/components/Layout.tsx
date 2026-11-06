@@ -1,16 +1,17 @@
 import { APP_NAME } from '@jat/shared';
 import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router';
-import { useMe, useSignOut } from '../api/hooks';
+import { useJobSearchSetup, useMe, useSignOut } from '../api/hooks';
 import { useOnline } from '../useOnline';
 import { ToastProvider } from './Toast';
 
-const NAV = [
+const NAV: readonly { to: string; label: string; owns: readonly string[]; gated?: boolean }[] = [
   { to: '/', label: 'Applications', owns: ['/applications', '/import'] },
   { to: '/leads', label: 'Leads', owns: ['/leads'] },
   { to: '/stats', label: 'Stats', owns: ['/stats'] },
   { to: '/resume', label: 'Resume', owns: ['/resume'] },
+  { to: '/job-search', label: 'Job search', owns: ['/job-search', '/apply-queue'], gated: true },
   { to: '/account', label: 'Account', owns: ['/account'] },
-] as const;
+];
 
 /** Whether the current page belongs to a nav link (the Applications link also covers an application's own pages). */
 function isActive(pathname: string, item: (typeof NAV)[number]): boolean {
@@ -25,6 +26,8 @@ export function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const online = useOnline();
+  // The job search is owner-only for now: its link shows only where it is open.
+  const jobSearch = useJobSearchSetup();
   // The board needs the full width for its seven columns; everything else reads better narrow.
   const width =
     location.pathname === '/' && new URLSearchParams(location.search).get('view') === 'board'
@@ -72,21 +75,23 @@ export function Layout() {
               aria-label="Main"
               className="order-last -mx-4 flex basis-full gap-1 overflow-x-auto px-4 [scrollbar-width:none] md:order-none md:mx-0 md:basis-auto md:px-0"
             >
-              {NAV.map((item) => {
-                const active = isActive(location.pathname, item);
-                return (
-                  <Link
-                    key={item.to}
-                    to={item.to}
-                    aria-current={active ? 'page' : undefined}
-                    className={`flex min-h-11 shrink-0 items-center px-2.5 text-sm transition-colors hover:text-fg md:px-3 ${
-                      active ? 'text-fg' : 'text-fg-2'
-                    }`}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
+              {NAV.filter((item) => !item.gated || jobSearch.data?.available === true).map(
+                (item) => {
+                  const active = isActive(location.pathname, item);
+                  return (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      aria-current={active ? 'page' : undefined}
+                      className={`flex min-h-11 shrink-0 items-center px-2.5 text-sm transition-colors hover:text-fg md:px-3 ${
+                        active ? 'text-fg' : 'text-fg-2'
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  );
+                },
+              )}
             </nav>
             <button
               type="button"

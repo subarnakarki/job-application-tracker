@@ -1,5 +1,13 @@
 import {
   ApplicationDetailSchema,
+  ApplyQueueSchema,
+  JobHitSchema,
+  JobSearchRunDetailSchema,
+  JobSearchRunListSchema,
+  JobSearchSetupSchema,
+  ResumeTextSchema,
+  type DraftEdit,
+  type JobSearchProfile,
   ApplicationListSchema,
   ImportItemSchema,
   ImportRunDetailSchema,
@@ -553,5 +561,109 @@ export function useDeleteResumeAnalysis() {
       client.removeQueries({ queryKey: ['resume-analysis', id] });
       return client.invalidateQueries({ queryKey: ['resume-analyses'] });
     },
+  });
+}
+
+// Job search (Phase 15)
+
+export function useJobSearchSetup() {
+  return useQuery({
+    queryKey: ['job-search-setup'],
+    queryFn: () => apiRequest('/api/job-search/profile', JobSearchSetupSchema),
+  });
+}
+
+export function useSaveJobSearchProfile() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (profile: JobSearchProfile) =>
+      apiRequest('/api/job-search/profile', JobSearchSetupSchema, { method: 'PUT', body: profile }),
+    onSuccess: (setup) => client.setQueryData(['job-search-setup'], setup),
+  });
+}
+
+export function useJobSearchRuns(enabled: boolean) {
+  return useQuery({
+    queryKey: ['job-search-runs'],
+    queryFn: () => apiRequest('/api/job-search/runs', JobSearchRunListSchema),
+    enabled,
+  });
+}
+
+export function useJobSearchRun(id: string) {
+  return useQuery({
+    queryKey: ['job-search-run', id],
+    queryFn: () =>
+      apiRequest(`/api/job-search/runs/${encodeURIComponent(id)}`, JobSearchRunDetailSchema),
+  });
+}
+
+function useRefreshJobSearch() {
+  const client = useQueryClient();
+  return () =>
+    Promise.all([
+      client.invalidateQueries({ queryKey: ['job-search-runs'] }),
+      client.invalidateQueries({ queryKey: ['job-search-run'] }),
+      client.invalidateQueries({ queryKey: ['apply-queue'] }),
+    ]);
+}
+
+export function useRunJobSearch() {
+  const refresh = useRefreshJobSearch();
+  return useMutation({
+    mutationFn: () =>
+      apiRequest('/api/job-search/runs', JobSearchRunDetailSchema, { method: 'POST', body: {} }),
+    onSuccess: refresh,
+  });
+}
+
+export function useApplyQueue(enabled = true) {
+  return useQuery({
+    queryKey: ['apply-queue'],
+    queryFn: () => apiRequest('/api/job-search/queue', ApplyQueueSchema),
+    enabled,
+  });
+}
+
+export type HitAction = 'applied' | 'blocked' | 'skip' | 'queue' | 'redraft';
+
+export function useHitAction() {
+  const refresh = useRefreshJobSearch();
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, action, reason }: { id: string; action: HitAction; reason?: string }) =>
+      apiRequest(`/api/job-search/hits/${encodeURIComponent(id)}/${action}`, JobHitSchema, {
+        method: 'POST',
+        body: action === 'blocked' ? { reason } : {},
+      }),
+    onSuccess: async (_hit, { action }) => {
+      await refresh();
+      if (action === 'applied')
+        await Promise.all([
+          client.invalidateQueries({ queryKey: ['applications'] }),
+          client.invalidateQueries({ queryKey: ['pipeline'] }),
+          client.invalidateQueries({ queryKey: ['stats'] }),
+        ]);
+    },
+  });
+}
+
+export function useEditDraft() {
+  const refresh = useRefreshJobSearch();
+  return useMutation({
+    mutationFn: ({ id, edit }: { id: string; edit: DraftEdit }) =>
+      apiRequest(`/api/job-search/hits/${encodeURIComponent(id)}/draft`, JobHitSchema, {
+        method: 'PUT',
+        body: edit,
+      }),
+    onSuccess: refresh,
+  });
+}
+
+export function useResumeText(enabled: boolean) {
+  return useQuery({
+    queryKey: ['resume-text'],
+    queryFn: () => apiRequest('/api/resume/text', ResumeTextSchema),
+    enabled,
   });
 }
