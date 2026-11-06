@@ -1,10 +1,10 @@
-# UI redesign plan (owner's answers in; awaiting approval)
+# UI redesign plan (approved)
 
 **Goal:** rebuild the web app's look as the approved dark design, without changing what the app does, its API
 or its accessible names. Source of truth for the look: the design artifact
 (`https://claude.ai/artifact/7jrKLP7xLZKEvGC5EQ8ogQ`: `index.html` for exact CSS values, `screens/*.png` for
 every page at 1440px and 390px, `DESIGN-BRIEF.md` for the handoff notes, `fonts/` for Inter). No code has been
-written; this plan stops for review. The owner answered the twelve open questions on 2026-11-06; their
+written yet. Approved by the owner on 2026-11-06. The owner answered the twelve open questions on 2026-11-06; their
 answers are folded in below and listed in [Owner decisions](#owner-decisions).
 
 ## Decisions

@@ -340,6 +340,10 @@ card and timeline, fill from link (posting preview mocked at the browser), and t
 
 Not included: meeting reminders, a calendar feed, posting deadlines, star ratings (possible later phases).
 
+## UI redesign (approved, not started)
+
+A dark redesign of the web app, in phases R0 to R10, with no API changes: see [REDESIGN-PLAN.md](REDESIGN-PLAN.md).
+
 ## Planned but not built
 
 | Item                                | Status                                                                                                    |
