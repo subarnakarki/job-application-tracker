@@ -1,4 +1,5 @@
 import { STATUSES, type Status } from '@jat/shared';
+import { StageBars } from './ui/StageBars';
 
 interface Props {
   company: string;
@@ -9,26 +10,45 @@ interface Props {
 
 /**
  * "Move to…": changes an application's stage in one step. A native select, so it works the same
- * with a mouse, a finger, the keyboard and a screen reader.
+ * with a mouse, a finger, the keyboard and a screen reader; the stage bars and chevron are decoration.
  */
 export function StatusMenu({ company, status, disabled, onMove }: Props) {
   return (
-    <select
-      aria-label={`Move ${company} to`}
-      className="input min-h-9 py-1 text-sm"
-      value={status}
-      disabled={disabled}
-      onChange={(event) => {
-        const to = event.target.value as Status;
-        if (to !== status) onMove(to);
-      }}
-    >
-      {STATUSES.map((option) => (
-        <option key={option} value={option}>
-          {option === status ? option : `Move to ${option}`}
-        </option>
-      ))}
-    </select>
+    <span className="relative inline-flex min-w-40 items-center">
+      <span className="pointer-events-none absolute left-3.5 flex">
+        <StageBars status={status} />
+      </span>
+      <select
+        aria-label={`Move ${company} to`}
+        className="inp w-full cursor-pointer appearance-none py-1 pr-9 pl-[3.25rem] text-sm"
+        value={status}
+        disabled={disabled}
+        onChange={(event) => {
+          const to = event.target.value as Status;
+          if (to !== status) onMove(to);
+        }}
+      >
+        {STATUSES.map((option) => (
+          <option key={option} value={option}>
+            {option === status ? option : `Move to ${option}`}
+          </option>
+        ))}
+      </select>
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 12 12"
+        className="pointer-events-none absolute right-3 size-3 text-fg-3"
+      >
+        <path
+          d="M2.5 4.5 6 8l3.5-3.5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </span>
   );
 }
 
