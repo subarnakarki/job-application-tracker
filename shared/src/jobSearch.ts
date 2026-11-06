@@ -511,3 +511,45 @@ export function pickOption(answer: string, options: string[]): string | null {
   if (decline.test(answer)) return options.find((option) => decline.test(option)) ?? null;
   return null;
 }
+
+// ---------------------------------------------------------------------------------------------
+// Application questions and drafts
+
+export const QUESTION_KINDS = [
+  'text',
+  'long_text',
+  'single_select',
+  'multi_select',
+  'file',
+  'checkbox',
+] as const;
+
+export const ApplicationQuestionSchema = z.strictObject({
+  label: z.string().max(1000),
+  required: z.boolean(),
+  kind: z.enum(QUESTION_KINDS),
+  /** The choices of a select question (capped; long country lists keep the first ones). */
+  options: z.array(z.string().max(300)).max(300),
+});
+export type ApplicationQuestion = z.infer<typeof ApplicationQuestionSchema>;
+
+/** Where an answer came from. Profile answers are filled by code; the model drafts the rest. */
+export const ANSWER_SOURCES = ['profile', 'draft', 'needs_you'] as const;
+
+export const DraftAnswerSchema = z.strictObject({
+  question: z.string().max(1000),
+  answer: z.string().max(4000),
+  source: z.enum(ANSWER_SOURCES),
+  /** For a fixed-choice question: the exact option to pick, when one matches. */
+  option: z.string().max(300).nullable(),
+});
+export type DraftAnswer = z.infer<typeof DraftAnswerSchema>;
+
+export const ApplicationDraftSchema = z.strictObject({
+  answers: z.array(DraftAnswerSchema).max(100),
+  /** Short and specific; pasted into a cover letter box when the form has one. */
+  coverLetter: z.string().max(5000),
+  /** "Why this company/role", reusable for similar free-text questions on the form. */
+  whyInterested: z.string().max(2000),
+});
+export type ApplicationDraft = z.infer<typeof ApplicationDraftSchema>;
