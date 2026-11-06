@@ -30,6 +30,8 @@ function productionCsp(): string {
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   build: {
+    // Never inline fonts as data: URIs: the CSP's font-src is 'self', so they would be blocked.
+    assetsInlineLimit: (file) => (/\.woff2?$/.test(file) ? false : undefined),
     rollupOptions: {
       // The service worker is its own entry, served at /sw.js (a worker's scope is its path).
       input: {

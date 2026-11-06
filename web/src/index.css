@@ -1,8 +1,130 @@
 @import 'tailwindcss';
 
-/* `dark:` follows the OS setting (prefers-color-scheme) by default in Tailwind v4. */
-body {
-  @apply bg-white text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
+/* ---------- Font: Inter (variable: optical size 14-32, weight 100-900), self-hosted ---------- */
+/* Licence: public/fonts/Inter-OFL.txt. Imported from here so Vite hashes it into /assets/, where
+   the service worker caches it; never inlined as a data: URI (the CSP's font-src is 'self'). */
+@font-face {
+  font-family: 'Inter';
+  src: url('./assets/fonts/inter-latin.woff') format('woff');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ---------- Design tokens ----------
+   Every colour is a CSS variable (Tailwind emits @theme values on :root), so a light theme later is
+   a block that redefines these, not a change to components. Only the dark theme exists today. */
+@theme {
+  --font-sans:
+    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+
+  /* Surfaces */
+  --color-bg: #000;
+  --color-s1: #0b0b0c;
+  --color-s2: #121214;
+  --color-s3: #1a1a1d;
+  --color-line: rgb(255 255 255 / 0.08);
+  --color-line-2: rgb(255 255 255 / 0.14);
+
+  /* Text tiers. fg-3 is the faintest text that still passes 4.5:1; fg-4 is for decoration only
+     (dividers, empty bars, key hints), never for text a person must read. */
+  --color-fg: #fff;
+  --color-fg-2: rgb(255 255 255 / 0.62);
+  --color-fg-3: rgb(255 255 255 / 0.5);
+  --color-fg-4: rgb(255 255 255 / 0.38);
+
+  /* Accents */
+  --color-blue: #0a8bff;
+  --color-blue-link: #7cc0ff;
+  --color-violet: #8b5cff;
+  --color-pink: #ff4fd8;
+  --color-amber: #ffb224;
+  --color-green: #2fd67a;
+  --color-red: #ff3b4f;
+
+  /* Stage colours: dots, bars and avatar tints. Always shown next to the stage name. */
+  --color-st-saved: #7c7c85;
+  --color-st-applied: #0a8bff;
+  --color-st-screening: #6f6bff;
+  --color-st-interviewing: #b45cff;
+  --color-st-offer: #2fd67a;
+  --color-st-rejected: #3a3a40;
+  --color-st-withdrawn: #3a3a40;
+
+  --radius-surface: 1.25rem;
+  --radius-tile: 1rem;
+  --radius-input: 0.75rem;
+
+  --shadow-line: inset 0 0 0 1px var(--color-line);
+  --shadow-line-2: inset 0 0 0 1px var(--color-line-2);
+
+  --ease-brand: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* The app is dark only for now, so `dark:` is always on. Pages that still use the old
+   `bg-white dark:bg-slate-950` pairs therefore render dark until their phase restyles them. */
+@custom-variant dark (&);
+
+/* Temporary: the old pages' dark: pairs use these slate steps. Pointing them at the neutral
+   tokens keeps those pages the same black as the new ones. Delete with the last slate-* class (R10). */
+@theme {
+  --color-slate-100: #f2f2f3;
+  --color-slate-200: #e4e4e6;
+  --color-slate-300: #a8a8ad;
+  --color-slate-400: #8a8a8f;
+  --color-slate-700: #2c2c30;
+  --color-slate-800: #1f1f23;
+  --color-slate-900: #121214;
+  --color-slate-950: #000;
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html {
+    background: var(--color-bg);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: var(--color-bg);
+    color: var(--color-fg);
+    font-size: 0.9375rem;
+    letter-spacing: -0.011em;
+    font-optical-sizing: auto;
+    font-feature-settings:
+      'cv11' 1,
+      'ss01' 1;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    background: rgb(10 139 255 / 0.35);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-blue);
+    outline-offset: 3px;
+  }
+}
+
+/* Reduced motion: every animation and transition in the app (and the JS ones check the same
+   setting themselves) is effectively off. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @layer components {
