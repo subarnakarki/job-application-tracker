@@ -102,11 +102,18 @@ export function ApplicationsPage() {
         subtitle={
           followUps === undefined || !everything.isSuccess ? undefined : (
             <>
-              <span className="text-fg">
-                {followUps} {followUps === 1 ? 'needs' : 'need'} a follow-up
-              </span>{' '}
-              and you have {interviewsThisWeek}{' '}
-              {interviewsThisWeek === 1 ? 'interview' : 'interviews'} in the next 7 days.
+              {followUps > 0 && (
+                <span className="text-fg">
+                  {followUps} {followUps === 1 ? 'needs' : 'need'} a follow-up
+                </span>
+              )}
+              {followUps > 0 && interviewsThisWeek > 0 && ' and you have '}
+              {followUps === 0 && interviewsThisWeek > 0 && (
+                <span className="text-fg">You have </span>
+              )}
+              {interviewsThisWeek > 0 &&
+                `${interviewsThisWeek} ${interviewsThisWeek === 1 ? 'interview' : 'interviews'} in the next 7 days`}
+              {followUps + interviewsThisWeek === 0 && 'You are all caught up'}.
             </>
           )
         }

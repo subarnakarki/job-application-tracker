@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { AppRoutes } from './App';
@@ -32,7 +32,10 @@ describe('App', () => {
       ),
     );
     renderAt('/applications/new');
-    expect(await screen.findByRole('button', { name: 'Try the demo' })).toBeVisible();
+    // The header offers the demo too, so look in the page itself.
+    expect(
+      within(await screen.findByRole('main')).getByRole('button', { name: 'Try the demo' }),
+    ).toBeVisible();
   });
 });
 
