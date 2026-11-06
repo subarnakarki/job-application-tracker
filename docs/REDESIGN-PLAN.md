@@ -182,7 +182,8 @@ Tests: `App.test.tsx`: the header's demo button signs in too, and there is one P
 
 ### R10. Clean-up and wrap
 
-- Delete the R1 aliases and any `slate-*`/`blue-*` classes left (`grep` must find none in `web/src`).
+- Delete the R1 aliases (`btn-primary`/`btn-secondary`/`btn-danger`/`input`), the temporary `--color-slate-*`
+  remap in `index.css`, and any `slate-*`/`blue-*`/`rose-*` classes left (`grep` must find none in `web/src`).
 - Manual pass on a phone and a desktop: keyboard-only through every page, Windows forced-colours (emulated in
   Chrome DevTools), 200% zoom, reduced motion, VoiceOver on the board.
 - Docs: README screenshots and features, this plan's outcome in `docs/PLAN.md`, and `CLAUDE.md`'s convention
