@@ -13,9 +13,9 @@ create table posting_suggestions (
   id uuid primary key default gen_random_uuid(),
   application_id uuid not null,
   user_id uuid not null,
-  -- Where it was found: 'greenhouse', 'lever' or 'ashby'.
+  -- Where it was found: the company's public job board on one of these.
   source text not null constraint posting_suggestions_source_check
-    check (source in ('greenhouse', 'lever', 'ashby')),
+    check (source in ('greenhouse', 'lever', 'ashby', 'rippling')),
   job_link text not null constraint posting_suggestions_job_link_check check (length(job_link) <= 2000),
   role text constraint posting_suggestions_role_check check (length(role) <= 200),
   salary_min integer check (salary_min >= 0),
