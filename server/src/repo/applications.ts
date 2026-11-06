@@ -13,6 +13,7 @@ import {
   type Sort,
   type Source,
   type Status,
+  type WorkMode,
 } from '@jat/shared';
 import type { Db, Queryable } from '../db/types';
 import type { ValidationIssue } from '../http/errors';
@@ -41,6 +42,9 @@ export interface ApplicationRecord {
   contact: string | null;
   nextStep: string | null;
   nextStepDate: string | null;
+  location: string | null;
+  workMode: WorkMode | null;
+  postedOn: string | null;
   notes: string;
   createdAt: Date;
   updatedAt: Date;
@@ -83,13 +87,16 @@ const COLUMN = {
   contact: 'contact',
   nextStep: 'next_step',
   nextStepDate: 'next_step_date',
+  location: 'location',
+  workMode: 'work_mode',
+  postedOn: 'posted_on',
   notes: 'notes',
   leadId: 'lead_id',
 } as const satisfies Record<EditableField, string>;
 
 const SELECT_COLUMNS = `id, company, role, status, date_applied, source, salary_min, salary_max,
-  salary_currency, job_link, contact, next_step, next_step_date, notes, created_at, updated_at,
-  last_activity_at, version, lead_id,
+  salary_currency, job_link, contact, next_step, next_step_date, location, work_mode, posted_on,
+  notes, created_at, updated_at, last_activity_at, version, lead_id,
   (select l.name from leads l where l.id = a.lead_id) as lead_name,
   (select coalesce(array_agg(i.held_on::text order by i.held_on), '{}') from interviews i
     where i.application_id = a.id) as interview_dates`;
@@ -108,6 +115,9 @@ interface ApplicationRow {
   contact: string | null;
   next_step: string | null;
   next_step_date: string | null;
+  location: string | null;
+  work_mode: WorkMode | null;
+  posted_on: string | null;
   notes: string;
   created_at: Date;
   updated_at: Date;
@@ -133,6 +143,9 @@ function toRecord(row: ApplicationRow): ApplicationRecord {
     contact: row.contact,
     nextStep: row.next_step,
     nextStepDate: row.next_step_date,
+    location: row.location,
+    workMode: row.work_mode,
+    postedOn: row.posted_on,
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -253,8 +266,9 @@ export async function createApplication(
     const inserted = await tx.query<ApplicationRow>(
       `insert into applications as a (user_id, company, role, status, date_applied, source, salary_min,
          salary_max, salary_currency, job_link, contact, next_step, next_step_date, notes,
-         created_at, updated_at, last_activity_at, lead_id)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $15, $15, $16)
+         created_at, updated_at, last_activity_at, lead_id, location, work_mode, posted_on)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $15, $15, $16,
+         $17, $18, $19)
        returning ${SELECT_COLUMNS}`,
       [
         owner.userId,
@@ -273,6 +287,9 @@ export async function createApplication(
         input.notes,
         now,
         input.leadId,
+        input.location,
+        input.workMode,
+        input.postedOn,
       ],
     );
     const row = inserted.rows[0];

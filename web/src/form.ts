@@ -6,6 +6,7 @@ import {
   type PostingPreview,
   type Source,
   type Status,
+  type WorkMode,
 } from '@jat/shared';
 
 /** What the form inputs hold: always strings, '' meaning "empty". */
@@ -22,6 +23,10 @@ export interface FormValues {
   contact: string;
   nextStep: string;
   nextStepDate: string;
+  location: string;
+  /** '' means not stated. */
+  workMode: WorkMode | '';
+  postedOn: string;
   notes: string;
   /** '' means no lead. */
   leadId: string;
@@ -40,6 +45,9 @@ export const EMPTY_FORM: FormValues = {
   contact: '',
   nextStep: '',
   nextStepDate: '',
+  location: '',
+  workMode: '',
+  postedOn: '',
   notes: '',
   leadId: '',
 };
@@ -58,6 +66,9 @@ export function toFormValues(application: ApplicationDetail): FormValues {
     contact: application.contact ?? '',
     nextStep: application.nextStep ?? '',
     nextStepDate: application.nextStepDate ?? '',
+    location: application.location ?? '',
+    workMode: application.workMode ?? '',
+    postedOn: application.postedOn ?? '',
     notes: application.notes,
     leadId: application.leadId ?? '',
   };
@@ -84,6 +95,9 @@ export function toRaw(values: FormValues): Record<string, unknown> {
     contact: orNull(values.contact),
     nextStep: orNull(values.nextStep),
     nextStepDate: orNull(values.nextStepDate),
+    location: orNull(values.location),
+    workMode: values.workMode === '' ? null : values.workMode,
+    postedOn: orNull(values.postedOn),
     notes: values.notes,
     leadId: orNull(values.leadId),
   };

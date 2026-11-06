@@ -1,0 +1,46 @@
+{
+  "version": "https://jsonfeed.org/version/1.1",
+  "title": "Teamtailor",
+  "home_page_url": "https://career.teamtailor.com/jobs",
+  "items": [
+    {
+      "id": "7b9dec76-cac2-489b-bc00-aab47097947f",
+      "title": "Customer Success Manager - Finnish speaking",
+      "url": "https://career.teamtailor.com/jobs/8660969-customer-success-manager-finnish-speaking",
+      "date_published": "2026-11-03T19:37:57+01:00",
+      "_jobposting": {
+        "@context": "http://schema.org/",
+        "@type": "JobPosting",
+        "title": "Customer Success Manager - Finnish speaking",
+        "description": "…",
+        "identifier": {
+          "@type": "PropertyValue",
+          "name": "Teamtailor",
+          "value": "8660969"
+        },
+        "datePosted": "2026-11-03T19:37:57+01:00",
+        "employmentType": "FULL_TIME",
+        "directApply": true,
+        "hiringOrganization": {
+          "@type": "Organization",
+          "name": "Teamtailor",
+          "sameAs": "https://career.teamtailor.com",
+          "logo": "https://images.teamtailor-cdn.com/images/s3/teamtailor-production/logotype-v3/image_uploads/c8c3f7c9-5cf9-4ef6-9554-652e97576f47/original.svg"
+        },
+        "jobLocation": [
+          {
+            "@type": "Place",
+            "address": {
+              "streetAddress": "Östgötagatan 16",
+              "addressLocality": "Stockholm",
+              "postalCode": "116 21",
+              "addressCountry": "SE",
+              "addressRegion": "Sweden",
+              "@type": "PostalAddress"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

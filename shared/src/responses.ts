@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { SOURCES, STATUSES } from './constants';
+import { SOURCES, STATUSES, WORK_MODES } from './constants';
 
 /**
  * What the API returns. These are strict: an unexpected field (a leaked
@@ -35,6 +35,9 @@ export const ApplicationSchema = z.strictObject({
   contact: z.string().nullable(),
   nextStep: z.string().nullable(),
   nextStepDate: calendarDate.nullable(),
+  location: z.string().nullable(),
+  workMode: z.enum(WORK_MODES).nullable(),
+  postedOn: calendarDate.nullable(),
   notes: z.string(),
   createdAt: instant,
   updatedAt: instant,

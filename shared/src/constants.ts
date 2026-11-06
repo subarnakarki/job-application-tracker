@@ -44,6 +44,10 @@ export const DATE_APPLIED_STATUSES = [
 /** An application needs a follow-up after this many calendar days without activity. */
 export const FOLLOW_UP_AFTER_DAYS = 7;
 
+/** Where the job is done. */
+export const WORK_MODES = ['Remote', 'Hybrid', 'On-site'] as const;
+export type WorkMode = (typeof WORK_MODES)[number];
+
 export const SORTS = ['updated_desc', 'applied_desc', 'company_asc'] as const;
 export type Sort = (typeof SORTS)[number];
 
@@ -58,6 +62,7 @@ export const LIMITS = {
   contact: 200,
   nextStep: 500,
   jobLink: 2000,
+  location: 200,
   notes: 10_000,
   search: 200,
   salaryMax: 100_000_000,

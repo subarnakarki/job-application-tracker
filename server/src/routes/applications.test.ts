@@ -283,6 +283,47 @@ describe.skipIf(!TEST_DATABASE_URL)('applications API (real app, real database)'
       expect(fine.statusCode).toBe(200);
     });
 
+    it('stores, returns, changes and exports the posting details: location, work mode, posted on', async () => {
+      const { cookie } = await t.login();
+      const created = detail(
+        await create(cookie, {
+          company: 'Acme',
+          role: 'SDET',
+          location: '  Boston, MA ',
+          workMode: 'Hybrid',
+          postedOn: '2026-10-20',
+        }),
+      );
+      expect(created).toMatchObject({
+        location: 'Boston, MA',
+        workMode: 'Hybrid',
+        postedOn: '2026-10-20',
+      });
+
+      const changed = await patch(cookie, created.id, 1, { workMode: 'Remote', location: null });
+      expect(changed.json()).toMatchObject({ workMode: 'Remote', location: null });
+      expect(detail(await read(cookie, created.id))).toMatchObject({
+        workMode: 'Remote',
+        location: null,
+        postedOn: '2026-10-20',
+      });
+
+      const csv = (await send('GET', '/api/applications/export.csv', cookie)).body;
+      expect(csv).toContain('Location,Work mode,Posted on');
+      expect(csv).toContain(',Remote,2026-10-20,');
+    });
+
+    it.each([
+      ['an unknown work mode', { workMode: 'Office' }],
+      ['a location on two lines', { location: 'Boston\nMA' }],
+      ['a made-up posting date', { postedOn: '2026-02-30' }],
+    ])('rejects %s with 400', async (_label, payload) => {
+      const { cookie } = await t.login();
+      const created = detail(await create(cookie));
+
+      expect((await patch(cookie, created.id, 1, payload)).statusCode).toBe(400);
+    });
+
     it.each([
       ['an unknown status', { status: 'Hired' }],
       ['clearing the company', { company: null }],

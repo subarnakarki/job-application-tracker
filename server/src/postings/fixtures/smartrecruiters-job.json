@@ -1,0 +1,24 @@
+{
+  "id": "744000158320111",
+  "name": "Senior / Lead Engineering Operations Manager",
+  "uuid": "a6f4c077-a7ac-4b8f-99d4-3756d1544f35",
+  "company": {
+    "name": "SmartRecruiters Inc",
+    "identifier": "smartrecruiters"
+  },
+  "releasedDate": "2026-10-28T15:14:43.941Z",
+  "location": {
+    "city": "Poland",
+    "region": "Remote",
+    "country": "pl",
+    "remote": true,
+    "hybrid": false,
+    "fullLocation": "Poland, Remote, Poland"
+  },
+  "typeOfEmployment": {
+    "id": "permanent",
+    "label": "Full-time"
+  },
+  "postingUrl": "https://jobs.smartrecruiters.com/smartrecruiters/744000158320111-senior-lead-engineering-operations-manager",
+  "applyUrl": "https://jobs.smartrecruiters.com/smartrecruiters/744000158320111-senior-lead-engineering-operations-manager?oga=true"
+}

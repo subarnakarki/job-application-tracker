@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { LIMITS, SORTS, SOURCES, STATUSES } from './constants';
+import { LIMITS, SORTS, SOURCES, STATUSES, WORK_MODES } from './constants';
 import { isValidDate, isValidTimeZone } from './dates';
 
 /** http(s) only, no embedded credentials. Blocks `javascript:`, `data:` and friends before they reach an href. */
@@ -65,6 +65,11 @@ const fields = {
   contact: optionalText(LIMITS.contact),
   nextStep: optionalText(LIMITS.nextStep),
   nextStepDate: dateOnly.nullable(),
+  /** Where the job is, as the posting says ("Boston, MA", "Remote (US)"). */
+  location: optionalText(LIMITS.location),
+  workMode: z.enum(WORK_MODES).nullable(),
+  /** When the job was posted. */
+  postedOn: dateOnly.nullable(),
   // Multi-line is fine, but Postgres cannot store NUL in text.
   notes: z
     .string()
@@ -114,6 +119,9 @@ export const ApplicationInputSchema = z
     contact: fields.contact.default(null),
     nextStep: fields.nextStep.default(null),
     nextStepDate: fields.nextStepDate.default(null),
+    location: fields.location.default(null),
+    workMode: fields.workMode.default(null),
+    postedOn: fields.postedOn.default(null),
     notes: fields.notes.default(''),
     leadId: fields.leadId.default(null),
   })
@@ -146,6 +154,9 @@ export const ApplicationPatchSchema = z
     contact: fields.contact.optional(),
     nextStep: fields.nextStep.optional(),
     nextStepDate: fields.nextStepDate.optional(),
+    location: fields.location.optional(),
+    workMode: fields.workMode.optional(),
+    postedOn: fields.postedOn.optional(),
     notes: fields.notes.optional(),
     leadId: fields.leadId.optional(),
   })

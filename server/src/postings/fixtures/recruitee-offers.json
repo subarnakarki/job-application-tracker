@@ -1,0 +1,92 @@
+{
+  "offers": [
+    {
+      "id": 2804401,
+      "slug": "aml-manager-austria",
+      "title": "AML Manager, Austria",
+      "careers_url": "https://careers.bunq.com/o/aml-manager-austria",
+      "careers_apply_url": "https://careers.bunq.com/o/aml-manager-austria/c/new",
+      "company_name": "bunq",
+      "locations": [
+        {
+          "id": 39972,
+          "name": "Vienna",
+          "state": "Wien",
+          "country": "Austria",
+          "city": "Vienna",
+          "translations": {
+            "en": {
+              "name": "Vienna",
+              "city": "Vienna",
+              "postal_code": null,
+              "street": null,
+              "note": null
+            }
+          },
+          "country_code": "AT",
+          "state_code": "9",
+          "postal_code": null,
+          "street": null,
+          "note": null
+        }
+      ],
+      "city": "Vienna",
+      "country": "Austria",
+      "remote": false,
+      "hybrid": true,
+      "on_site": false,
+      "published_at": "2026-10-30 16:32:58 UTC",
+      "salary": {
+        "max": null,
+        "min": null,
+        "period": null,
+        "currency": null
+      },
+      "employment_type_code": "fulltime_permanent"
+    },
+    {
+      "id": 2800490,
+      "slug": "data-scientist-marketing-3",
+      "title": "Data Scientist Marketing",
+      "careers_url": "https://careers.bunq.com/o/data-scientist-marketing-3",
+      "careers_apply_url": "https://careers.bunq.com/o/data-scientist-marketing-3/c/new",
+      "company_name": "bunq",
+      "locations": [
+        {
+          "id": 39979,
+          "name": "Amsterdam",
+          "state": "Noord-Holland",
+          "country": "Netherlands",
+          "city": "Amsterdam",
+          "translations": {
+            "en": {
+              "name": "Amsterdam",
+              "city": "Amsterdam",
+              "postal_code": null,
+              "street": null,
+              "note": null
+            }
+          },
+          "country_code": "NL",
+          "state_code": "NH",
+          "postal_code": null,
+          "street": null,
+          "note": null
+        }
+      ],
+      "city": "Amsterdam",
+      "country": "Netherlands",
+      "remote": false,
+      "hybrid": true,
+      "on_site": false,
+      "published_at": "2026-10-28 13:21:58 UTC",
+      "salary": {
+        "max": null,
+        "min": null,
+        "period": null,
+        "currency": null
+      },
+      "employment_type_code": "fulltime_permanent"
+    }
+  ]
+}
