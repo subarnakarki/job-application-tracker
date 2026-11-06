@@ -699,4 +699,61 @@ describe.skipIf(!TEST_DATABASE_URL)('schema (real Postgres, real migrations)', (
       ).toBe('lead_notes_body_check');
     });
   });
+
+  describe('resumes and resume analyses (0008)', () => {
+    const SHA = 'a'.repeat(64);
+    const insertResume = (userId: string, overrides: Record<string, unknown> = {}) => {
+      const values = {
+        user_id: userId,
+        file_name: 'cv.pdf',
+        media_type: 'application/pdf',
+        file: Buffer.from('%PDF-1.7'),
+        text: 'Pat Doe, SDET',
+        text_sha256: SHA,
+        ...overrides,
+      };
+      const columns = Object.keys(values);
+      return sql(
+        `insert into resumes (${columns.join(', ')}) values (${columns.map((_, index) => `$${index + 1}`).join(', ')})`,
+        Object.values(values),
+      );
+    };
+
+    it('keeps one resume per user, with its file, and pasted text with none', async () => {
+      const owner = await insertUser({ email: 'resume-one@example.com' });
+      await insertResume(owner);
+      expect((await violation(insertResume(owner))).constraint).toBe('resumes_pkey');
+
+      const paster = await insertUser({ email: 'resume-paste@example.com' });
+      await insertResume(paster, { file: null, file_name: null, media_type: 'text/plain' });
+    });
+
+    it.each([
+      ['a file over 2 MB', { file: Buffer.alloc(2097153) }, 'resumes_file_check'],
+      ['empty text', { text: '' }, 'resumes_text_check'],
+      ['an unknown type', { media_type: 'image/png' }, 'resumes_media_type_check'],
+      ['a file without a name', { file_name: null }, 'resumes_file_pair_check'],
+      ['pasted text with a file', { media_type: 'text/plain' }, 'resumes_text_only_check'],
+      ['a bad hash', { text_sha256: 'nope' }, 'resumes_text_sha256_check'],
+    ])('rejects %s', async (_label, overrides, constraint) => {
+      const owner = await insertUser({ email: `resume-${constraint}@example.com` });
+      expect((await violation(insertResume(owner, overrides))).constraint).toBe(constraint);
+    });
+
+    it('goes when the user is deleted, analyses included', async () => {
+      const owner = await insertUser({ email: 'resume-cascade@example.com' });
+      await insertResume(owner);
+      await sql(
+        "insert into resume_analyses (user_id, text_sha256, result, model) values ($1, $2, '{}', 'm')",
+        [owner, SHA],
+      );
+      await sql('delete from users where id = $1', [owner]);
+
+      for (const table of ['resumes', 'resume_analyses'])
+        expect(
+          (await sql(`select count(*)::int as n from ${table} where user_id = $1`, [owner]))
+            .rows[0],
+        ).toEqual({ n: 0 });
+    });
+  });
 });
