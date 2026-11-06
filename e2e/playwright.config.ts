@@ -23,6 +23,9 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:5173',
     trace: 'retain-on-failure',
+    // The redesign adds entrance, count-up and drop animations; with reduced motion they are off,
+    // so nothing in a test races an animation (and the reduced-motion path itself stays covered).
+    reducedMotion: 'reduce',
     extraHTTPHeaders: { 'x-test-secret': TEST_ROUTES_SECRET },
   },
   projects: [
