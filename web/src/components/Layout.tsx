@@ -28,7 +28,7 @@ export function Layout() {
   const width =
     location.pathname === '/' && new URLSearchParams(location.search).get('view') === 'board'
       ? 'max-w-screen-2xl'
-      : 'max-w-4xl';
+      : 'max-w-[75rem]';
 
   // Opened offline (from the installed app): the shell is cached, your data is not.
   if (!online && !me.data) {
