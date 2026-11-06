@@ -1,6 +1,10 @@
+import { createHash } from 'node:crypto';
 import { DATE_APPLIED_STATUSES, localDateIn, type Source, type Status } from '@jat/shared';
 import { pathToFileURL } from 'node:url';
 import { findOrCreateDemoUser } from '../auth/users';
+import { saveAnalysis } from '../repo/resumes';
+import { ANALYZER_MODEL } from '../resume/analyze';
+import { SAMPLE_RESUME, sampleResult } from './sampleAnalysis';
 import { createDb } from '../db/connection';
 import type { Db } from '../db/types';
 
@@ -228,6 +232,19 @@ export async function seedDemoData(db: Db, demoUserId: string, now: Date): Promi
         from = status;
       }
     }
+    // The resume match a visitor can look at (the demo account cannot upload a resume).
+    await tx.query('delete from resume_analyses where user_id = $1', [demoUserId]);
+    await saveAnalysis(
+      tx,
+      demoUserId,
+      {
+        fileName: 'Sample resume (Alex Rivera).pdf',
+        textSha256: createHash('sha256').update(SAMPLE_RESUME).digest('hex'),
+        result: sampleResult(),
+        model: ANALYZER_MODEL,
+      },
+      now,
+    );
     return DEMO_SAMPLES.length;
   });
 }

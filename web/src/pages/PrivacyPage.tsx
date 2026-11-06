@@ -50,6 +50,15 @@ export function PrivacyPage() {
           your emails or applications is sent to it.
         </p>
 
+        <h2 className="mt-6 text-xl font-semibold tracking-[-0.03em]">Your resume</h2>
+        <p>
+          If you upload a resume, the file and the text read from it are kept in your account so the
+          app can analyse it and, later, attach it for you. When you ask for an analysis or check it
+          against a posting, its text is sent to Anthropic&apos;s API (Claude) for that answer only.
+          The analyses are saved; you can delete them, and the resume, at any time. The demo account
+          cannot upload one.
+        </p>
+
         <h2 className="mt-6 text-xl font-semibold tracking-[-0.03em]">Cookies</h2>
         <p>
           Strictly necessary cookies only: one keeps you signed in (30 days), and one holds a Google

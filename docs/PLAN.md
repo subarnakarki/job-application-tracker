@@ -481,6 +481,29 @@ Tests, per the conventions:
 3. 5 analyses a day per user and 200 a day in total.
 4. 14c is built after 14a and 14b, in this phase.
 
+## Phase 14 outcome
+
+Built as planned (14a, 14b and 14c), with these changes from the tables above:
+
+- **Upload and analysis are separate steps.** `PUT /api/resume` stores the resume (file and text, as the owner
+  decided); `POST /api/resume/analyses` analyses the stored one. The same text within a day returns the saved
+  analysis without a new call.
+- **DOCX without a new dependency.** A small zip reader in `server/src/resume/extract.ts` reads only the body,
+  header and footer parts and caps the unzipped total at 5 MB (zip bombs stop there). PDF uses `unpdf` 1.9.1
+  (pinned, loaded on first use, at most 10 pages); it works in the esbuild bundle.
+- **Title count.** The answer must have at least 10 usable titles (up to 20); duplicates and empty ones are
+  dropped, so a slightly short answer is still shown rather than wasted. The prompt asks for exactly 20.
+- **14c needs no re-upload** (the text is stored): "Check my resume" on an application with a job link reads the
+  posting's full text (`server/src/postings/text.ts`, same guarded fetcher), asks Claude (low effort) for its
+  keywords, and scores the resume by code. Nothing is stored.
+- **Analysis not configured** (no Anthropic key) answers 404 `not_available`, like Gmail import, so the API fuzzer's
+  "never 5xx" rule holds; 502/503 remain for a failed answer or a rejected key.
+- **Route contracts** gained a file-download response kind (`{ file: [...] }`), validated in tests and in OpenAPI.
+- **Demo:** the seed adds one sample analysis of a made-up resume; the demo account cannot upload.
+- **Migration 0008** must be applied to Neon (Migrate workflow) before this code reaches `main`.
+- Not built: the opt-in eval script (`npm run eval:resume`); the prompt is checked by unit tests with canned
+  answers only, as with the Gmail classifier.
+
 ## Phase 15 plan: scheduled job search, apply queue and Claude in Chrome (approved)
 
 **Goal:** make the owner's recurring job-application workflow as close to hands-off as is safe. Setup happens

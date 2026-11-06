@@ -95,6 +95,33 @@ When a confirmation creates an application, the server also reads the job postin
 boards only) and fills the empty fields; with no link, it looks for the role on the company's public job board
 and saves a match as a suggestion. Imported changes are recorded with actor `gmail`. Item actions answer 409 `import_conflict` when not possible.
 
+## Resume match
+
+| Method | Path                                 | Auth | Notes                                                                   |
+| ------ | ------------------------------------ | ---- | ----------------------------------------------------------------------- |
+| GET    | `/api/resume`                        | user | `{ resume, analysisAvailable }`; `resume` is null when none is stored   |
+| PUT    | `/api/resume`                        | user | `{ kind: "file", fileName, dataBase64 }` (PDF or DOCX, 2 MB, type from  |
+|        |                                      |      | the bytes) or `{ kind: "text", text }`; replaces the one resume. 413,   |
+|        |                                      |      | 415, 422 (`no_text` for a scanned PDF, `too_many_pages` over 10). Not   |
+|        |                                      |      | for the demo. 20 an hour                                                |
+| DELETE | `/api/resume`                        | user | 204; analyses are kept                                                  |
+| GET    | `/api/resume/file`                   | user | The stored file (`application/pdf` or DOCX); 404 for pasted text        |
+| POST   | `/api/resume/analyses`               | user | Claude reads the resume as a senior recruiter: 201 with up to 20 ranked |
+|        |                                      |      | titles, each with keywords marked `found` by code. The same text within |
+|        |                                      |      | a day answers 200 with the saved analysis. 409 `no_resume`, 404         |
+|        |                                      |      | `not_available` (no Anthropic key), 502 `analysis_failed` (nothing      |
+|        |                                      |      | saved). 5 a day per user, 200 a day in total                            |
+| GET    | `/api/resume/analyses`               | user | The newest 5, each with its top three titles                            |
+| GET    | `/api/resume/analyses/:id`           | user | One analysis                                                            |
+| DELETE | `/api/resume/analyses/:id`           | user | 204                                                                     |
+| POST   | `/api/applications/:id/resume-match` | user | Reads the job link, asks Claude for the keywords that posting asks for, |
+|        |                                      |      | and marks each found or missing in the resume: `{ keywords, found,      |
+|        |                                      |      | matchPercent }`. Saves nothing. 422 `no_job_link` or an unreadable      |
+|        |                                      |      | posting. Counts against the link budget and the analysis limits         |
+
+The resume file and its text are kept until the user replaces or deletes them (or the account); the JSON export
+describes the resume and includes every analysis, never the text. Logs hold only outcomes, sizes and timings.
+
 ## Health
 
 `GET /api/health` (never touches the database) and `GET /api/health/db` (proves the database answers).

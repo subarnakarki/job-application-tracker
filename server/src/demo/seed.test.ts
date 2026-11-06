@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { findOrCreateDemoUser } from '../auth/users';
 import { runMigrations } from '../db/migrate';
 import { listApplications } from '../repo/applications';
+import { listAllAnalyses } from '../repo/resumes';
 import { statsBySource } from '../repo/stats';
 import { T0 } from '../test/app';
 import { insertUser } from '../test/factories';
@@ -39,6 +40,20 @@ describe.skipIf(!TEST_DATABASE_URL)('demo seed (real Postgres)', () => {
     expect(statuses.size).toBe(7); // every stage has something in it
     expect(stats.sources.every((row) => row.total > 0)).toBe(true);
     expect(SOURCES.length).toBe(stats.sources.length);
+  });
+
+  it('gives the demo one sample resume analysis of 20 titles, however often it runs', async () => {
+    const owner = await demoOwner();
+    await seedDemoData(testDb.db, owner.userId, T0);
+    await seedDemoData(testDb.db, owner.userId, T0);
+
+    const analyses = await listAllAnalyses(testDb.db, owner.userId);
+    expect(analyses).toHaveLength(1);
+    expect(analyses[0]?.titles).toHaveLength(20);
+    const keywords = analyses[0]?.titles.flatMap((entry) => entry.keywords) ?? [];
+    // Marked by code against the sample resume: some found, some missing.
+    expect(keywords.some((keyword) => keyword.found)).toBe(true);
+    expect(keywords.some((keyword) => !keyword.found)).toBe(true);
   });
 
   it('flags the quiet ones for follow-up, and keeps next steps in the future', async () => {

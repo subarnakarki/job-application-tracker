@@ -26,6 +26,9 @@ Built by an SDET as a portfolio project, so the tests matter as much as the feat
   public posting (company career sites, Greenhouse, Lever, Ashby, Rippling, Workday and others) and fill only empty fields:
   role, salary, location, work mode and posting date. "Find posting" looks an application without a link up on
   the company's public job board and suggests the match.
+- Resume match: upload a resume (PDF, Word or pasted text) and Claude reads it as a senior recruiter would,
+  listing the 20 job titles it fits best with the keywords applicant tracking systems match for each, marked found
+  or missing in the resume by plain code. "Check my resume" scores the resume against one application's posting.
 - Mobile-first, keyboard and screen-reader friendly, with a dark design (Inter, self-hosted) and
   respect for reduced-motion settings. Colours are tokens, so a light theme can be added later.
 
