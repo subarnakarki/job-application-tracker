@@ -514,7 +514,8 @@
     animation: toast-in 0.5s var(--ease-brand);
   }
 
-  /* Native <dialog>: blurred backdrop, scales in. Browsers without @starting-style just show it. */
+  /* Native <dialog>: blurred backdrop, scales in. It closes at once (display is not animated), so a closed
+   dialog never lingers in the page. Browsers without @starting-style just show it. */
   dialog.dlg {
     margin: auto;
     width: min(27.5rem, calc(100% - 2rem));
@@ -530,9 +531,7 @@
     transform: translateY(8px) scale(0.96);
     transition:
       opacity 0.3s var(--ease-brand),
-      transform 0.45s var(--ease-brand),
-      overlay 0.45s allow-discrete,
-      display 0.45s allow-discrete;
+      transform 0.45s var(--ease-brand);
   }
   dialog.dlg[open] {
     opacity: 1;
@@ -543,10 +542,7 @@
     -webkit-backdrop-filter: blur(6px);
     backdrop-filter: blur(6px);
     opacity: 0;
-    transition:
-      opacity 0.3s,
-      overlay 0.3s allow-discrete,
-      display 0.3s allow-discrete;
+    transition: opacity 0.3s;
   }
   dialog.dlg[open]::backdrop {
     opacity: 1;
