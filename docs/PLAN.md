@@ -275,6 +275,71 @@ findings:
 - Tests: instant-move helpers (unit), the menu (component), and e2e for the list menu (desktop and phone), a mouse
   drag (desktop), a keyboard move (both) and a conflict (both). The drag and keyboard tests passed 10 repeated runs.
 
+## Phase 12 plan: networking leads, interviews, fill from link, installable app (proposed, awaiting approval)
+
+**Goal:** make the tracker the one place for a job search: the people helping you, every interview, and adding a
+posting in seconds, on a phone like an app. Ideas reviewed from
+[bosterkamp/job-opportunity-tracker](https://github.com/bosterkamp/job-opportunity-tracker) (MIT); rebuilt in
+this stack, no code copied.
+
+### 12a. Networking leads (people who help you, with conversation notes)
+
+| Area         | Decision                                                                                                                                                                                                            |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Data         | Migration `0005`: `leads` (name required; company, email, phone, profile link optional) and `lead_notes` (date, text up to 5,000). `applications.lead_id` (optional)                                                |
+| Ownership    | Composite key `(user_id, lead_id)` so an application can only point at its owner's lead; deleting a lead keeps its applications, unlinked (`ON DELETE SET NULL (lead_id)`)                                          |
+| Notes        | Dated today by default, never in the future (user's time zone); edit and delete; deleting a lead deletes its notes                                                                                                  |
+| vs `contact` | The existing free-text "Contact" stays (your point of contact at the company); a lead is the person who helped you get there                                                                                        |
+| Limits       | 500 leads per user (30 for the demo), 200 notes per lead; the existing per-user write limits apply                                                                                                                  |
+| API          | `GET/POST /api/leads`, `GET/PATCH/DELETE /api/leads/:id` (detail: notes and linked applications), `POST /api/leads/:id/notes`, `PATCH/DELETE /api/leads/:id/notes/:noteId`; application input gains `leadId`        |
+| UI           | "Leads" in the header; list with search (name, company, newest note, number of applications); lead page with notes and linked applications; "Lead" picker on the application form; the lead shown on an application |
+| Export       | JSON export includes leads and notes; CSV gains a "Lead" column                                                                                                                                                     |
+
+### 12b. Interviews
+
+| Area        | Decision                                                                                                                                                                                                                                                           |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Data        | Migration `0006`: `interviews` (application, date, optional label up to 200 such as "Hiring manager", optional notes). Up to 20 per application                                                                                                                    |
+| Dates       | Past and future dates allowed, so scheduled interviews can be logged ahead                                                                                                                                                                                         |
+| Domain rule | **Change:** an upcoming interview (today or later) counts as an upcoming next step, so it stops "needs follow-up". Logging, editing or removing an interview is activity (resets the follow-up clock). Updated in `shared/` and its SQL twin, with the parity test |
+| Status      | Logging an interview does not change the status by itself                                                                                                                                                                                                          |
+| API         | `POST /api/applications/:id/interviews`, `PATCH/DELETE /api/applications/:id/interviews/:interviewId`; detail includes interviews; list items gain `interviewCount` and `nextInterviewOn`                                                                          |
+| UI          | "Add interview" on the application page; one dated timeline of status changes and interviews; cards show "2 interviews" or "Interview Nov 12"                                                                                                                      |
+
+### 12c. Fill from link
+
+| Area    | Decision                                                                                                                                                                                                                                                                                                                                                      |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Flow    | "Fill from link" on the add form: paste a posting URL; fills **only empty** fields (company, role, salary range and currency, job link); nothing is saved until "Save"                                                                                                                                                                                        |
+| Sources | schema.org `JobPosting` data on the page (most career sites), and the public Greenhouse, Lever and Ashby posting APIs when the link is theirs. LinkedIn and sign-in sites: a clear "can't read this site" message                                                                                                                                             |
+| API     | `POST /api/postings/preview { url }` returns the details; stores nothing; logs only the host and the outcome                                                                                                                                                                                                                                                  |
+| Safety  | Server-side fetching of pasted links is the classic SSRF risk: http(s) on ports 80/443 only; every address checked after DNS lookup (private, loopback, link-local and cloud-metadata ranges, IPv4 and IPv6) and the connection pinned to the checked address; redirects followed by hand (at most 3), each re-checked; 10 s and 2 MB limits; no cookies sent |
+| Limits  | 60 previews per hour per user (20 for the demo)                                                                                                                                                                                                                                                                                                               |
+| Tests   | The fetcher is injected, so the fuzzer and API tests never touch the network; address-guard and parser unit tests on saved fixture pages; fetch tests against a local server via an explicit test-only allowance                                                                                                                                              |
+
+### 12d. Installable app (phones)
+
+| Area        | Decision                                                                                                                                                                                                                                                                                                               |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Install     | Web app manifest, icons (including maskable and Apple touch icon), theme colour; installs from Safari (Add to Home Screen) and Chrome (Install app), no app store                                                                                                                                                      |
+| Offline     | A small hand-written service worker caches only the app's own files: hashed assets cache-first, pages network-first with the cached shell as fallback. `/api/` is never cached, so your data never sits in the cache. Offline, the app opens and says it is offline; nothing can be saved until the connection is back |
+| Updates     | A new deploy reaches the installed app on its next launch                                                                                                                                                                                                                                                              |
+| Phone board | On small screens the board becomes one tab per stage (with counts) instead of sideways scrolling; moves use the "Move to" menu there                                                                                                                                                                                   |
+| Headers     | CSP stays strict (`worker-src 'self'`, `manifest-src 'self'`)                                                                                                                                                                                                                                                          |
+
+### Order, deploys and tests
+
+1. 12a server (migration first, applied to Neon with the Migrate workflow **before** the code that uses it is
+   pushed), then 12a UI. 2. 12b the same way. 3. 12c. 4. 12d. 5. Demo seed gains sample leads and interviews;
+   README and this plan's outcome.
+
+Critical tests only, as agreed: unit for domain rules, the address guard and the posting parser; API tests for
+every new route (with isolation tests for every id route in `ISOLATION_COVERAGE`, and contracts so the fuzzer
+covers them); e2e for add a lead with a note and link it to an application, log an interview and see it on the
+card and timeline, fill from link (posting preview mocked at the browser), and the app opening offline.
+
+Not included: meeting reminders, a calendar feed, posting deadlines, star ratings (possible later phases).
+
 ## Planned but not built
 
 | Item                                | Status                                                                                                    |
