@@ -1,0 +1,512 @@
+import { readFileSync } from 'node:fs';
+import {
+  ApplyQueueSchema,
+  DEFAULT_QUERY,
+  JobHitSchema,
+  JobSearchRunDetailSchema,
+  JobSearchSetupSchema,
+  type JobHit,
+  type JobSearchProfile,
+  type ModelDraft,
+  type SearchSource,
+} from '@jat/shared';
+import type { LightMyRequestResponse } from 'fastify';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import type { JobSearchClaude } from '../jobsearch/claude';
+import { FetchError, type PageFetcher } from '../postings/fetchPage';
+import { createTestApp, SAME_ORIGIN, T0, type TestApp } from '../test/app';
+import { TEST_DATABASE_URL } from '../test/testDb';
+import { MANUAL_RUN_RULE } from './jobSearch';
+
+const MISSING_ID = '00000000-0000-4000-8000-000000000000';
+const CRON_SECRET = 'cron-secret-for-tests-0123456789abcdef';
+const HOUR = 60 * 60 * 1000;
+
+/** A real Greenhouse answer (trimmed), re-dated and re-titled for each job the search "finds". */
+const GREENHOUSE = JSON.parse(
+  readFileSync(new URL('../jobsearch/fixtures/greenhouse-job.json', import.meta.url), 'utf8'),
+) as Record<string, unknown>;
+const greenhouseJob = (
+  title: string,
+  postedHoursAgo: number,
+  content = 'Own the roadmap. '.repeat(20),
+) =>
+  JSON.stringify({
+    ...GREENHOUSE,
+    title,
+    content,
+    first_published: new Date(T0.getTime() - postedHoursAgo * HOUR).toISOString(),
+  });
+const apiUrl = (id: number) =>
+  `https://boards-api.greenhouse.io/v1/boards/acme/jobs/${String(id)}?questions=true&pay_transparency=true`;
+const jobLink = (id: number) => `https://job-boards.greenhouse.io/acme/jobs/${String(id)}`;
+
+const PAGES: Record<string, string> = {
+  [apiUrl(101)]: greenhouseJob('Senior Product Manager', 3),
+  [apiUrl(102)]: greenhouseJob(
+    'Engineering Manager',
+    5,
+    'You partner with the product manager. '.repeat(10),
+  ),
+  [apiUrl(103)]: greenhouseJob('Product Manager, Growth', 72),
+  [apiUrl(104)]: greenhouseJob('Product Manager Intern', 2),
+};
+const fetchPage: PageFetcher = (url) => {
+  const text = PAGES[url];
+  return text === undefined
+    ? Promise.reject(new FetchError('network', 'tests never reach the network'))
+    : Promise.resolve({ url, contentType: 'application/json', text });
+};
+
+/** The model's side, chosen per test: what the search finds and how drafts answer. */
+interface StubClaude extends JobSearchClaude {
+  links: string[];
+  searches: { query: string; sources: SearchSource[] }[];
+  drafts: number;
+  draftsFail: boolean;
+}
+const claude: StubClaude = {
+  links: [101, 102, 103, 104].map(jobLink),
+  searches: [],
+  drafts: 0,
+  draftsFail: false,
+  search(query: string, sources: SearchSource[]) {
+    claude.searches.push({ query, sources });
+    return Promise.resolve({
+      links: [...claude.links, 'https://job-boards.greenhouse.io/acme', 'https://evil.example/x'],
+      searches: 2,
+    });
+  },
+  draft(request: { questions: { label: string }[] }): Promise<ModelDraft | null> {
+    claude.drafts += 1;
+    if (claude.draftsFail) return Promise.resolve(null);
+    return Promise.resolve({
+      // A country the trimmed option list does not have, so that question needs the candidate.
+      answers: request.questions.map((question) => ({
+        question: question.label,
+        answer: /country/i.test(question.label) ? 'United States' : 'No',
+        needsCandidate: false,
+      })),
+      coverLetter: 'Dear Acme team, ...',
+      whyInterested: 'The roadmap work.',
+    });
+  },
+};
+
+const PROFILE: JobSearchProfile = {
+  fullName: 'Pat Example',
+  email: 'pat@example.com',
+  phone: '+1 555 010 0199',
+  city: 'Boston',
+  state: 'MA',
+  workAuthorization: 'US citizen',
+  needsSponsorship: false,
+  salaryMin: 150000,
+  salaryMax: null,
+  linkedin: 'https://www.linkedin.com/in/pat',
+  portfolio: '',
+  website: '',
+  workModes: ['Remote', 'Hybrid'],
+  queries: [DEFAULT_QUERY],
+  includeTitles: ['product manager'],
+  skipTitles: ['intern'],
+  timeframeDays: 1,
+  cadence: 'daily',
+  runHour: 8,
+  runWeekday: 1,
+  scheduleOn: true,
+  willingToRelocate: 'No',
+  startDate: 'Two weeks after an offer',
+  howHeard: 'Company careers page',
+  over18: true,
+  eeoAnswer: 'Decline to self-identify',
+};
+
+function parsed<T>(schema: { safeParse(value: unknown): { success: boolean; data?: T } }) {
+  return (response: LightMyRequestResponse): T => {
+    const result = schema.safeParse(response.json());
+    if (!result.success || result.data === undefined)
+      throw new Error(
+        `Response broke the contract (${String(response.statusCode)}): ${response.body}`,
+      );
+    return result.data;
+  };
+}
+const runOf = parsed(JobSearchRunDetailSchema);
+const hitOf = parsed(JobHitSchema);
+const queueOf = parsed(ApplyQueueSchema);
+
+describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', () => {
+  let t: TestApp;
+  const env: Record<string, string> = {
+    JOB_SEARCH_USER_IDS: '',
+    JOB_SEARCH_CRON_SECRET: CRON_SECRET,
+  };
+
+  beforeAll(async () => {
+    t = await createTestApp({ env, jobSearchClaude: claude, fetchPage });
+  });
+  afterAll(async () => {
+    await t.close();
+  });
+  beforeEach(async () => {
+    claude.links = [101, 102, 103, 104].map(jobLink);
+    claude.searches = [];
+    claude.drafts = 0;
+    claude.draftsFail = false;
+    t.clock.set(T0);
+    await t.db.query("delete from rate_limits where key like 'job-search%'");
+  });
+
+  const send = (method: 'GET' | 'POST' | 'PUT', url: string, cookie: string, payload?: object) =>
+    t.app.inject({
+      method,
+      url,
+      headers: { ...SAME_ORIGIN, cookie },
+      ...(payload ? { payload } : method === 'GET' ? {} : { payload: {} }),
+    });
+
+  /** A signed-in user the job search is open to, set up, with a resume. */
+  async function member(options: { setUp?: boolean; resume?: boolean } = {}) {
+    const login = await t.login({ timeZone: 'America/New_York' });
+    env['JOB_SEARCH_USER_IDS'] = [env['JOB_SEARCH_USER_IDS'], login.user.id]
+      .filter(Boolean)
+      .join(',');
+    if (options.setUp !== false)
+      expect((await send('PUT', '/api/job-search/profile', login.cookie, PROFILE)).statusCode).toBe(
+        200,
+      );
+    if (options.resume !== false)
+      await send('PUT', '/api/resume', login.cookie, {
+        kind: 'text',
+        text: 'Pat Example. Senior product manager, eight years of roadmaps. '.repeat(5),
+      });
+    return login;
+  }
+  const run = (cookie: string) => send('POST', '/api/job-search/runs', cookie);
+  const byRole = (hits: JobHit[], role: string) => {
+    const hit = hits.find((entry) => entry.role === role);
+    if (!hit) throw new Error(`no hit for ${role}`);
+    return hit;
+  };
+
+  describe('who may use it', () => {
+    it('is closed (404) to a user not on the list, and says so on the setup', async () => {
+      const { cookie } = await t.login();
+      expect(
+        parsed(JobSearchSetupSchema)(await send('GET', '/api/job-search/profile', cookie)),
+      ).toEqual({
+        available: false,
+        profile: null,
+        confirmedAt: null,
+        hasResume: false,
+      });
+      for (const [method, url, body] of [
+        ['PUT', '/api/job-search/profile', PROFILE],
+        ['POST', '/api/job-search/runs', undefined],
+        ['GET', '/api/job-search/queue', undefined],
+      ] as const) {
+        const response = await send(method, url, cookie, body);
+        expect(response.statusCode, url).toBe(404);
+        expect(response.json()).toMatchObject({ error: 'not_available' });
+      }
+    });
+
+    it('saves the setup once confirmed, and needs it and a resume before a run', async () => {
+      const notSetUp = await member({ setUp: false, resume: false });
+      expect((await run(notSetUp.cookie)).json()).toMatchObject({ error: 'not_set_up' });
+
+      const noResume = await member({ resume: false });
+      const setup = parsed(JobSearchSetupSchema)(
+        await send('GET', '/api/job-search/profile', noResume.cookie),
+      );
+      expect(setup).toMatchObject({ available: true, profile: PROFILE, hasResume: false });
+      expect((await run(noResume.cookie)).json()).toMatchObject({ error: 'no_resume' });
+    });
+
+    it('refuses a profile that is not valid', async () => {
+      const { cookie } = await member();
+      const response = await send('PUT', '/api/job-search/profile', cookie, {
+        ...PROFILE,
+        linkedin: 'javascript:alert(1)',
+      });
+      expect(response.statusCode).toBe(400);
+    });
+  });
+
+  describe('a run', () => {
+    it('searches the saved query, reads each job once, sorts them and drafts the targets', async () => {
+      const { cookie } = await member();
+
+      const response = await run(cookie);
+
+      expect(response.statusCode).toBe(201);
+      const { run: summary, hits } = runOf(response);
+      expect(claude.searches).toEqual([{ query: DEFAULT_QUERY, sources: ['greenhouse'] }]);
+      expect(summary).toMatchObject({
+        trigger: 'manual',
+        status: 'done',
+        searches: 2,
+        counts: { found: 4, target: 1, keywordOnly: 1, skipped: 2, needsYou: 1, notDrafted: 0 },
+      });
+      expect(hits.map((hit) => [hit.role, hit.kind, hit.state])).toEqual([
+        ['Senior Product Manager', 'target', 'needs_you'],
+        ['Engineering Manager', 'keyword_only', 'new'],
+        ['Product Manager Intern', 'skipped', 'skipped'],
+        ['Product Manager, Growth', 'skipped', 'skipped'],
+      ]);
+      expect(byRole(hits, 'Product Manager, Growth').reason).toBe('Posted more than 1 day ago');
+      expect(claude.drafts).toBe(1);
+
+      const target = byRole(hits, 'Senior Product Manager');
+      expect(target).toMatchObject({
+        company: 'GitLab',
+        jobLink: jobLink(101),
+        applyLink: jobLink(101),
+        workMode: 'Remote',
+      });
+      const answers = new Map(target.draft?.answers.map((answer) => [answer.question, answer]));
+      expect(answers.get('First Name')).toMatchObject({ answer: 'Pat', source: 'profile' });
+      expect(
+        [...answers.values()].find((answer) => /sponsorship/.test(answer.question)),
+      ).toMatchObject({ answer: 'No', option: 'No', source: 'profile' });
+      expect(answers.get('Have you previously worked at or consulted for GitLab?')).toMatchObject({
+        option: 'No',
+        source: 'draft',
+      });
+      // Not one of the (trimmed) options: the candidate answers it.
+      expect(answers.get('What is your current country of residence?')?.source).toBe('needs_you');
+      expect(answers.get('Gender')).toMatchObject({ answer: 'Decline to self-identify' });
+      expect(target.draft?.coverLetter).toBe('Dear Acme team, ...');
+    });
+
+    it('never shows a job twice, and refuses a second run while one is going', async () => {
+      const { cookie, user } = await member();
+      expect((await run(cookie)).statusCode).toBe(201);
+      const again = runOf(await run(cookie));
+      expect(again.hits).toEqual([]);
+
+      await t.db.query(
+        "insert into job_search_runs (user_id, trigger, local_day, started_at) values ($1, 'manual', '2026-11-05', $2)",
+        [user.id, t.clock.now()],
+      );
+      const busy = await run(cookie);
+      expect(busy.statusCode).toBe(409);
+      expect(busy.json()).toMatchObject({ error: 'run_in_progress' });
+    });
+
+    it('skips a job already in the tracker', async () => {
+      const { cookie } = await member();
+      await send('POST', '/api/applications', cookie, {
+        company: 'GitLab',
+        role: 'Senior Product Manager',
+      });
+      const { hits } = runOf(await run(cookie));
+      expect(byRole(hits, 'Senior Product Manager')).toMatchObject({
+        kind: 'skipped',
+        reason: 'Already in your tracker',
+      });
+    });
+
+    it('allows three runs by hand a day', async () => {
+      const { cookie } = await member();
+      claude.links = [];
+      for (let index = 0; index < MANUAL_RUN_RULE.limit; index += 1)
+        expect((await run(cookie)).statusCode).toBe(201);
+      expect((await run(cookie)).statusCode).toBe(429);
+    });
+
+    it('keeps a job undrafted when its draft fails, for a later try', async () => {
+      const { cookie } = await member();
+      claude.draftsFail = true;
+      const { run: summary, hits } = runOf(await run(cookie));
+      expect(summary.counts.notDrafted).toBe(1);
+      expect(byRole(hits, 'Senior Product Manager')).toMatchObject({
+        state: 'new',
+        draftError: 'The draft did not finish',
+      });
+    });
+  });
+
+  describe('the apply queue', () => {
+    async function withRun() {
+      const login = await member();
+      const { hits } = runOf(await run(login.cookie));
+      return { ...login, hits };
+    }
+
+    it('groups waiting jobs, and finishing the answers makes a job ready', async () => {
+      const { cookie, hits } = await withRun();
+      let queue = queueOf(await send('GET', '/api/job-search/queue', cookie));
+      expect(queue.needsYou.map((hit) => hit.role)).toEqual(['Senior Product Manager']);
+      expect(queue.keywordOnly.map((hit) => hit.role)).toEqual(['Engineering Manager']);
+      expect(queue.ready).toEqual([]);
+
+      const target = byRole(hits, 'Senior Product Manager');
+      const edited = await send('PUT', `/api/job-search/hits/${target.id}/draft`, cookie, {
+        answers: [
+          { question: 'What is your current country of residence?', answer: 'United States' },
+        ],
+        coverLetter: 'Edited letter',
+      });
+      expect(hitOf(edited)).toMatchObject({
+        state: 'ready',
+        draft: { coverLetter: 'Edited letter' },
+      });
+      queue = queueOf(await send('GET', '/api/job-search/queue', cookie));
+      expect(queue.ready.map((hit) => hit.id)).toEqual([target.id]);
+    });
+
+    it('marks a job applied once, creating the application in the tracker', async () => {
+      const { cookie, hits } = await withRun();
+      const target = byRole(hits, 'Senior Product Manager');
+
+      const applied = hitOf(
+        await send('POST', `/api/job-search/hits/${target.id}/applied`, cookie),
+      );
+      expect(applied.state).toBe('applied');
+      expect(applied.applicationId).not.toBeNull();
+      const again = hitOf(await send('POST', `/api/job-search/hits/${target.id}/applied`, cookie));
+      expect(again.applicationId).toBe(applied.applicationId);
+
+      const application = await send(
+        'GET',
+        `/api/applications/${applied.applicationId ?? ''}`,
+        cookie,
+      );
+      expect(application.json()).toMatchObject({
+        company: 'GitLab',
+        role: 'Senior Product Manager',
+        status: 'Applied',
+        source: 'Company site',
+        dateApplied: '2026-11-05',
+        jobLink: jobLink(101),
+      });
+      const list = await send('GET', '/api/applications', cookie);
+      expect(list.json<{ total: number }>().total).toBe(1);
+    });
+
+    it('marks a job blocked with a reason, or skipped', async () => {
+      const { cookie, hits } = await withRun();
+      const target = byRole(hits, 'Senior Product Manager');
+      expect(
+        hitOf(
+          await send('POST', `/api/job-search/hits/${target.id}/blocked`, cookie, {
+            reason: 'Needs an account',
+          }),
+        ),
+      ).toMatchObject({ state: 'blocked', blockReason: 'Needs an account' });
+      const other = byRole(hits, 'Engineering Manager');
+      expect(hitOf(await send('POST', `/api/job-search/hits/${other.id}/skip`, cookie)).state).toBe(
+        'skipped',
+      );
+      const blankReason = await send('POST', `/api/job-search/hits/${target.id}/blocked`, cookie, {
+        reason: ' ',
+      });
+      expect(blankReason.statusCode).toBe(400);
+    });
+
+    it('moves a keyword-only job into the queue and drafts it', async () => {
+      const { cookie, hits } = await withRun();
+      const other = byRole(hits, 'Engineering Manager');
+      const moved = hitOf(await send('POST', `/api/job-search/hits/${other.id}/queue`, cookie));
+      expect(moved).toMatchObject({ kind: 'target', state: 'needs_you' });
+      expect(claude.drafts).toBe(2);
+    });
+  });
+
+  describe('the data export', () => {
+    it('includes the setup, the runs and the jobs found', async () => {
+      const { cookie } = await member();
+      await run(cookie);
+      const exported = await send('GET', '/api/me/export', cookie);
+      expect(exported.statusCode).toBe(200);
+      const { jobSearch } = exported.json<{
+        jobSearch: { profile: unknown; runs: unknown[]; hits: unknown[] };
+      }>();
+      expect(jobSearch.profile).toEqual(PROFILE);
+      expect(jobSearch.runs).toHaveLength(1);
+      expect(jobSearch.hits).toHaveLength(4);
+    });
+  });
+
+  describe('isolation between users', () => {
+    it("answers 404 for someone else's run or job, and changes nothing", async () => {
+      const owner = await member();
+      const { run: theirRun, hits } = runOf(await run(owner.cookie));
+      const target = byRole(hits, 'Senior Product Manager');
+      const other = await member();
+
+      const probes: [string, string, object | undefined][] = [
+        ['GET', `/api/job-search/runs/{id}`, undefined],
+        ['POST', `/api/job-search/hits/{id}/applied`, undefined],
+        ['POST', `/api/job-search/hits/{id}/blocked`, { reason: 'x' }],
+        ['POST', `/api/job-search/hits/{id}/skip`, undefined],
+        ['POST', `/api/job-search/hits/{id}/queue`, undefined],
+        ['POST', `/api/job-search/hits/{id}/redraft`, undefined],
+        ['PUT', `/api/job-search/hits/{id}/draft`, { answers: [], coverLetter: '' }],
+      ];
+      for (const [method, path, body] of probes) {
+        const ownId = path.includes('/runs/') ? theirRun.id : target.id;
+        for (const id of [ownId, MISSING_ID, 'not-a-uuid']) {
+          const response = await send(
+            method as 'GET' | 'POST' | 'PUT',
+            path.replace('{id}', id),
+            other.cookie,
+            body,
+          );
+          expect(response.statusCode, `${method} ${path} ${id}`).toBe(404);
+          expect(response.json()).toMatchObject({ error: 'not_found' });
+        }
+      }
+      const unchanged = runOf(
+        await send('GET', `/api/job-search/runs/${theirRun.id}`, owner.cookie),
+      );
+      expect(byRole(unchanged.hits, 'Senior Product Manager').state).toBe('needs_you');
+    });
+  });
+
+  describe('the hourly schedule', () => {
+    const cron = (secret?: string) =>
+      t.app.inject({
+        method: 'POST',
+        url: '/api/cron/job-search',
+        headers: {
+          'content-type': 'application/json',
+          ...(secret ? { 'x-cron-secret': secret } : {}),
+        },
+        payload: '{}',
+      });
+
+    it('answers 404 without the right secret', async () => {
+      expect((await cron()).statusCode).toBe(404);
+      expect((await cron('wrong-secret-of-a-good-length-000000')).statusCode).toBe(404);
+    });
+
+    it('starts a due run once per local day, then only keeps drafting', async () => {
+      env['JOB_SEARCH_USER_IDS'] = '';
+      const { cookie } = await member();
+      // 13:30 UTC is 08:30 in New York: past the 8:00 run hour.
+      t.clock.set(new Date('2026-11-05T13:30:00Z'));
+
+      expect((await cron(CRON_SECRET)).json()).toEqual({ started: 1, drafted: 0 });
+      expect((await cron(CRON_SECRET)).json()).toEqual({ started: 0, drafted: 0 });
+
+      const runs = await send('GET', '/api/job-search/runs', cookie);
+      expect(
+        runs.json<{ items: { trigger: string }[] }>().items.map((item) => item.trigger),
+      ).toEqual(['schedule']);
+    });
+
+    it('does not start a run before the run hour, or with the schedule off', async () => {
+      env['JOB_SEARCH_USER_IDS'] = '';
+      const { cookie } = await member();
+      t.clock.set(new Date('2026-11-05T12:30:00Z')); // 07:30 in New York
+      expect((await cron(CRON_SECRET)).json()).toEqual({ started: 0, drafted: 0 });
+
+      await send('PUT', '/api/job-search/profile', cookie, { ...PROFILE, scheduleOn: false });
+      t.clock.set(new Date('2026-11-05T15:00:00Z'));
+      expect((await cron(CRON_SECRET)).json()).toEqual({ started: 0, drafted: 0 });
+    });
+  });
+});

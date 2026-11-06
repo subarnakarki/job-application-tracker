@@ -629,3 +629,98 @@ export function assembleDraft(
     needsYou,
   };
 }
+
+// ---------------------------------------------------------------------------------------------
+// API shapes
+
+const instantSchema = z.iso.datetime({ offset: true });
+
+export const HIT_STATES = ['new', 'ready', 'needs_you', 'applied', 'blocked', 'skipped'] as const;
+export type HitState = (typeof HIT_STATES)[number];
+
+/** `GET /api/job-search/profile`. */
+export const JobSearchSetupSchema = z.strictObject({
+  /** False when this account may not use the job search, or the server has no Anthropic key. */
+  available: z.boolean(),
+  profile: JobSearchProfileSchema.nullable(),
+  confirmedAt: instantSchema.nullable(),
+  /** The setup also needs a stored resume (Phase 14). */
+  hasResume: z.boolean(),
+});
+export type JobSearchSetup = z.infer<typeof JobSearchSetupSchema>;
+
+export const RunCountsSchema = z.strictObject({
+  found: z.number().int().min(0),
+  target: z.number().int().min(0),
+  keywordOnly: z.number().int().min(0),
+  finishYourself: z.number().int().min(0),
+  skipped: z.number().int().min(0),
+  ready: z.number().int().min(0),
+  needsYou: z.number().int().min(0),
+  applied: z.number().int().min(0),
+  blocked: z.number().int().min(0),
+  notDrafted: z.number().int().min(0),
+});
+export type RunCounts = z.infer<typeof RunCountsSchema>;
+
+export const JobSearchRunSchema = z.strictObject({
+  id: z.uuid(),
+  trigger: z.enum(['schedule', 'manual']),
+  status: z.enum(['running', 'done', 'failed']),
+  searches: z.number().int().min(0),
+  error: z.string().nullable(),
+  startedAt: instantSchema,
+  finishedAt: instantSchema.nullable(),
+  counts: RunCountsSchema,
+});
+export type JobSearchRun = z.infer<typeof JobSearchRunSchema>;
+
+export const JobHitSchema = z.strictObject({
+  id: z.uuid(),
+  runId: z.uuid(),
+  source: z.enum(SEARCH_SOURCES),
+  company: z.string(),
+  role: z.string(),
+  location: z.string().nullable(),
+  workMode: z.enum(WORK_MODES).nullable(),
+  postedAt: instantSchema.nullable(),
+  jobLink: z.string(),
+  applyLink: z.string(),
+  kind: z.enum(HIT_KINDS),
+  reason: z.string(),
+  state: z.enum(HIT_STATES),
+  questions: z.array(ApplicationQuestionSchema).nullable(),
+  draft: ApplicationDraftSchema.nullable(),
+  draftError: z.string().nullable(),
+  blockReason: z.string().nullable(),
+  applicationId: z.uuid().nullable(),
+  createdAt: instantSchema,
+});
+export type JobHit = z.infer<typeof JobHitSchema>;
+
+export const JobSearchRunListSchema = z.strictObject({ items: z.array(JobSearchRunSchema) });
+export const JobSearchRunDetailSchema = z.strictObject({
+  run: JobSearchRunSchema,
+  hits: z.array(JobHitSchema),
+});
+export type JobSearchRunDetail = z.infer<typeof JobSearchRunDetailSchema>;
+
+/** `GET /api/job-search/queue`: what is waiting, across runs. */
+export const ApplyQueueSchema = z.strictObject({
+  ready: z.array(JobHitSchema),
+  needsYou: z.array(JobHitSchema),
+  finishYourself: z.array(JobHitSchema),
+  keywordOnly: z.array(JobHitSchema),
+  /** Target jobs not drafted yet (drafting continues on the next run or by hand). */
+  notDrafted: z.number().int().min(0),
+});
+export type ApplyQueue = z.infer<typeof ApplyQueueSchema>;
+
+export const BlockHitSchema = z.strictObject({ reason: required(500) });
+export const DraftEditSchema = z.strictObject({
+  answers: z
+    .array(z.strictObject({ question: z.string().max(1000), answer: z.string().max(4000) }))
+    .max(100),
+  coverLetter: z.string().max(5000),
+});
+export type DraftEdit = z.infer<typeof DraftEditSchema>;

@@ -5,6 +5,7 @@ import type { GoogleProvider } from '../auth/google';
 import { FetchError, type PageFetcher } from '../postings/fetchPage';
 import type { EmailClassifier } from '../import/classify';
 import type { ResumeAnalyzer } from '../resume/analyze';
+import type { JobSearchClaude } from '../jobsearch/claude';
 import type { GmailClient } from '../import/gmail';
 import type { GmailAuthorizer } from '../import/gmailAuth';
 import { createSession } from '../auth/sessions';
@@ -60,6 +61,8 @@ export interface TestAppOptions {
   classifier?: EmailClassifier | null;
   /** Resume analyzer stub (default: not configured). */
   resumeAnalyzer?: ResumeAnalyzer | null;
+  /** Job search Claude stub (default: not configured). */
+  jobSearchClaude?: JobSearchClaude | null;
   /** Add extra routes (a probe) before the app starts. */
   configure?: (app: FastifyInstance) => void;
 }
@@ -81,6 +84,7 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     ...(options.gmail ? { gmail: options.gmail } : {}),
     classifier: options.classifier ?? null,
     resumeAnalyzer: options.resumeAnalyzer ?? null,
+    jobSearchClaude: options.jobSearchClaude ?? null,
     validateResponses: true,
   });
   options.configure?.(app);

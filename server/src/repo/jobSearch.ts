@@ -1,0 +1,433 @@
+import {
+  ApplicationDraftSchema,
+  ApplicationQuestionSchema,
+  JobSearchProfileSchema,
+  type ApplicationDraft,
+  type ApplicationQuestion,
+  type HitKind,
+  type HitState,
+  type JobHit,
+  type JobSearchProfile,
+  type JobSearchRun,
+  type RunCounts,
+  type SearchSource,
+  type WorkMode,
+} from '@jat/shared';
+import { z } from 'zod';
+import type { Queryable } from '../db/types';
+
+/**
+ * All SQL for the job search: the profile, runs and hits. Every statement is scoped by `user_id`,
+ * so someone else's run or hit behaves exactly like one that does not exist.
+ */
+
+// ---------- Profile ----------
+
+export async function getProfile(
+  db: Queryable,
+  userId: string,
+): Promise<{ profile: JobSearchProfile; confirmedAt: Date } | null> {
+  const result = await db.query<{ profile: unknown; confirmed_at: Date }>(
+    'select profile, confirmed_at from job_search_profiles where user_id = $1',
+    [userId],
+  );
+  const row = result.rows[0];
+  if (!row) return null;
+  // A stored profile that no longer parses (the schema grew) is treated as not set up.
+  const parsed = JobSearchProfileSchema.safeParse(row.profile);
+  return parsed.success ? { profile: parsed.data, confirmedAt: row.confirmed_at } : null;
+}
+
+export async function saveProfile(
+  db: Queryable,
+  userId: string,
+  profile: JobSearchProfile,
+  now: Date,
+): Promise<Date> {
+  const result = await db.query<{ confirmed_at: Date }>(
+    `insert into job_search_profiles (user_id, profile, confirmed_at, updated_at)
+      values ($1, $2, $3, $3)
+      on conflict (user_id) do update set profile = excluded.profile, updated_at = excluded.updated_at
+      returning confirmed_at`,
+    [userId, JSON.stringify(profile), now],
+  );
+  return (result.rows[0] as { confirmed_at: Date }).confirmed_at;
+}
+
+// ---------- Runs ----------
+
+interface RunRow {
+  id: string;
+  trigger: 'schedule' | 'manual';
+  status: 'running' | 'done' | 'failed';
+  searches: number;
+  error: string | null;
+  started_at: Date;
+  finished_at: Date | null;
+  found: number;
+  target: number;
+  keyword_only: number;
+  finish_yourself: number;
+  skipped: number;
+  ready: number;
+  needs_you: number;
+  applied: number;
+  blocked: number;
+  not_drafted: number;
+}
+
+const RUN_SELECT = `r.id, r.trigger, r.status, r.searches, r.error, r.started_at, r.finished_at,
+  count(h.id)::int as found,
+  count(h.id) filter (where h.kind = 'target')::int as target,
+  count(h.id) filter (where h.kind = 'keyword_only')::int as keyword_only,
+  count(h.id) filter (where h.kind = 'finish_yourself')::int as finish_yourself,
+  count(h.id) filter (where h.kind = 'skipped' or h.state = 'skipped')::int as skipped,
+  count(h.id) filter (where h.state = 'ready')::int as ready,
+  count(h.id) filter (where h.state = 'needs_you')::int as needs_you,
+  count(h.id) filter (where h.state = 'applied')::int as applied,
+  count(h.id) filter (where h.state = 'blocked')::int as blocked,
+  count(h.id) filter (where h.state = 'new' and h.kind in ('target', 'finish_yourself'))::int
+    as not_drafted
+  from job_search_runs r left join job_search_hits h on h.run_id = r.id`;
+
+function toRun(row: RunRow): JobSearchRun {
+  const counts: RunCounts = {
+    found: row.found,
+    target: row.target,
+    keywordOnly: row.keyword_only,
+    finishYourself: row.finish_yourself,
+    skipped: row.skipped,
+    ready: row.ready,
+    needsYou: row.needs_you,
+    applied: row.applied,
+    blocked: row.blocked,
+    notDrafted: row.not_drafted,
+  };
+  return {
+    id: row.id,
+    trigger: row.trigger,
+    status: row.status,
+    searches: row.searches,
+    error: row.error,
+    startedAt: row.started_at.toISOString(),
+    finishedAt: row.finished_at?.toISOString() ?? null,
+    counts,
+  };
+}
+
+/** A run that has been running this long is dead (the function limit is 300 s). */
+const STALE_RUN_MS = 10 * 60 * 1000;
+
+/**
+ * Starts a run, or returns null when one is already running. A run left running by a crash is
+ * marked failed first, so it cannot block searches for ever.
+ */
+export async function startRun(
+  db: Queryable,
+  userId: string,
+  trigger: 'schedule' | 'manual',
+  localDay: string,
+  now: Date,
+): Promise<string | null> {
+  await db.query(
+    `update job_search_runs set status = 'failed', error = 'Stopped before it finished',
+      finished_at = $3
+      where user_id = $1 and status = 'running' and started_at < $2`,
+    [userId, new Date(now.getTime() - STALE_RUN_MS), now],
+  );
+  const result = await db.query<{ id: string }>(
+    `insert into job_search_runs (user_id, trigger, local_day, started_at) values ($1, $2, $3, $4)
+      on conflict (user_id) where status = 'running' do nothing returning id`,
+    [userId, trigger, localDay, now],
+  );
+  return result.rows[0]?.id ?? null;
+}
+
+export async function finishRun(
+  db: Queryable,
+  runId: string,
+  outcome: { status: 'done' | 'failed'; searches: number; error: string | null },
+  now: Date,
+): Promise<void> {
+  await db.query(
+    `update job_search_runs set status = $2, searches = $3, error = $4, finished_at = $5
+      where id = $1`,
+    [runId, outcome.status, outcome.searches, outcome.error?.slice(0, 500) ?? null, now],
+  );
+}
+
+export async function lastScheduledRunDay(db: Queryable, userId: string): Promise<string | null> {
+  const result = await db.query<{ day: string }>(
+    `select to_char(max(local_day), 'YYYY-MM-DD') as day from job_search_runs
+      where user_id = $1 and trigger = 'schedule'`,
+    [userId],
+  );
+  return result.rows[0]?.day ?? null;
+}
+
+export async function listRuns(db: Queryable, userId: string, limit = 10): Promise<JobSearchRun[]> {
+  const result = await db.query<RunRow>(
+    `select ${RUN_SELECT} where r.user_id = $1 group by r.id order by r.started_at desc limit $2`,
+    [userId, limit],
+  );
+  return result.rows.map(toRun);
+}
+
+export async function getRun(
+  db: Queryable,
+  userId: string,
+  id: string,
+): Promise<JobSearchRun | null> {
+  const result = await db.query<RunRow>(
+    `select ${RUN_SELECT} where r.user_id = $1 and r.id = $2 group by r.id`,
+    [userId, id],
+  );
+  const row = result.rows[0];
+  return row ? toRun(row) : null;
+}
+
+// ---------- Hits ----------
+
+export interface HitInput {
+  runId: string;
+  source: SearchSource;
+  board: string;
+  jobId: string;
+  jobLink: string;
+  applyLink: string;
+  company: string;
+  role: string;
+  location: string | null;
+  workMode: WorkMode | null;
+  postedAt: Date | null;
+  kind: HitKind;
+  reason: string;
+  questions: ApplicationQuestion[] | null;
+}
+
+interface HitRow {
+  id: string;
+  run_id: string;
+  source: SearchSource;
+  job_link: string;
+  apply_link: string;
+  company: string;
+  role: string;
+  location: string | null;
+  work_mode: WorkMode | null;
+  posted_at: Date | null;
+  kind: HitKind;
+  reason: string;
+  state: HitState;
+  questions: unknown;
+  draft: unknown;
+  draft_error: string | null;
+  block_reason: string | null;
+  application_id: string | null;
+  created_at: Date;
+}
+
+const HIT_COLUMNS = `id, run_id, source, job_link, apply_link, company, role, location, work_mode,
+  posted_at, kind, reason, state, questions, draft, draft_error, block_reason, application_id,
+  created_at`;
+
+const QuestionsSchema = z.array(ApplicationQuestionSchema).nullable();
+
+function toHit(row: HitRow): JobHit {
+  const questions = QuestionsSchema.safeParse(row.questions);
+  const draft = ApplicationDraftSchema.nullable().safeParse(row.draft);
+  return {
+    id: row.id,
+    runId: row.run_id,
+    source: row.source,
+    company: row.company,
+    role: row.role,
+    location: row.location,
+    workMode: row.work_mode,
+    postedAt: row.posted_at?.toISOString() ?? null,
+    jobLink: row.job_link,
+    applyLink: row.apply_link,
+    kind: row.kind,
+    reason: row.reason,
+    state: row.state,
+    questions: questions.success ? questions.data : null,
+    draft: draft.success ? draft.data : null,
+    draftError: row.draft_error,
+    blockReason: row.block_reason,
+    applicationId: row.application_id,
+    createdAt: row.created_at.toISOString(),
+  };
+}
+
+/** The (source, board, job id) keys of jobs this user has already seen, to skip them early. */
+export async function seenJobKeys(db: Queryable, userId: string): Promise<Set<string>> {
+  const result = await db.query<{ key: string }>(
+    `select source || ':' || board || ':' || job_id as key from job_search_hits where user_id = $1`,
+    [userId],
+  );
+  return new Set(result.rows.map((row) => row.key));
+}
+
+/** Whether the tracker already has this job: the same link, or the same company and role. */
+export async function isTracked(
+  db: Queryable,
+  userId: string,
+  job: { links: string[]; company: string; role: string },
+): Promise<boolean> {
+  const result = await db.query(
+    `select 1 from applications where user_id = $1 and (
+        job_link = any($2) or (lower(company) = lower($3) and lower(role) = lower($4))
+      ) limit 1`,
+    [userId, job.links, job.company, job.role],
+  );
+  return result.rowCount > 0;
+}
+
+/** Saves a found job; returns null when the user already has it (another run got there first). */
+export async function insertHit(
+  db: Queryable,
+  userId: string,
+  input: HitInput,
+  now: Date,
+): Promise<string | null> {
+  const result = await db.query<{ id: string }>(
+    `insert into job_search_hits (user_id, run_id, source, board, job_id, job_link, apply_link,
+        company, role, location, work_mode, posted_at, kind, reason, state, questions, created_at,
+        updated_at)
+      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $17)
+      on conflict (user_id, source, board, job_id) do nothing returning id`,
+    [
+      userId,
+      input.runId,
+      input.source,
+      input.board.slice(0, 100),
+      input.jobId.slice(0, 200),
+      input.jobLink.slice(0, 2000),
+      input.applyLink.slice(0, 2000),
+      input.company.slice(0, 200),
+      input.role.slice(0, 200),
+      input.location?.slice(0, 200) ?? null,
+      input.workMode,
+      input.postedAt,
+      input.kind,
+      input.reason.slice(0, 300),
+      input.kind === 'skipped' ? 'skipped' : 'new',
+      input.questions === null ? null : JSON.stringify(input.questions),
+      now,
+    ],
+  );
+  return result.rows[0]?.id ?? null;
+}
+
+export async function getHit(db: Queryable, userId: string, id: string): Promise<JobHit | null> {
+  const result = await db.query<HitRow>(
+    `select ${HIT_COLUMNS} from job_search_hits where user_id = $1 and id = $2`,
+    [userId, id],
+  );
+  const row = result.rows[0];
+  return row ? toHit(row) : null;
+}
+
+export async function listRunHits(db: Queryable, userId: string, runId: string): Promise<JobHit[]> {
+  const result = await db.query<HitRow>(
+    `select ${HIT_COLUMNS} from job_search_hits where user_id = $1 and run_id = $2
+      order by case kind when 'target' then 0 when 'finish_yourself' then 1
+        when 'keyword_only' then 2 else 3 end, posted_at desc nulls last, created_at`,
+    [userId, runId],
+  );
+  return result.rows.map(toHit);
+}
+
+/** Every hit still waiting on something, newest first (at most 200). */
+export async function listOpenHits(db: Queryable, userId: string): Promise<JobHit[]> {
+  const result = await db.query<HitRow>(
+    `select ${HIT_COLUMNS} from job_search_hits
+      where user_id = $1 and kind <> 'skipped' and state in ('new', 'ready', 'needs_you')
+      order by posted_at desc nulls last, created_at desc limit 200`,
+    [userId],
+  );
+  return result.rows.map(toHit);
+}
+
+/** Targets (and finish-yourself jobs) still waiting for a draft, oldest first. */
+export async function listUndrafted(
+  db: Queryable,
+  userId: string,
+  limit: number,
+): Promise<JobHit[]> {
+  const result = await db.query<HitRow>(
+    `select ${HIT_COLUMNS} from job_search_hits
+      where user_id = $1 and state = 'new' and kind in ('target', 'finish_yourself')
+      order by created_at, id limit $2`,
+    [userId, limit],
+  );
+  return result.rows.map(toHit);
+}
+
+export async function saveDraft(
+  db: Queryable,
+  userId: string,
+  id: string,
+  outcome: { draft: ApplicationDraft; needsYou: boolean } | { error: string },
+  now: Date,
+): Promise<void> {
+  if ('error' in outcome) {
+    await db.query(
+      `update job_search_hits set draft_error = $3, updated_at = $4
+        where user_id = $1 and id = $2 and state = 'new'`,
+      [userId, id, outcome.error.slice(0, 300), now],
+    );
+    return;
+  }
+  // Only a job still in the queue: one marked applied or skipped meanwhile keeps its state.
+  await db.query(
+    `update job_search_hits set draft = $3, state = $4, draft_error = null, updated_at = $5
+      where user_id = $1 and id = $2 and state in ('new', 'ready', 'needs_you')`,
+    [userId, id, JSON.stringify(outcome.draft), outcome.needsYou ? 'needs_you' : 'ready', now],
+  );
+}
+
+export async function setHitState(
+  db: Queryable,
+  userId: string,
+  id: string,
+  change: {
+    state: HitState;
+    kind?: HitKind;
+    blockReason?: string | null;
+    applicationId?: string | null;
+  },
+  now: Date,
+): Promise<boolean> {
+  const result = await db.query(
+    `update job_search_hits set state = $3, kind = coalesce($4, kind),
+        block_reason = case when $5::boolean then $6 else block_reason end,
+        application_id = coalesce($7, application_id), updated_at = $8
+      where user_id = $1 and id = $2`,
+    [
+      userId,
+      id,
+      change.state,
+      change.kind ?? null,
+      change.blockReason !== undefined,
+      change.blockReason ?? null,
+      change.applicationId ?? null,
+      now,
+    ],
+  );
+  return result.rowCount > 0;
+}
+
+/** Everything, for the data export. */
+export async function exportJobSearch(
+  db: Queryable,
+  userId: string,
+): Promise<{ profile: JobSearchProfile | null; runs: JobSearchRun[]; hits: JobHit[] }> {
+  const profile = await getProfile(db, userId);
+  const runs = await listRuns(db, userId, 1000);
+  const hits = await db.query<HitRow>(
+    `select ${HIT_COLUMNS} from job_search_hits where user_id = $1 order by created_at`,
+    [userId],
+  );
+  return { profile: profile?.profile ?? null, runs, hits: hits.rows.map(toHit) };
+}

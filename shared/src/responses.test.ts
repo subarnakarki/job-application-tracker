@@ -78,6 +78,7 @@ describe('response contracts', () => {
         imports: { runs: [], items: [] },
         resume: null,
         resumeAnalyses: [],
+        jobSearch: { profile: null, runs: [], hits: [] },
       }).success,
     ).toBe(true);
   });

@@ -13,6 +13,7 @@ import type { Db } from '../db/types';
 import { ApiError, parseInput } from '../http/errors';
 import { deleteUser, listAllWithHistory } from '../repo/applications';
 import { listAllImports } from '../repo/imports';
+import { exportJobSearch } from '../repo/jobSearch';
 import { getResume, listAllAnalyses } from '../repo/resumes';
 import { presentDetail } from '../repo/present';
 import { presentImportItem, presentImportRun } from './import';
@@ -84,6 +85,7 @@ export function registerMeRoutes(app: FastifyInstance, db: Db | undefined): void
       const leads = await listAllLeadDetails(db, user.id);
       const resume = await getResume(db, user.id);
       const resumeAnalyses = await listAllAnalyses(db, user.id);
+      const jobSearch = await exportJobSearch(db, user.id);
       void reply.header(
         'content-disposition',
         `attachment; filename="job-applications-${localDateIn(now, user.timeZone)}.json"`,
@@ -102,6 +104,7 @@ export function registerMeRoutes(app: FastifyInstance, db: Db | undefined): void
         },
         resume,
         resumeAnalyses,
+        jobSearch,
       };
     },
   );

@@ -25,6 +25,8 @@ const PUBLIC_ROUTES = [
   'GET /api/auth/google/callback',
   'POST /api/auth/demo',
   'POST /api/auth/logout',
+  // Scheduled job search: refused without the shared secret (see jobSearch.test.ts).
+  'POST /api/cron/job-search',
 ].sort();
 /** Public, but only registered when test routes are enabled, and always behind the secret. */
 const PUBLIC_TEST_ROUTES = ['POST /api/test/login', 'POST /api/test/cleanup'].sort();
@@ -55,6 +57,13 @@ const ISOLATION_COVERAGE: Record<string, string> = {
   'POST /api/import/items/:id/dismiss': 'server/src/routes/import.test.ts',
   'GET /api/resume/analyses/:id': 'server/src/routes/resume.test.ts',
   'POST /api/applications/:id/resume-match': 'server/src/routes/resume.test.ts',
+  'GET /api/job-search/runs/:id': 'server/src/routes/jobSearch.test.ts',
+  'POST /api/job-search/hits/:id/applied': 'server/src/routes/jobSearch.test.ts',
+  'POST /api/job-search/hits/:id/blocked': 'server/src/routes/jobSearch.test.ts',
+  'POST /api/job-search/hits/:id/skip': 'server/src/routes/jobSearch.test.ts',
+  'POST /api/job-search/hits/:id/queue': 'server/src/routes/jobSearch.test.ts',
+  'POST /api/job-search/hits/:id/redraft': 'server/src/routes/jobSearch.test.ts',
+  'PUT /api/job-search/hits/:id/draft': 'server/src/routes/jobSearch.test.ts',
   'DELETE /api/resume/analyses/:id': 'server/src/routes/resume.test.ts',
 };
 

@@ -26,6 +26,8 @@ import { gmailRestClient, type GmailClient } from './import/gmail';
 import { gmailAuthorizerFromEnv, type GmailAuthorizer } from './import/gmailAuth';
 import { registerMeRoutes } from './routes/me';
 import { registerResumeRoutes } from './routes/resume';
+import { registerJobSearchRoutes } from './routes/jobSearch';
+import { jobSearchClaudeFromEnv, type JobSearchClaude } from './jobsearch/claude';
 import { analyzerFromEnv, type ResumeAnalyzer } from './resume/analyze';
 import { registerSessionRoutes } from './routes/session';
 import { registerTestRoutes, registerTestSecretGuard } from './routes/testSupport';
@@ -46,6 +48,8 @@ export interface AppDeps {
   classifier?: EmailClassifier | null;
   /** Resume analysis (Claude as a recruiter). Defaults to the real one when ANTHROPIC_API_KEY is set. */
   resumeAnalyzer?: ResumeAnalyzer | null;
+  /** Job search: web search and drafting with Claude. Defaults to the real one with a key. */
+  jobSearchClaude?: JobSearchClaude | null;
   /** Reads pasted posting links. Defaults to the guarded real fetcher; tests pass a stub. */
   fetchPage?: PageFetcher;
   /** Validate every response against its route contract (tests). */
@@ -120,6 +124,14 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     clock,
     analyzer: deps.resumeAnalyzer === undefined ? analyzerFromEnv(env) : deps.resumeAnalyzer,
     fetchPage,
+  });
+  registerJobSearchRoutes(app, {
+    db: deps.db,
+    clock,
+    env,
+    claude: deps.jobSearchClaude === undefined ? jobSearchClaudeFromEnv(env) : deps.jobSearchClaude,
+    fetchPage,
+    fetchBoard,
   });
   if (testRoutes) registerTestRoutes(app, { db: deps.db, clock });
 

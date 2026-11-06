@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { SOURCES, STATUSES, WORK_MODES } from './constants';
+import { JobHitSchema, JobSearchProfileSchema, JobSearchRunSchema } from './jobSearch';
 import { ResumeAnalysisSchema, ResumeSchema } from './resume';
 
 /**
@@ -281,6 +282,12 @@ export const DataExportSchema = z.strictObject({
   /** The stored resume, described (its file is a separate download: GET /api/resume/file). */
   resume: ResumeSchema.nullable(),
   resumeAnalyses: z.array(ResumeAnalysisSchema),
+  /** The job search setup, every run and every job it found. */
+  jobSearch: z.strictObject({
+    profile: JobSearchProfileSchema.nullable(),
+    runs: z.array(JobSearchRunSchema),
+    hits: z.array(JobHitSchema),
+  }),
 });
 export type DataExport = z.infer<typeof DataExportSchema>;
 
