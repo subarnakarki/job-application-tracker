@@ -13,6 +13,9 @@ import { googleProviderFromEnv, type GoogleProvider } from './auth/google';
 import { registerApplicationRoutes } from './routes/applications';
 import { registerGoogleRoutes } from './routes/google';
 import { createPageFetcher, type PageFetcher } from './postings/fetchPage';
+
+/** Size cap for reading a company's whole job board. */
+const BOARD_MAX_BYTES = 10 * 1024 * 1024;
 import { registerInterviewRoutes } from './routes/interviews';
 import { registerPostingRoutes } from './routes/postings';
 import { registerLeadRoutes } from './routes/leads';
@@ -91,11 +94,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   registerApplicationRoutes(app, { db: deps.db, clock });
   registerLeadRoutes(app, { db: deps.db, clock });
   registerInterviewRoutes(app, { db: deps.db, clock });
-  registerPostingRoutes(app, {
-    db: deps.db,
-    clock,
-    fetchPage: deps.fetchPage ?? createPageFetcher(),
-  });
+  const fetchPage = deps.fetchPage ?? createPageFetcher();
+  registerPostingRoutes(app, { db: deps.db, clock, fetchPage });
   registerImportRoutes(app, {
     db: deps.db,
     clock,
@@ -104,6 +104,11 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       deps.gmailAuthorizer === undefined ? gmailAuthorizerFromEnv(env) : deps.gmailAuthorizer,
     gmail: deps.gmail ?? gmailRestClient,
     classifier: deps.classifier === undefined ? classifierFromEnv(env) : deps.classifier,
+    postings: {
+      fetchPage,
+      // A company's whole job board (every open job) can be several MB.
+      fetchBoard: deps.fetchPage ?? createPageFetcher({ maxBytes: BOARD_MAX_BYTES }),
+    },
   });
   if (testRoutes) registerTestRoutes(app, { db: deps.db, clock });
 

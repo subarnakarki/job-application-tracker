@@ -5,6 +5,11 @@ import { EmailVerdictSchema, type EmailVerdict } from './verdict';
 
 export const CLASSIFIER_MODEL = 'claude-opus-5-5';
 
+/** How an answer is read: a missing posting link is no link, not a reason to discard the answer. */
+const AnswerSchema = EmailVerdictSchema.extend({
+  postingUrl: EmailVerdictSchema.shape.postingUrl.default(null),
+});
+
 export type Classification =
   | { kind: 'verdict'; verdict: EmailVerdict }
   /** Refused, cut off, malformed or failed: the email goes to review instead. */
@@ -28,6 +33,10 @@ You are given one email. Decide what it says about a job application:
 - rejection: the company is not moving forward.
 - not_job_related: anything else, including job alerts, newsletters and recommendations.
 
+postingUrl is the link to the job posting itself (the job description on the company's careers
+site or a job board), copied exactly from the email's links; null when there is none. Never an
+unsubscribe, tracking, sign-in, calendar, survey or "check your application status" link.
+
 company is the hiring company (not the job board or the applicant tracking system, such as
 Greenhouse, Lever or Workday); use an empty string if it is not clear. role is the job title
 if the email names one, otherwise null. confidence is high only when the email is unambiguous.
@@ -47,6 +56,13 @@ export function renderEmail(message: GmailMessage): string {
     `Date: ${message.date?.toISOString() ?? 'unknown'}`,
     '',
     safe(message.body),
+    ...(message.links?.length
+      ? [
+          '',
+          'Links:',
+          ...message.links.map((link) => `- ${safe(link.text) || '(no text)'}: ${safe(link.url)}`),
+        ]
+      : []),
     '</email>',
   ].join('\n');
 }
@@ -71,7 +87,7 @@ export function claudeClassifier(client: Anthropic): EmailClassifier {
           return { kind: 'unclassified', reason: 'Answer was cut off' };
         }
         const text = response.content.find((block) => block.type === 'text')?.text ?? '';
-        const parsed = EmailVerdictSchema.safeParse(parseJson(text));
+        const parsed = AnswerSchema.safeParse(parseJson(text));
         return parsed.success
           ? { kind: 'verdict', verdict: parsed.data }
           : { kind: 'unclassified', reason: 'Unexpected answer' };

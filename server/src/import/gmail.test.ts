@@ -29,7 +29,33 @@ describe('parseMessage', () => {
       subject: 'Your application to Acme',
       date: new Date('2026-11-03T14:00:00Z'),
       body: 'Thanks for applying, café!',
+      links: [],
     });
+  });
+
+  it('keeps the links of an email, which its text alone would lose', () => {
+    const html =
+      '<p>Thanks! <a href="https://job-boards.greenhouse.io/acme/jobs/42?gh_src=x&amp;t=1">View the job</a> ' +
+      '<a href="mailto:jobs@acme.example">Mail us</a> <a href=\'https://acme.example/unsubscribe\'><b>Unsubscribe</b></a></p>';
+    const plain =
+      'See https://jobs.lever.co/acme/1234, or https://job-boards.greenhouse.io/acme/jobs/42?gh_src=x&t=1.';
+    const message = parseMessage({
+      id: 'm3',
+      payload: {
+        mimeType: 'multipart/alternative',
+        headers,
+        parts: [
+          { mimeType: 'text/html', body: { data: b64(html) } },
+          { mimeType: 'text/plain', body: { data: b64(plain) } },
+        ],
+      },
+    });
+
+    expect(message.links).toEqual([
+      { url: 'https://job-boards.greenhouse.io/acme/jobs/42?gh_src=x&t=1', text: 'View the job' },
+      { url: 'https://acme.example/unsubscribe', text: 'Unsubscribe' },
+      { url: 'https://jobs.lever.co/acme/1234', text: '' },
+    ]);
   });
 
   it('falls back to the text of an HTML-only email, without scripts or styles', () => {

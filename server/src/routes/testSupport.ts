@@ -54,7 +54,10 @@ const ImportBody = z.strictObject({
           .number()
           .min(0)
           .max(24 * 365),
-        verdict: EmailVerdictSchema.nullable(),
+        // Seeds may leave the posting link out.
+        verdict: EmailVerdictSchema.extend({
+          postingUrl: z.string().max(2000).nullable().default(null),
+        }).nullable(),
       }),
     )
     .max(20),

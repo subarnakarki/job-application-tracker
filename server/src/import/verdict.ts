@@ -16,6 +16,8 @@ export const EmailVerdictSchema = z.strictObject({
   role: z.string().max(200).nullable(),
   confidence: z.enum(CONFIDENCES),
   summary: z.string().max(300),
+  /** The job posting's link, if the email has one: checked against the email's own links before use. */
+  postingUrl: z.string().max(2000).nullable(),
 });
 export type EmailVerdict = z.infer<typeof EmailVerdictSchema>;
 

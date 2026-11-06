@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { runMigrations } from '../db/migrate';
 import {
@@ -19,10 +20,32 @@ import { createTestDb, TEST_DATABASE_URL, type TestDb } from '../test/testDb';
 import { applyItem, dismissItem, undoItem } from './actions';
 import { ClassifierUnavailableError, type Classification, type EmailClassifier } from './classify';
 import { GmailError, type GmailClient, type GmailMessage } from './gmail';
+import { FetchError, type PageFetcher } from '../postings/fetchPage';
+import { suggestionsOf } from '../repo/postingSuggestions';
 import { ImportAlreadyRunningError, runImport, type ImportDeps } from './run';
 import type { EmailVerdict } from './verdict';
 
 const HOUR = 60 * 60 * 1000;
+
+const fixture = (name: string) =>
+  readFileSync(new URL(`../postings/fixtures/${name}`, import.meta.url), 'utf8');
+
+/** The internet, as far as these tests go: the given URLs, and 404 for everything else. */
+function internet(map: Record<string, string>): PageFetcher & { asked: string[] } {
+  const asked: string[] = [];
+  const fetcher = (url: string) => {
+    asked.push(url);
+    const text = map[url];
+    return text === undefined
+      ? Promise.reject(new FetchError('http_status', '404'))
+      : Promise.resolve({ url, contentType: 'application/json', text });
+  };
+  return Object.assign(fetcher, { asked });
+}
+
+const FIGMA_JOB = JSON.parse(fixture('greenhouse-job-pay.json')) as { id: number };
+const FIGMA_LINK = `https://job-boards.greenhouse.io/figma/jobs/${FIGMA_JOB.id}`;
+const FIGMA_API = `https://boards-api.greenhouse.io/v1/boards/figma/jobs/${FIGMA_JOB.id}?pay_transparency=true`;
 
 function email(id: string, hoursAgo: number): GmailMessage {
   return {
@@ -38,6 +61,7 @@ function verdict(overrides: Partial<EmailVerdict>): Classification {
   return {
     kind: 'verdict',
     verdict: {
+      postingUrl: null,
       kind: 'rejection',
       company: 'Acme',
       role: 'SDET',
@@ -301,6 +325,109 @@ describe.skipIf(!TEST_DATABASE_URL)('Gmail import (real Postgres, fake Gmail and
       );
 
       expect(await startRun(testDb.db, owner.userId, clock.now())).toBeTruthy();
+    });
+  });
+
+  describe('job details from the posting', () => {
+    const withLinks = (id: string, links: string[]) => ({
+      ...email(id, 1),
+      links: links.map((url) => ({ url, text: 'View the job' })),
+    });
+    const confirmation = (company: string, postingUrl: string | null, role: string | null = null) =>
+      verdict({ kind: 'application_confirmation', company, role, postingUrl });
+
+    it('fills a new application from the posting its email links to, and says so', async () => {
+      const web = internet({ [FIGMA_API]: fixture('greenhouse-job-pay.json') });
+      deps.postings = { fetchPage: web, fetchBoard: web };
+      inbox.add(withLinks('figma', [FIGMA_LINK]), confirmation('Figma', FIGMA_LINK));
+
+      const items = await itemsOf(await runImport(deps, owner, 'token'));
+      const item = items.get('figma');
+      expect(item?.reason).toBe(
+        'New application; filled from the posting: role, salary, location, posting date',
+      );
+      const app = await getApplication(testDb.db, owner.userId, item?.applicationId ?? '');
+      expect(app?.record).toMatchObject({
+        company: 'Figma',
+        role: 'Account Executive, Enterprise',
+        jobLink: FIGMA_LINK,
+        salaryMin: 165000,
+        salaryMax: 190000,
+        salaryCurrency: 'USD',
+      });
+    });
+
+    it('ignores a link the email does not contain, so a made-up one is never read', async () => {
+      const web = internet({ [FIGMA_API]: fixture('greenhouse-job-pay.json') });
+      deps.postings = { fetchPage: web, fetchBoard: internet({}) };
+      inbox.add(withLinks('other', []), confirmation('Figma', FIGMA_LINK, 'SDET'));
+
+      const item = (await itemsOf(await runImport(deps, owner, 'token'))).get('other');
+      const app = await getApplication(testDb.db, owner.userId, item?.applicationId ?? '');
+      expect(app?.record.jobLink).toBeNull();
+      expect(web.asked).toEqual([]);
+    });
+
+    it('keeps a link to an unknown site as the job link, without reading it', async () => {
+      const link = 'https://careers.somewhere.example/jobs/1';
+      const web = internet({});
+      deps.postings = { fetchPage: web, fetchBoard: internet({}) };
+      inbox.add(withLinks('site', [link]), confirmation('Somewhere', link, 'SDET'));
+
+      const item = (await itemsOf(await runImport(deps, owner, 'token'))).get('site');
+      const app = await getApplication(testDb.db, owner.userId, item?.applicationId ?? '');
+      expect(app?.record.jobLink).toBe(link);
+      expect(web.asked).toEqual([]);
+    });
+
+    it('with no link, finds the posting on the company’s job board and saves it as a suggestion', async () => {
+      const stripe = internet({
+        'https://boards-api.greenhouse.io/v1/boards/stripe/jobs': fixture('greenhouse-board.json'),
+      });
+      deps.postings = { fetchPage: internet({}), fetchBoard: stripe };
+      inbox.add(email('stripe', 1), confirmation('Stripe', null, 'Abuse Investigator'));
+
+      const item = (await itemsOf(await runImport(deps, owner, 'token'))).get('stripe');
+      expect(item?.reason).toBe('New application; a possible posting was found on Greenhouse');
+      const app = await getApplication(testDb.db, owner.userId, item?.applicationId ?? '');
+      // Never applied by itself: the application is as the email left it.
+      expect(app?.record).toMatchObject({
+        role: 'Abuse Investigator',
+        jobLink: null,
+        location: null,
+      });
+      expect(app?.suggestion).toMatchObject({
+        source: 'greenhouse',
+        jobLink: 'https://stripe.com/jobs/search?gh_jid=8172487',
+      });
+    });
+
+    it('never fails the import when postings or boards cannot be read', async () => {
+      const broken: PageFetcher = () => Promise.reject(new Error('network down'));
+      deps.postings = { fetchPage: broken, fetchBoard: broken };
+      inbox.add(withLinks('a', [FIGMA_LINK]), confirmation('Figma', FIGMA_LINK, 'SDET'));
+      inbox.add(email('b', 2), confirmation('Stripe', null, 'Abuse Investigator'));
+
+      const items = await itemsOf(await runImport(deps, owner, 'token'));
+      expect([...items.values()].map((item) => item.outcome)).toEqual(['created', 'created']);
+      const ids = [...items.values()].map((item) => item.applicationId ?? '');
+      expect([...(await suggestionsOf(testDb.db, ids)).values()]).toEqual([null, null]);
+    });
+
+    it('undoing a created application removes its suggestion with it', async () => {
+      const stripe = internet({
+        'https://boards-api.greenhouse.io/v1/boards/stripe/jobs': fixture('greenhouse-board.json'),
+      });
+      deps.postings = { fetchPage: internet({}), fetchBoard: stripe };
+      inbox.add(email('undo', 1), confirmation('Stripe', null, 'Abuse Investigator'));
+      const item = (await itemsOf(await runImport(deps, owner, 'token'))).get('undo');
+
+      expect((await undoItem(testDb.db, owner, item?.id ?? '', clock.now())).kind).toBe('done');
+      expect(
+        (await suggestionsOf(testDb.db, [item?.applicationId ?? ''])).get(
+          item?.applicationId ?? '',
+        ),
+      ).toBeNull();
     });
   });
 

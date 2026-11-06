@@ -9,6 +9,7 @@ import {
 
 function verdict(overrides: Partial<EmailVerdict> = {}): EmailVerdict {
   return {
+    postingUrl: null,
     kind: 'rejection',
     company: 'Acme',
     role: 'SDET',

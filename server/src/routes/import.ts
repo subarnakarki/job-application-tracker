@@ -21,7 +21,7 @@ import {
   serializeImportCookie,
   type GmailAuthorizer,
 } from '../import/gmailAuth';
-import { ImportAlreadyRunningError, runImport } from '../import/run';
+import { ImportAlreadyRunningError, runImport, type ImportDeps } from '../import/run';
 import type { Owner } from '../repo/applications';
 import {
   getRun,
@@ -60,6 +60,8 @@ export interface ImportRouteDeps {
   authorizer: GmailAuthorizer | null;
   gmail: GmailClient;
   classifier: EmailClassifier | null;
+  /** Reading the job postings of the applications an import creates (see runImport). */
+  postings?: ImportDeps['postings'];
 }
 
 export function presentImportItem(item: ImportItem): ImportItemView {
@@ -228,7 +230,13 @@ export function registerImportRoutes(app: FastifyInstance, deps: ImportRouteDeps
           `${origin(request, deps.env)}${GMAIL_CALLBACK_PATH}`,
         );
         const runId = await runImport(
-          { db: db(), gmail: deps.gmail, classifier, clock: deps.clock },
+          {
+            db: db(),
+            gmail: deps.gmail,
+            classifier,
+            clock: deps.clock,
+            ...(deps.postings ? { postings: deps.postings } : {}),
+          },
           owner,
           accessToken,
         );

@@ -34,6 +34,19 @@ export const BOARD_SOURCES = [
 ] as const;
 export type BoardSource = (typeof BOARD_SOURCES)[number];
 
+/** How each board is named to people. */
+export const BOARD_LABELS: Record<BoardSource, string> = {
+  greenhouse: 'Greenhouse',
+  lever: 'Lever',
+  ashby: 'Ashby',
+  rippling: 'Rippling',
+  smartrecruiters: 'SmartRecruiters',
+  breezy: 'Breezy HR',
+  recruitee: 'Recruitee',
+  teamtailor: 'Teamtailor',
+  personio: 'Personio',
+};
+
 const SLUG = /^[A-Za-z0-9_.-]{1,100}$/;
 const SUBDOMAIN = /^[a-z0-9][a-z0-9-]{0,62}$/;
 const UUID = /^[0-9a-f-]{36}$/i;

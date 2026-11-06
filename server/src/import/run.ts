@@ -1,4 +1,11 @@
-import { ApplicationInputSchema, localDateIn, resolveDateApplied, type Status } from '@jat/shared';
+import {
+  ApplicationInputSchema,
+  isHttpUrl,
+  LIMITS,
+  localDateIn,
+  resolveDateApplied,
+  type Status,
+} from '@jat/shared';
 import type { Clock } from '../clock';
 import type { Db } from '../db/types';
 import {
@@ -18,14 +25,58 @@ import {
 } from '../repo/imports';
 import type { Classification, EmailClassifier } from './classify';
 import { GmailError, gmailQuery, MAX_MESSAGES, type GmailClient, type GmailMessage } from './gmail';
-import { decide } from './verdict';
-import { UNKNOWN_ROLE } from '../postings/fill';
+import { decide, type EmailVerdict } from './verdict';
+import { BOARD_LABELS, siteOf } from '../postings/boards';
+import type { Details } from '../postings/details';
+import type { PageFetcher } from '../postings/fetchPage';
+import { fillEmpty, UNKNOWN_ROLE, type Fillable } from '../postings/fill';
+import { findOnBoards } from '../postings/lookup';
+import { isSignInSite, readPosting } from '../postings/preview';
+import { saveSuggestion } from '../repo/postingSuggestions';
 
 export interface ImportDeps {
   db: Db;
   gmail: GmailClient;
   classifier: EmailClassifier;
   clock: Clock;
+  /** Reading job postings for the applications an import creates. Without it, none are read. */
+  postings?: {
+    /** For a posting link (the usual 2 MB cap). */
+    fetchPage: PageFetcher;
+    /** For a company's whole job board, which can be several MB. */
+    fetchBoard: PageFetcher;
+  };
+}
+
+/** At most this many posting links read, and board lookups made, per import (a run has 300 s). */
+export const MAX_POSTING_READS = 20;
+export const MAX_BOARD_LOOKUPS = 8;
+
+/** Career-site hosts whose pages are known to carry JobPosting data, read automatically too. */
+const AUTO_READ_PAGES = /(^|\.)(teamtailor\.com|jobs\.personio\.(de|com))$/i;
+
+/**
+ * Whether a link from an email is read without asking: only known job boards. Anyone can send an
+ * email, so arbitrary links are kept as the job link but read only when the user asks.
+ */
+export function readsAutomatically(link: string): boolean {
+  const url = new URL(link);
+  return (
+    url.protocol === 'https:' && (siteOf(url).kind !== 'page' || AUTO_READ_PAGES.test(url.hostname))
+  );
+}
+
+/** The verdict's posting link, but only if it really is one of the email's own links. */
+export function postingLinkOf(verdict: EmailVerdict, message: GmailMessage | null): string | null {
+  const link = verdict.postingUrl?.trim();
+  if (!link || link.length > LIMITS.jobLink || !isHttpUrl(link)) return null;
+  return message?.links?.some((candidate) => candidate.url === link) ? link : null;
+}
+
+/** "Acme Careers <jobs@acme.example>" -> "jobs@acme.example". */
+export function senderAddress(from: string): string | null {
+  const address = /<([^<>\s]+@[^<>\s]+)>/.exec(from)?.[1] ?? /^\S+@\S+$/.exec(from.trim())?.[0];
+  return address ?? null;
 }
 
 /** This user already has an import running: only one at a time. */
@@ -56,6 +107,88 @@ interface Prepared {
   itemId: string;
   message: GmailMessage | null;
   classification: Classification;
+  /** The job posting link from the email, when it has one. */
+  link?: string | null;
+  /** What that posting says, when it was read. */
+  posting?: (Details & { jobLink: string }) | null;
+}
+
+/** An application this import created without posting details: worth a board lookup. */
+interface Created {
+  itemId: string;
+  applicationId: string;
+  company: string;
+  role: string;
+  sender: string | null;
+  reason: string;
+}
+
+/** Reads the posting links of job emails, on known job boards only. Failures just leave them unread. */
+async function readPostings(fetchPage: PageFetcher, prepared: Prepared[]): Promise<void> {
+  for (const item of prepared) {
+    if (item.classification.kind === 'verdict')
+      item.link = postingLinkOf(item.classification.verdict, item.message);
+  }
+  const toRead = prepared
+    .filter(
+      (item) =>
+        item.link &&
+        item.classification.kind === 'verdict' &&
+        item.classification.verdict.kind !== 'not_job_related' &&
+        !isSignInSite(new URL(item.link)) &&
+        readsAutomatically(item.link),
+    )
+    .slice(0, MAX_POSTING_READS);
+  await mapLimit(toRead, CONCURRENCY, async (item) => {
+    try {
+      item.posting = await readPosting(item.link ?? '', fetchPage);
+    } catch {
+      item.posting = null;
+    }
+  });
+}
+
+/** Looks the created applications up on public job boards and saves what is found as a suggestion. */
+async function lookUpBoards(deps: ImportDeps, owner: Owner, created: Created[]): Promise<void> {
+  const fetchBoard = deps.postings?.fetchBoard;
+  if (!fetchBoard) return;
+  await mapLimit(created.slice(0, MAX_BOARD_LOOKUPS), 3, async (entry) => {
+    try {
+      const match = await findOnBoards(
+        { company: entry.company, role: entry.role, senderEmail: entry.sender },
+        fetchBoard,
+      );
+      if (!match) return;
+      const { details } = match;
+      const saved = await saveSuggestion(
+        deps.db,
+        owner.userId,
+        entry.applicationId,
+        {
+          source: match.source,
+          jobLink: match.jobLink,
+          role: details.role,
+          salaryMin: details.salary?.min ?? null,
+          salaryMax: details.salary?.max ?? null,
+          salaryCurrency: details.salary?.currency ?? null,
+          location: details.location,
+          workMode: details.workMode,
+          postedOn: details.postedOn,
+        },
+        deps.clock.now(),
+      );
+      if (saved)
+        await updateItem(deps.db, owner.userId, entry.itemId, {
+          reason:
+            `${entry.reason}; a possible posting was found on ${BOARD_LABELS[match.source]}`.slice(
+              0,
+              200,
+            ),
+        });
+    } catch {
+      // A lookup is a bonus: it never fails the import.
+    }
+  });
 }
 
 /**
@@ -133,7 +266,13 @@ export async function runImport(
     prepared.sort(
       (a, b) => (a.message?.date?.getTime() ?? Infinity) - (b.message?.date?.getTime() ?? Infinity),
     );
-    for (const item of prepared) await applyOne(deps, owner, item);
+    if (deps.postings) await readPostings(deps.postings.fetchPage, prepared);
+    const created: Created[] = [];
+    for (const item of prepared) {
+      const result = await applyOne(deps, owner, item);
+      if (result) created.push(result);
+    }
+    await lookUpBoards(deps, owner, created);
 
     await finishRun(db, owner.userId, runId, {
       status: 'finished',
@@ -152,7 +291,12 @@ export async function runImport(
   }
 }
 
-async function applyOne(deps: ImportDeps, owner: Owner, prepared: Prepared): Promise<void> {
+/** Applies one email; returns the application it created when that one could use a board lookup. */
+async function applyOne(
+  deps: ImportDeps,
+  owner: Owner,
+  prepared: Prepared,
+): Promise<Created | void> {
   const { db, clock } = deps;
   const { itemId, message, classification } = prepared;
   const save = (fields: ItemFields) =>
@@ -193,9 +337,24 @@ async function applyOne(deps: ImportDeps, owner: Owner, prepared: Prepared): Pro
         applicationId: decision.applicationId,
       });
     case 'create': {
+      // What the email gave, then the empty fields filled from its posting (when it was read).
+      const base: Fillable = {
+        role: verdict.role?.trim() || UNKNOWN_ROLE,
+        jobLink: prepared.link ?? null,
+        salaryMin: null,
+        salaryMax: null,
+        salaryCurrency: null,
+        location: null,
+        workMode: null,
+        postedOn: null,
+      };
+      const { patch, filled } = prepared.posting
+        ? fillEmpty(base, prepared.posting)
+        : { patch: {}, filled: [] };
       const input = ApplicationInputSchema.safeParse({
         company: verdict.company.trim(),
-        role: verdict.role?.trim() || UNKNOWN_ROLE,
+        ...base,
+        ...patch,
         status: decision.status,
         dateApplied:
           importedDateApplied(null, decision.status, null, message?.date ?? null, owner.timeZone) ??
@@ -210,14 +369,29 @@ async function applyOne(deps: ImportDeps, owner: Owner, prepared: Prepared): Pro
       }
       if (created.kind === 'invalid')
         return review('Could not create it from this email', decision.status);
-      return save({
+      const reason = filled.length
+        ? `New application; filled from the posting: ${filled.join(', ')}`.slice(0, 200)
+        : 'New application';
+      await save({
         ...described,
         outcome: 'created',
-        reason: 'New application',
+        reason,
         applicationId: created.value.record.id,
         toStatus: created.value.record.status,
         appliedVersion: created.value.record.version,
       });
+      const role = verdict.role?.trim();
+      // Nothing read from a posting, but a role to look for: the company's job board may have it.
+      if (!prepared.posting && role)
+        return {
+          itemId,
+          applicationId: created.value.record.id,
+          company: verdict.company.trim(),
+          role,
+          sender: message ? senderAddress(message.from) : null,
+          reason,
+        };
+      return;
     }
     case 'change': {
       const candidate = candidates.find((app) => app.id === decision.applicationId);

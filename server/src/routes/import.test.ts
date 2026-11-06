@@ -42,6 +42,7 @@ const inbox: GmailClient & EmailClassifier & { owner: string } = {
         role: 'SDET',
         confidence: 'high',
         summary: 'Acme received the application.',
+        postingUrl: null,
       },
     });
   },

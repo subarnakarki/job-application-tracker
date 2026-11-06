@@ -3,6 +3,14 @@ import { z } from 'zod';
 /** The longest body the classifier sees; the opening of an email carries its meaning. */
 export const BODY_LIMIT = 8000;
 export const MAX_MESSAGES = 50;
+/** The most links of one email the classifier is shown (to pick the job posting from). */
+export const LINK_LIMIT = 25;
+
+/** A link in an email, with the words it was on (HTML loses its targets when turned into text). */
+export interface EmailLink {
+  url: string;
+  text: string;
+}
 
 /** One email, reduced to what classification and the results page need. */
 export interface GmailMessage {
@@ -10,6 +18,8 @@ export interface GmailMessage {
   from: string;
   subject: string;
   date: Date | null;
+  /** http(s) links in the email, in order, without duplicates. */
+  links?: EmailLink[];
   body: string;
 }
 
@@ -100,6 +110,40 @@ export function messageBody(payload: Part): string {
   return '';
 }
 
+const decodeEntities = (text: string) =>
+  text
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
+
+/** http(s) links of an email: anchors of its HTML (with their text) and bare URLs in its plain text. */
+export function messageLinks(payload: Part): EmailLink[] {
+  const found: EmailLink[] = [];
+  const html = findPart(payload, 'text/html');
+  if (html?.body?.data) {
+    for (const match of decode(html.body.data).matchAll(
+      /<a\b[^>]*\bhref\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi,
+    )) {
+      found.push({
+        url: decodeEntities(match[1] ?? '').trim(),
+        text: tidy(htmlToText(match[2] ?? '')).slice(0, 120),
+      });
+    }
+  }
+  const plain = findPart(payload, 'text/plain');
+  if (plain?.body?.data) {
+    for (const match of decode(plain.body.data).matchAll(/https?:\/\/[^\s<>"')\]]+/gi))
+      found.push({ url: match[0].replace(/[.,;:!?]+$/, ''), text: '' });
+  }
+  const seen = new Set<string>();
+  return found
+    .filter((link) => /^https?:\/\//i.test(link.url) && link.url.length <= 2000)
+    .filter((link) => !seen.has(link.url) && seen.add(link.url))
+    .slice(0, LINK_LIMIT);
+}
+
 export function parseMessage(raw: unknown): GmailMessage {
   const message = MessageSchema.parse(raw);
   const header = (name: string) =>
@@ -111,6 +155,7 @@ export function parseMessage(raw: unknown): GmailMessage {
     subject: header('subject').slice(0, 500),
     date: Number.isNaN(date.getTime()) ? null : date,
     body: messageBody(message.payload),
+    links: messageLinks(message.payload),
   };
 }
 
