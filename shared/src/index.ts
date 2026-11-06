@@ -3,6 +3,7 @@ export const APP_NAME = 'Job Application Tracker';
 export * from './constants';
 export * from './dates';
 export * from './followUp';
+export * from './jobSearch';
 export * from './patch';
 export * from './responses';
 export * from './resume';
