@@ -5,6 +5,7 @@ export * from './dates';
 export * from './followUp';
 export * from './patch';
 export * from './responses';
+export * from './resume';
 export * from './schemas';
 export * from './stats';
 export * from './status';
