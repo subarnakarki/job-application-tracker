@@ -404,7 +404,7 @@ Built as planned, with these changes from the table above:
 - **Find posting** (added after, on request): runs the same board lookup for an existing application with no
   job link (30 an hour per user), so applications imported before this phase can get a suggestion too.
 
-## Phase 14 plan: resume match (proposed, awaiting approval)
+## Phase 14 plan: resume match (approved)
 
 **Goal:** a user uploads their resume and gets a senior recruiter's read of it: the 20 job titles they are most
 qualified for, ranked, and for each title the keywords applicant tracking systems (and the recruiters searching
@@ -473,14 +473,15 @@ Tests, per the conventions:
 - **Opt-in eval** (not in CI, costs money): `npm run eval:resume` runs the real model on 5 sample resumes and
   checks the structure, that every title is a recognised one, and that keywords fit the title.
 
-### Open questions for the owner
+### Decided with the owner
 
-1. DOCX support in the first cut, or PDF and pasted text only (drops `mammoth` and its zip handling)?
-2. Store only the result (proposed), or also the resume text so 14c does not need the file again?
-3. Are 5 a day per user and 200 a day in total right, or should it be owner-only at first, as Gmail import was?
-4. Build 14c now or as a later phase?
+1. PDF and DOCX in the first cut, and pasted text.
+2. The resume PDF or DOCX and its text are stored from Phase 14 on (one current resume per user, deletable), since
+   Phase 15 needs them for scheduled runs and attaching. The analysis result is stored as above.
+3. 5 analyses a day per user and 200 a day in total.
+4. 14c is built after 14a and 14b, in this phase.
 
-## Phase 15 plan: scheduled job search, apply queue and Claude in Chrome (proposed, awaiting approval)
+## Phase 15 plan: scheduled job search, apply queue and Claude in Chrome (approved)
 
 **Goal:** make the owner's recurring job-application workflow as close to hands-off as is safe. Setup happens
 once. After that the tracker searches the job boards on a schedule and drafts every application. Claude in
@@ -658,10 +659,10 @@ The results decide the resume-attach option and whether drafts need the question
   - Mark applied putting the job on the board;
   - the summary counts.
 
-### Still open
+### Decided with the owner (open questions)
 
-1. Owner-only first (proposed), or open to every user with the caps?
-2. Should every draft wait for review in the tracker, or only the ones marked **needs you** (proposed)?
+1. Owner-only first (`JOB_SEARCH_USER_IDS`).
+2. Only drafts marked **needs you** wait for review in the tracker; the go check happens in Chrome.
 
 ## Planned but not built
 
