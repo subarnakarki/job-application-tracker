@@ -1,0 +1,113 @@
+import { describe, expect, it } from 'vitest';
+import { FetchError, type PageFetcher } from './fetchPage';
+import { PreviewError } from './preview';
+import {
+  jobPostingDescription,
+  proseInJson,
+  readPostingText,
+  textOfBody,
+  visibleText,
+} from './text';
+
+const PROSE = 'You will build Playwright suites in TypeScript and own CI/CD quality gates. '.repeat(
+  4,
+);
+
+/** A fetcher that answers from a map of URL -> body, and fails like a dead site otherwise. */
+function fetcher(pages: Record<string, string>): { fetchPage: PageFetcher; asked: string[] } {
+  const asked: string[] = [];
+  return {
+    asked,
+    fetchPage: (url) => {
+      asked.push(url);
+      const text = pages[url];
+      return text === undefined
+        ? Promise.reject(new FetchError('http_status', '404'))
+        : Promise.resolve({ url, contentType: 'text/html', text });
+    },
+  };
+}
+
+async function failure(promise: Promise<unknown>): Promise<string> {
+  try {
+    await promise;
+  } catch (error) {
+    if (error instanceof PreviewError) return error.code;
+    throw error;
+  }
+  throw new Error('expected a PreviewError');
+}
+
+describe('posting text', () => {
+  it("reads Greenhouse's escaped HTML content", () => {
+    const body = JSON.stringify({
+      id: 1,
+      title: 'SDET',
+      content: '&lt;p&gt;You will &lt;strong&gt;build&lt;/strong&gt; Playwright suites.&lt;/p&gt;',
+    });
+    expect(textOfBody(body)).toBe('You will build Playwright suites.');
+  });
+
+  it("reads Lever's description and requirement lists", () => {
+    const body = JSON.stringify({
+      text: 'SDET',
+      descriptionPlain: 'About the team.',
+      lists: [{ text: 'Requirements', content: '<li>Playwright</li><li>TypeScript</li>' }],
+    });
+    expect(textOfBody(body)).toBe('About the team.\nPlaywright TypeScript');
+  });
+
+  it('never takes the text of other jobs from a whole board', () => {
+    expect(
+      proseInJson({
+        jobs: [
+          { id: 'a', title: 'One', descriptionPlain: 'first job' },
+          { id: 'b', title: 'Two', descriptionPlain: 'second job' },
+        ],
+      }),
+    ).toEqual([]);
+  });
+
+  it('reads the JobPosting description on a page, including inside @graph', () => {
+    const html = `<html><script type="application/ld+json">${JSON.stringify({
+      '@graph': [{ '@type': 'Organization' }, { '@type': 'JobPosting', description: '<p>Hi</p>' }],
+    })}</script><body>other</body></html>`;
+    expect(jobPostingDescription(html)).toBe('Hi');
+  });
+
+  it('falls back to the visible text, without scripts, styles or navigation', () => {
+    const html =
+      '<nav>Menu</nav><script>evil()</script><style>p{}</style><main><h1>SDET</h1><p>Build &amp; test</p></main>';
+    expect(visibleText(html)).toBe('SDET Build & test');
+  });
+
+  it('reads a board link through its API', async () => {
+    const api = 'https://boards-api.greenhouse.io/v1/boards/acme/jobs/42?pay_transparency=true';
+    const { fetchPage, asked } = fetcher({ [api]: JSON.stringify({ content: PROSE }) });
+
+    expect(await readPostingText('https://job-boards.greenhouse.io/acme/jobs/42', fetchPage)).toBe(
+      PROSE.trim(),
+    );
+    expect(asked).toEqual([api]);
+  });
+
+  it('reads a plain careers page', async () => {
+    const url = 'https://careers.example.com/jobs/sdet';
+    const { fetchPage } = fetcher({ [url]: `<main><p>${PROSE}</p></main>` });
+    expect(await readPostingText(url, fetchPage)).toBe(PROSE.trim());
+  });
+
+  it('refuses sign-in sites, unreadable links and pages with no posting', async () => {
+    const { fetchPage } = fetcher({ 'https://careers.example.com/empty': '<p>Jobs</p>' });
+    expect(await failure(readPostingText('https://www.linkedin.com/jobs/view/1', fetchPage))).toBe(
+      'unsupported_site',
+    );
+    expect(await failure(readPostingText('not a url', fetchPage))).toBe('unreadable');
+    expect(await failure(readPostingText('https://careers.example.com/empty', fetchPage))).toBe(
+      'no_posting_data',
+    );
+    expect(await failure(readPostingText('https://careers.example.com/gone', fetchPage))).toBe(
+      'no_posting_data',
+    );
+  });
+});
