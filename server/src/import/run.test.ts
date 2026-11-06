@@ -109,6 +109,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Gmail import (real Postgres, fake Gmail and
         nextStep: null,
         nextStepDate: null,
         notes: '',
+        leadId: null,
       },
       clock.now(),
     );

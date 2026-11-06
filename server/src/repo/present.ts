@@ -45,6 +45,8 @@ export function presentApplication(
       context,
     ),
     isClosed: isClosed(record.status),
+    leadId: record.leadId,
+    leadName: record.leadName,
   };
 }
 

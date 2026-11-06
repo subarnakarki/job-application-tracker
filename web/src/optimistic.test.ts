@@ -26,6 +26,8 @@ function app(id: string, overrides: Partial<Application> = {}): Application {
     version: 3,
     needsFollowUp: true,
     isClosed: false,
+    leadId: null,
+    leadName: null,
     ...overrides,
   };
 }

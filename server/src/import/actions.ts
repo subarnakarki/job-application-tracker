@@ -135,6 +135,7 @@ export function applyItem(db: Db, owner: Owner, itemId: string, now: Date) {
     if (!input.success) return { conflict: 'The email does not name a company' };
     const created = await createApplication(db, owner, input.data, now);
     if (created.kind === 'limit_reached') return { conflict: 'Application limit reached' };
+    if (created.kind === 'invalid') return { conflict: 'Could not create it from this email' };
     return {
       outcome: 'created',
       applicationId: created.value.record.id,

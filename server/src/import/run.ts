@@ -188,6 +188,8 @@ async function applyOne(deps: ImportDeps, owner: Owner, prepared: Prepared): Pro
       if (created.kind === 'limit_reached') {
         return review('Application limit reached', decision.status);
       }
+      if (created.kind === 'invalid')
+        return review('Could not create it from this email', decision.status);
       return save({
         ...described,
         outcome: 'created',

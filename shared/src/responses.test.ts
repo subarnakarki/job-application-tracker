@@ -30,6 +30,8 @@ const application = {
   version: 1,
   needsFollowUp: false,
   isClosed: false,
+  leadId: null,
+  leadName: null,
 };
 const history = {
   id: ID,
@@ -60,6 +62,7 @@ describe('response contracts', () => {
         exportedAt: '2026-11-05T12:00:00.000Z',
         user,
         applications: [{ ...application, history: [history] }],
+        leads: [],
         imports: { runs: [], items: [] },
       }).success,
     ).toBe(true);

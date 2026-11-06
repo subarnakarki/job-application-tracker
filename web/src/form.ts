@@ -22,6 +22,8 @@ export interface FormValues {
   nextStep: string;
   nextStepDate: string;
   notes: string;
+  /** '' means no lead. */
+  leadId: string;
 }
 
 export const EMPTY_FORM: FormValues = {
@@ -38,6 +40,7 @@ export const EMPTY_FORM: FormValues = {
   nextStep: '',
   nextStepDate: '',
   notes: '',
+  leadId: '',
 };
 
 export function toFormValues(application: ApplicationDetail): FormValues {
@@ -55,6 +58,7 @@ export function toFormValues(application: ApplicationDetail): FormValues {
     nextStep: application.nextStep ?? '',
     nextStepDate: application.nextStepDate ?? '',
     notes: application.notes,
+    leadId: application.leadId ?? '',
   };
 }
 
@@ -80,6 +84,7 @@ export function toRaw(values: FormValues): Record<string, unknown> {
     nextStep: orNull(values.nextStep),
     nextStepDate: orNull(values.nextStepDate),
     notes: values.notes,
+    leadId: orNull(values.leadId),
   };
 }
 

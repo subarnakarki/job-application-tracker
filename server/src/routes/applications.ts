@@ -213,6 +213,8 @@ export function registerApplicationRoutes(app: FastifyInstance, deps: Applicatio
       if (result.kind === 'limit_reached') {
         throw new ApiError(409, 'limit_reached', `You can keep up to ${result.limit} applications`);
       }
+      if (result.kind === 'invalid')
+        throw new ApiError(400, 'validation_error', 'The request is invalid', result.issues);
       void reply.code(201).header('location', `/api/applications/${result.value.record.id}`);
       void reply.header('etag', etag(result.value.record.version));
       return presentDetail(result.value, context(request, owner));

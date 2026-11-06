@@ -270,3 +270,27 @@ export async function deleteLeadNote(
   );
   return (result.rowCount ?? 0) > 0;
 }
+
+/** Every lead with its notes and linked applications, for the data export (three queries in all). */
+export async function listAllLeadDetails(db: Queryable, userId: string): Promise<LeadDetail[]> {
+  const leads = await listLeads(db, userId);
+  const [notes, applications] = await Promise.all([
+    db.query<NoteRow & { lead_id: string }>(
+      `select lead_id, ${NOTE_COLUMNS} from lead_notes where user_id = $1
+        order by held_on desc, created_at desc`,
+      [userId],
+    ),
+    db.query<{ lead_id: string; id: string; company: string; role: string; status: Status }>(
+      `select lead_id, id, company, role, status from applications
+        where user_id = $1 and lead_id is not null order by updated_at desc, id`,
+      [userId],
+    ),
+  ]);
+  return leads.map((lead) => ({
+    ...lead,
+    notes: notes.rows.filter((row) => row.lead_id === lead.id).map(toNote),
+    applications: applications.rows
+      .filter((row) => row.lead_id === lead.id)
+      .map(({ id, company, role, status }) => ({ id, company, role, status })),
+  }));
+}

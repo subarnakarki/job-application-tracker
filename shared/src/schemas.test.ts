@@ -34,6 +34,7 @@ describe('ApplicationInputSchema (create)', () => {
       nextStep: null,
       nextStepDate: null,
       notes: '',
+      leadId: null,
     });
   });
 
@@ -52,6 +53,7 @@ describe('ApplicationInputSchema (create)', () => {
       nextStep: 'Onsite',
       nextStepDate: '2026-11-12',
       notes: 'Line one\nLine two',
+      leadId: '0b4f9c1e-7a52-4c8e-9f3d-2a6b8c1d5e70',
     };
     expect(ApplicationInputSchema.parse(full)).toEqual(full);
   });

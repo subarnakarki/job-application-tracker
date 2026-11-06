@@ -164,6 +164,66 @@ describe.skipIf(!TEST_DATABASE_URL)('leads API (real app, real database)', () =>
     expect(over.json()).toMatchObject({ error: 'limit_reached' });
   });
 
+  it("links applications to the user's own leads only, and unlinks them when the lead is deleted", async () => {
+    const owner = await t.login();
+    const stranger = await t.login();
+    const lead = detail(await call(owner.cookie, 'POST', '/api/leads', { name: 'Sam Rivera' }));
+    const theirs = detail(await call(stranger.cookie, 'POST', '/api/leads', { name: 'Not yours' }));
+
+    const linked = await call(owner.cookie, 'POST', '/api/applications', {
+      company: 'Globex',
+      role: 'SDET',
+      leadId: lead.id,
+    });
+    expect(linked.statusCode).toBe(201);
+    const application = linked.json<{
+      id: string;
+      version: number;
+      leadId: string;
+      leadName: string;
+    }>();
+    expect(application).toMatchObject({ leadId: lead.id, leadName: 'Sam Rivera' });
+
+    const foreign = await call(owner.cookie, 'POST', '/api/applications', {
+      company: 'Initech',
+      role: 'SDET',
+      leadId: theirs.id,
+    });
+    expect(foreign.statusCode).toBe(400);
+    expect(foreign.json()).toMatchObject({ issues: [{ path: 'leadId', message: 'No such lead' }] });
+    const foreignEdit = await t.app.inject({
+      method: 'PATCH',
+      url: `/api/applications/${application.id}`,
+      headers: {
+        cookie: owner.cookie,
+        ...SAME_ORIGIN,
+        'content-type': 'application/json',
+        'if-match': `"${application.version}"`,
+      },
+      payload: JSON.stringify({ leadId: theirs.id }),
+    });
+    expect(foreignEdit.statusCode).toBe(400);
+
+    const withApplication = detail(await call(owner.cookie, 'GET', `/api/leads/${lead.id}`));
+    expect(withApplication.applicationCount).toBe(1);
+    expect(withApplication.applications).toEqual([
+      { id: application.id, company: 'Globex', role: 'SDET', status: 'Saved' },
+    ]);
+    const csv = await call(owner.cookie, 'GET', '/api/applications/export.csv');
+    expect(csv.body.split('\r\n')[0]).toContain('Lead');
+    expect(csv.body).toContain('Sam Rivera');
+    const exported = (await call(owner.cookie, 'GET', '/api/me/export')).json<{
+      leads: { name: string }[];
+    }>();
+    expect(exported.leads.map((entry) => entry.name)).toEqual(['Sam Rivera']);
+
+    await call(owner.cookie, 'DELETE', `/api/leads/${lead.id}`);
+    const after = (
+      await call(owner.cookie, 'GET', `/api/applications/${application.id}`)
+    ).json<object>();
+    expect(after).toMatchObject({ company: 'Globex', leadId: null, leadName: null });
+  });
+
   describe('isolation: another user gets the same 404 as for an id that does not exist', () => {
     it.each([
       ['GET', 'lead'],

@@ -45,6 +45,8 @@ export interface ApplicationRecord {
   updatedAt: Date;
   lastActivityAt: Date;
   version: number;
+  leadId: string | null;
+  leadName: string | null;
 }
 
 export interface HistoryRecord {
@@ -77,11 +79,13 @@ const COLUMN = {
   nextStep: 'next_step',
   nextStepDate: 'next_step_date',
   notes: 'notes',
+  leadId: 'lead_id',
 } as const satisfies Record<EditableField, string>;
 
 const SELECT_COLUMNS = `id, company, role, status, date_applied, source, salary_min, salary_max,
   salary_currency, job_link, contact, next_step, next_step_date, notes, created_at, updated_at,
-  last_activity_at, version`;
+  last_activity_at, version, lead_id,
+  (select l.name from leads l where l.id = lead_id) as lead_name`;
 
 interface ApplicationRow {
   id: string;
@@ -102,6 +106,8 @@ interface ApplicationRow {
   updated_at: Date;
   last_activity_at: Date;
   version: number;
+  lead_id: string | null;
+  lead_name: string | null;
 }
 
 function toRecord(row: ApplicationRow): ApplicationRecord {
@@ -124,6 +130,8 @@ function toRecord(row: ApplicationRow): ApplicationRecord {
     updatedAt: row.updated_at,
     lastActivityAt: row.last_activity_at,
     version: row.version,
+    leadId: row.lead_id,
+    leadName: row.lead_name,
   };
 }
 
@@ -186,7 +194,23 @@ export function applicationLimit(owner: Pick<Owner, 'isDemo'>): number {
 }
 
 export type CreateResult =
-  { kind: 'created'; value: ApplicationWithHistory } | { kind: 'limit_reached'; limit: number };
+  | { kind: 'created'; value: ApplicationWithHistory }
+  | { kind: 'limit_reached'; limit: number }
+  | { kind: 'invalid'; issues: ValidationIssue[] };
+
+const NO_SUCH_LEAD: ValidationIssue = { path: 'leadId', message: 'No such lead' };
+
+/**
+ * Whether the lead exists and is this user's. Locks it (key share) until the transaction ends, so
+ * it cannot be deleted between this check and the write that links to it.
+ */
+async function ownsLead(tx: Queryable, userId: string, leadId: string): Promise<boolean> {
+  const result = await tx.query(
+    'select 1 from leads where id = $1 and user_id = $2 for key share',
+    [leadId, userId],
+  );
+  return (result.rowCount ?? 0) > 0;
+}
 
 /**
  * Creates an application and its first history row. The owner's user row is
@@ -208,6 +232,8 @@ export async function createApplication(
     );
     const limit = applicationLimit(owner);
     if ((counted.rows[0]?.n ?? 0) >= limit) return { kind: 'limit_reached', limit };
+    if (input.leadId !== null && !(await ownsLead(tx, owner.userId, input.leadId)))
+      return { kind: 'invalid', issues: [NO_SUCH_LEAD] };
 
     const dateApplied = resolveDateApplied({
       previousStatus: null,
@@ -218,8 +244,8 @@ export async function createApplication(
     const inserted = await tx.query<ApplicationRow>(
       `insert into applications (user_id, company, role, status, date_applied, source, salary_min,
          salary_max, salary_currency, job_link, contact, next_step, next_step_date, notes,
-         created_at, updated_at, last_activity_at)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $15, $15)
+         created_at, updated_at, last_activity_at, lead_id)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $15, $15, $16)
        returning ${SELECT_COLUMNS}`,
       [
         owner.userId,
@@ -237,6 +263,7 @@ export async function createApplication(
         input.nextStepDate,
         input.notes,
         now,
+        input.leadId,
       ],
     );
     const row = inserted.rows[0];
@@ -317,6 +344,13 @@ export async function updateApplication(
         value: { record: current, history: history.get(current.id) ?? [] },
       };
     }
+
+    if (
+      changes.includes('leadId') &&
+      merged.leadId !== null &&
+      !(await ownsLead(tx, owner.userId, merged.leadId))
+    )
+      return { kind: 'invalid', issues: [NO_SUCH_LEAD] };
 
     const salaryIssues = findSalaryIssues(merged);
     if (salaryIssues.length > 0) {

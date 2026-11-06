@@ -43,6 +43,9 @@ export const ApplicationSchema = z.strictObject({
   /** Computed per request in the user's time zone; never stored. */
   needsFollowUp: z.boolean(),
   isClosed: z.boolean(),
+  leadId: z.uuid().nullable(),
+  /** The linked lead's name, for display. */
+  leadName: z.string().nullable(),
 });
 export type Application = z.infer<typeof ApplicationSchema>;
 
@@ -180,14 +183,6 @@ export type ImportRunList = z.infer<typeof ImportRunListSchema>;
 export const ImportStatusSchema = z.strictObject({ available: z.boolean() });
 
 /** `GET /api/me/export`: everything the app holds about the user. */
-export const DataExportSchema = z.strictObject({
-  exportedAt: instant,
-  user: UserSchema,
-  applications: z.array(ApplicationDetailSchema),
-  /** Gmail imports: which emails were read and what each led to (never the email body). */
-  imports: z.strictObject({ runs: z.array(ImportRunSchema), items: z.array(ImportItemSchema) }),
-});
-export type DataExport = z.infer<typeof DataExportSchema>;
 
 export const LeadNoteSchema = z.strictObject({
   id: z.uuid(),
@@ -235,3 +230,14 @@ export const LeadListSchema = z.strictObject({
   total: z.number().int().min(0),
 });
 export type LeadList = z.infer<typeof LeadListSchema>;
+
+export const DataExportSchema = z.strictObject({
+  exportedAt: instant,
+  user: UserSchema,
+  applications: z.array(ApplicationDetailSchema),
+  /** Gmail imports: which emails were read and what each led to (never the email body). */
+  /** Networking leads, each with its notes and linked applications. */
+  leads: z.array(LeadDetailSchema),
+  imports: z.strictObject({ runs: z.array(ImportRunSchema), items: z.array(ImportItemSchema) }),
+});
+export type DataExport = z.infer<typeof DataExportSchema>;

@@ -1,3 +1,4 @@
+import { listAllLeadDetails } from '../repo/leads';
 import {
   DataExportSchema,
   localDateIn,
@@ -79,6 +80,7 @@ export function registerMeRoutes(app: FastifyInstance, db: Db | undefined): void
       const now = request.clock.now();
       const applications = await listAllWithHistory(db, user.id);
       const imports = await listAllImports(db, user.id);
+      const leads = await listAllLeadDetails(db, user.id);
       void reply.header(
         'content-disposition',
         `attachment; filename="job-applications-${localDateIn(now, user.timeZone)}.json"`,
@@ -89,6 +91,7 @@ export function registerMeRoutes(app: FastifyInstance, db: Db | undefined): void
         applications: applications.map((entry) =>
           presentDetail(entry, { now, timeZone: user.timeZone }),
         ),
+        leads,
         imports: {
           runs: imports.runs.map(presentImportRun),
           // Unfinished claims are internal bookkeeping, not data about the user.

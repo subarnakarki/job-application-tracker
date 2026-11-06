@@ -15,6 +15,7 @@ const COLUMNS: {
   { header: 'Currency', value: (a) => a.salaryCurrency },
   { header: 'Job link', value: (a) => a.jobLink },
   { header: 'Contact', value: (a) => a.contact },
+  { header: 'Lead', value: (a) => a.leadName },
   { header: 'Next step', value: (a) => a.nextStep },
   { header: 'Next step date', value: (a) => a.nextStepDate },
   { header: 'Notes', value: (a) => a.notes },

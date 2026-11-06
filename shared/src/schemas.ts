@@ -70,6 +70,8 @@ const fields = {
     .string()
     .max(LIMITS.notes)
     .refine((value) => !value.includes('\u0000'), 'Must not contain NUL characters'),
+  /** The networking lead it came through; the API checks the lead is the user's own. */
+  leadId: z.uuid('Must be a lead id').nullable(),
 };
 
 export interface SalaryIssue {
@@ -113,6 +115,7 @@ export const ApplicationInputSchema = z
     nextStep: fields.nextStep.default(null),
     nextStepDate: fields.nextStepDate.default(null),
     notes: fields.notes.default(''),
+    leadId: fields.leadId.default(null),
   })
   .superRefine((value, context) => {
     for (const issue of findSalaryIssues(value)) {
@@ -144,6 +147,7 @@ export const ApplicationPatchSchema = z
     nextStep: fields.nextStep.optional(),
     nextStepDate: fields.nextStepDate.optional(),
     notes: fields.notes.optional(),
+    leadId: fields.leadId.optional(),
   })
   .superRefine((value, context) => {
     const { salaryMin, salaryMax } = value;
