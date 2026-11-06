@@ -30,21 +30,16 @@ export function ConfirmDialog({
   }, [open]);
 
   return (
-    <dialog
-      ref={ref}
-      aria-labelledby="confirm-title"
-      onClose={onCancel}
-      className="m-auto w-[min(28rem,calc(100%-2rem))] rounded-xl bg-white p-6 text-slate-900 shadow-xl backdrop:bg-black/50 dark:bg-slate-900 dark:text-slate-100"
-    >
-      <h2 id="confirm-title" className="text-lg font-semibold">
+    <dialog ref={ref} aria-labelledby="confirm-title" onClose={onCancel} className="dlg">
+      <h2 id="confirm-title" className="text-[1.375rem] font-semibold tracking-[-0.035em]">
         {title}
       </h2>
-      <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{message}</p>
-      <div className="mt-6 flex justify-end gap-3">
-        <button type="button" onClick={onCancel} className="btn-secondary">
+      <p className="mt-2 text-[0.9375rem] text-fg-2">{message}</p>
+      <div className="mt-6 flex flex-wrap justify-end gap-3">
+        <button type="button" onClick={onCancel} className="btn-d">
           Cancel
         </button>
-        <button type="button" onClick={onConfirm} disabled={busy} className="btn-danger">
+        <button type="button" onClick={onConfirm} disabled={busy} className="btn-red">
           {confirmLabel}
         </button>
       </div>
