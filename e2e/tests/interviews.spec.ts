@@ -27,7 +27,9 @@ test('log a scheduled interview and see it on the card and in the history', asyn
   await expect(detailPage.history.first()).toHaveText(/Interview: Onsite/);
 
   await applicationsPage.goto();
-  await expect(applicationsPage.card('Hooli')).toContainText(/Interview \w+ \d+, \d{4}/);
+  await expect(applicationsPage.card('Hooli')).toContainText(
+    /Interview \w{3}, \w{3} \d{1,2}(, \d{4})?/,
+  );
 
   // Removing it brings the card back to no interviews.
   await detailPage.goto(created.id);

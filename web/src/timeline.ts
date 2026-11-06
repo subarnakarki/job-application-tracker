@@ -1,5 +1,5 @@
 import type { Application, HistoryEntry, Interview } from '@jat/shared';
-import { formatDate } from './format';
+import { formatWeekdayDate } from './format';
 
 export type TimelineItem =
   | { kind: 'status'; key: string; at: string; entry: HistoryEntry }
@@ -32,7 +32,8 @@ export function timeline(history: HistoryEntry[], interviews: Interview[]): Time
 export function interviewText(
   application: Pick<Application, 'interviewCount' | 'nextInterviewOn'>,
 ): string | null {
-  if (application.nextInterviewOn) return `Interview ${formatDate(application.nextInterviewOn)}`;
+  if (application.nextInterviewOn)
+    return `Interview ${formatWeekdayDate(application.nextInterviewOn)}`;
   if (application.interviewCount === 0) return null;
   return application.interviewCount === 1
     ? '1 interview'

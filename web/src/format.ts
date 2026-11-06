@@ -10,6 +10,21 @@ const DAY = new Intl.DateTimeFormat(undefined, {
   timeZone: 'UTC',
 });
 
+const WEEKDAY_DAY = new Intl.DateTimeFormat(undefined, {
+  weekday: 'short',
+  month: 'short',
+  day: 'numeric',
+  timeZone: 'UTC',
+});
+
+const WEEKDAY_DAY_YEAR = new Intl.DateTimeFormat(undefined, {
+  weekday: 'short',
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
+
 const MOMENT = new Intl.DateTimeFormat(undefined, {
   month: 'short',
   day: 'numeric',
@@ -26,6 +41,20 @@ export function formatDate(calendarDate: string): string {
   const [year, month, day] = calendarDate.split('-').map(Number);
   if (!year || !month || !day) return calendarDate;
   return DAY.format(new Date(Date.UTC(year, month - 1, day)));
+}
+
+/**
+ * A calendar date with its weekday, "Wed, Nov 12". The year is added only when it is not
+ * `currentYear` (this year, by default), so "Mon, Jan 4, 2027" is never mistaken for this year.
+ */
+export function formatWeekdayDate(
+  calendarDate: string,
+  currentYear: number = new Date().getFullYear(),
+): string {
+  const [year, month, day] = calendarDate.split('-').map(Number);
+  if (!year || !month || !day) return calendarDate;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (year === currentYear ? WEEKDAY_DAY : WEEKDAY_DAY_YEAR).format(date);
 }
 
 /** An instant (an ISO timestamp), in the viewer's own time zone, with the time. */

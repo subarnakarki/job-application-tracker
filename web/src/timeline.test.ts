@@ -30,7 +30,7 @@ describe('timeline', () => {
 describe('interviewText', () => {
   it('names the next interview, else counts past ones, else says nothing', () => {
     expect(interviewText({ interviewCount: 2, nextInterviewOn: '2026-11-12' })).toMatch(
-      /^Interview Nov 12, 2026$/,
+      /^Interview \w{3}, Nov 12(, 2026)?$/,
     );
     expect(interviewText({ interviewCount: 1, nextInterviewOn: null })).toBe('1 interview');
     expect(interviewText({ interviewCount: 3, nextInterviewOn: null })).toBe('3 interviews');
