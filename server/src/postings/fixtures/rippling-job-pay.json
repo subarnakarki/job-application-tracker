@@ -1,0 +1,22 @@
+{
+  "uuid": "84d388b6-7656-434c-8862-0312eb6b97ac",
+  "name": "Business Operations Manager",
+  "workLocations": ["San Francisco, CA", "New York, NY"],
+  "employmentType": {
+    "label": "SALARIED_FT",
+    "id": "Salaried, full-time"
+  },
+  "createdOn": "2026-03-31T17:37:26.093000-07:00",
+  "url": "https://ats.rippling.com/rippling/jobs/84d388b6-7656-434c-8862-0312eb6b97ac",
+  "payRangeDetails": [
+    {
+      "location": "US",
+      "currency": "USD",
+      "frequency": "YEAR",
+      "rangeStart": 185000.0,
+      "rangeEnd": 240000.0,
+      "isRemote": false
+    }
+  ],
+  "companyName": "Rippling"
+}

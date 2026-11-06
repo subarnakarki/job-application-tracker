@@ -1,0 +1,30 @@
+[
+  {
+    "id": "6ed76ce8-4156-4b60-b120-403538bd66cd",
+    "text": "Administrative Business Partner",
+    "hostedUrl": "https://jobs.lever.co/palantir/6ed76ce8-4156-4b60-b120-403538bd66cd",
+    "categories": {
+      "commitment": "Full-time",
+      "location": "Singapore, Singapore",
+      "team": "Administrative",
+      "allLocations": ["Singapore, Singapore"]
+    },
+    "workplaceType": "hybrid",
+    "createdAt": 1786469891368,
+    "country": "SG"
+  },
+  {
+    "id": "0ccbe620-a3ef-41d1-a5c4-68e56b3c91d0",
+    "text": "American Tech Fellowship",
+    "hostedUrl": "https://jobs.lever.co/palantir/0ccbe620-a3ef-41d1-a5c4-68e56b3c91d0",
+    "categories": {
+      "commitment": "Scholarship",
+      "location": "North America",
+      "team": "Business Development",
+      "allLocations": ["North America"]
+    },
+    "workplaceType": "remote",
+    "createdAt": 1750119374985,
+    "country": "US"
+  }
+]
