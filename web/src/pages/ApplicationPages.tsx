@@ -12,6 +12,7 @@ import {
 import { ApplicationForm } from '../components/ApplicationForm';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { InterviewsSection } from '../components/InterviewsSection';
+import { RevealHeading } from '../components/ui/PageHeader';
 import { FollowUpFlag, StatusBadge } from '../components/StatusBadge';
 import { EMPTY_FORM, toFormValues, toPatch, type FieldErrors } from '../form';
 import { timeline } from '../timeline';
@@ -252,9 +253,16 @@ export function ApplicationDetailPage() {
 
 export function NotFoundPage() {
   return (
-    <div className="flex flex-col gap-2">
-      <h1 className="text-2xl font-semibold">Page not found</h1>
-      <Link to="/" className="text-blue-700 underline dark:text-blue-400">
+    <div className="relative flex min-h-[62vh] flex-col items-center justify-center gap-5 overflow-hidden text-center">
+      <div aria-hidden="true" className="orb" />
+      <p aria-hidden="true" className="big-404 rise">
+        404
+      </p>
+      <RevealHeading
+        text="Page not found"
+        className="relative text-4xl font-semibold tracking-[-0.05em] sm:text-5xl"
+      />
+      <Link to="/" className="btn-w relative mt-1 min-h-12 px-6 text-[0.9375rem]">
         Back to your applications
       </Link>
     </div>
