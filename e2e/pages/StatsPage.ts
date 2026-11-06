@@ -20,7 +20,7 @@ export class StatsPage {
   }
 
   /**
-   * The figures for a source (or 'All sources') in reading order, whichever layout is shown:
+   * The figures for a source (or 'Total') in reading order, whichever layout is shown:
    * applications, applied, responded, interviewed, offers, then the response rate.
    */
   figures(name: string): Locator {

@@ -777,3 +777,19 @@
     box-shadow: 0 0 0 1px var(--color-violet);
   }
 }
+
+@layer components {
+  /* Response-rate bar: blue to violet, grows in from the left once. */
+  .rate-bar {
+    background: linear-gradient(90deg, var(--color-blue), var(--color-violet));
+    transform-origin: left;
+    animation: bar-in 1.2s var(--ease-brand) both;
+    animation-delay: 0.5s;
+  }
+}
+
+@keyframes bar-in {
+  from {
+    transform: scaleX(0);
+  }
+}
