@@ -5,6 +5,9 @@ import {
   ImportRunDetailSchema,
   ImportRunListSchema,
   ImportStatusSchema,
+  LeadDetailSchema,
+  LeadListSchema,
+  LeadNoteSchema,
   PipelineSchema,
   StatsSchema,
   UserEnvelopeSchema,
@@ -12,6 +15,10 @@ import {
   type ApplicationInput,
   type ApplicationList,
   type ApplicationPatch,
+  type LeadInput,
+  type LeadNoteInput,
+  type LeadNotePatch,
+  type LeadPatch,
   type ListQuery,
   type Pipeline,
   type Status,
@@ -274,5 +281,111 @@ export function useImportAction(runId: string) {
         client.invalidateQueries({ queryKey: ['import-runs'] }),
         refresh(),
       ]),
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Networking leads
+
+export function useLeads(q?: string) {
+  return useQuery({
+    queryKey: ['leads', q ?? ''],
+    queryFn: () =>
+      apiRequest(`/api/leads${q ? `?q=${encodeURIComponent(q)}` : ''}`, LeadListSchema),
+  });
+}
+
+export function useLead(id: string) {
+  return useQuery({
+    queryKey: ['lead', id],
+    queryFn: () => apiRequest(`/api/leads/${encodeURIComponent(id)}`, LeadDetailSchema),
+  });
+}
+
+/** A lead change can show up in lead lists, the lead page and applications (their lead's name). */
+function useLeadRefresh() {
+  const client = useQueryClient();
+  return () =>
+    Promise.all([
+      client.invalidateQueries({ queryKey: ['leads'] }),
+      client.invalidateQueries({ queryKey: ['lead'] }),
+      client.invalidateQueries({ queryKey: ['applications'] }),
+      client.invalidateQueries({ queryKey: ['application'] }),
+    ]);
+}
+
+export function useCreateLead() {
+  const refresh = useLeadRefresh();
+  return useMutation({
+    mutationFn: (input: LeadInput) =>
+      apiRequest('/api/leads', LeadDetailSchema, { method: 'POST', body: input }),
+    onSuccess: refresh,
+  });
+}
+
+export function useUpdateLead(id: string) {
+  const refresh = useLeadRefresh();
+  return useMutation({
+    mutationFn: (patch: LeadPatch) =>
+      apiRequest(`/api/leads/${encodeURIComponent(id)}`, LeadDetailSchema, {
+        method: 'PATCH',
+        body: patch,
+      }),
+    onSuccess: refresh,
+  });
+}
+
+export function useDeleteLead(id: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiRequest(`/api/leads/${encodeURIComponent(id)}`, null, { method: 'DELETE' }),
+    // Not refetching the deleted lead itself (it would 404).
+    onSuccess: () => {
+      client.removeQueries({ queryKey: ['lead', id], type: 'inactive' });
+      return Promise.all([
+        client.invalidateQueries({ queryKey: ['leads'] }),
+        client.invalidateQueries({ queryKey: ['applications'] }),
+        client.invalidateQueries({ queryKey: ['application'] }),
+      ]);
+    },
+  });
+}
+
+export function useAddLeadNote(leadId: string) {
+  const refresh = useLeadRefresh();
+  return useMutation({
+    mutationFn: (input: LeadNoteInput) =>
+      apiRequest(`/api/leads/${encodeURIComponent(leadId)}/notes`, LeadNoteSchema, {
+        method: 'POST',
+        body: input,
+      }),
+    onSuccess: refresh,
+  });
+}
+
+export function useUpdateLeadNote(leadId: string) {
+  const refresh = useLeadRefresh();
+  return useMutation({
+    mutationFn: ({ noteId, patch }: { noteId: string; patch: LeadNotePatch }) =>
+      apiRequest(
+        `/api/leads/${encodeURIComponent(leadId)}/notes/${encodeURIComponent(noteId)}`,
+        LeadNoteSchema,
+        { method: 'PATCH', body: patch },
+      ),
+    onSuccess: refresh,
+  });
+}
+
+export function useDeleteLeadNote(leadId: string) {
+  const refresh = useLeadRefresh();
+  return useMutation({
+    mutationFn: (noteId: string) =>
+      apiRequest(
+        `/api/leads/${encodeURIComponent(leadId)}/notes/${encodeURIComponent(noteId)}`,
+        null,
+        { method: 'DELETE' },
+      ),
+    onSuccess: refresh,
   });
 }

@@ -151,6 +151,16 @@ export function ApplicationDetailPage() {
         <Field label="Source">{application.source}</Field>
         <Field label="Salary">{salary(application)}</Field>
         <Field label="Contact">{application.contact}</Field>
+        <Field label="Lead">
+          {application.leadId && (
+            <Link
+              to={`/leads/${application.leadId}`}
+              className="text-blue-700 underline dark:text-blue-400"
+            >
+              {application.leadName}
+            </Link>
+          )}
+        </Field>
         <Field label="Next step">
           {[
             application.nextStep,

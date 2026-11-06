@@ -40,6 +40,12 @@ export function Layout() {
           </Link>
           <div className="flex items-center gap-3 text-sm">
             <Link
+              to="/leads"
+              className="text-slate-600 underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-blue-600 dark:text-slate-300"
+            >
+              Leads
+            </Link>
+            <Link
               to="/stats"
               className="text-slate-600 underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-blue-600 dark:text-slate-300"
             >

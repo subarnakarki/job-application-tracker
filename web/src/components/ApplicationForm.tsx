@@ -1,5 +1,6 @@
 import { SOURCES, STATUSES, type ApplicationInput } from '@jat/shared';
 import { useId, useState, type ReactNode } from 'react';
+import { useLeads } from '../api/hooks';
 import { validate, type FieldErrors, type FormValues } from '../form';
 
 interface Props {
@@ -32,6 +33,8 @@ export function ApplicationForm({
   const [clientErrors, setClientErrors] = useState<FieldErrors>({});
   const errors = { ...serverErrors, ...clientErrors };
   const id = useId();
+  const leads = useLeads();
+  const leadOptions = leads.data?.items ?? [];
 
   const set = (field: keyof FormValues) => (event: { target: { value: string } }) =>
     setValues((current) => ({ ...current, [field]: event.target.value }));
@@ -143,6 +146,25 @@ export function ApplicationForm({
         {field('contact', 'Contact', (props) => (
           <input {...props} />
         ))}
+        {field(
+          'leadId',
+          'Lead',
+          (props) => (
+            <select {...props}>
+              <option value="">No lead</option>
+              {/* Keep the current choice selectable while the list loads. */}
+              {values.leadId && !leadOptions.some((lead) => lead.id === values.leadId) && (
+                <option value={values.leadId}>Current lead</option>
+              )}
+              {leadOptions.map((lead) => (
+                <option key={lead.id} value={lead.id}>
+                  {lead.company ? `${lead.name} (${lead.company})` : lead.name}
+                </option>
+              ))}
+            </select>
+          ),
+          'The person who helped you get here',
+        )}
         {field('nextStep', 'Next step', (props) => (
           <input {...props} />
         ))}

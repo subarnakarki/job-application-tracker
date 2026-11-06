@@ -12,6 +12,7 @@ import {
 import { ApplicationsPage } from './pages/ApplicationsPage';
 import { AccountPage } from './pages/AccountPage';
 import { ImportResultsPage } from './pages/ImportResultsPage';
+import { EditLeadPage, LeadPage, LeadsPage, NewLeadPage } from './pages/LeadPages';
 import { LoginPage } from './pages/LoginPage';
 import { PrivacyPage } from './pages/PrivacyPage';
 import { StatsPage } from './pages/StatsPage';
@@ -26,6 +27,10 @@ export function AppRoutes() {
         <Route path="applications/new" element={<NewApplicationPage />} />
         <Route path="applications/:id" element={<ApplicationDetailPage />} />
         <Route path="applications/:id/edit" element={<EditApplicationPage />} />
+        <Route path="leads" element={<LeadsPage />} />
+        <Route path="leads/new" element={<NewLeadPage />} />
+        <Route path="leads/:id" element={<LeadPage />} />
+        <Route path="leads/:id/edit" element={<EditLeadPage />} />
         <Route path="stats" element={<StatsPage />} />
         <Route path="import/:runId" element={<ImportResultsPage />} />
         <Route path="account" element={<AccountPage />} />
