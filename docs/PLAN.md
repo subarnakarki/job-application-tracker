@@ -399,7 +399,9 @@ Built as planned, with these changes from the table above:
 - **Migration 0007** is applied to Neon (Migrate workflow) before the code that uses it.
 - **UI.** The application page shows the suggestion ("Use these details" or "Not this job") and a "Fill from
   posting" button; the edit page has "Fill from link" with the job link already in. The privacy page has a Job
-  postings section. e2e covers both buttons and the suggestion card, with the server's answers mocked.
+  postings section. e2e covers the buttons and the suggestion card, with the server's answers mocked.
+- **Find posting** (added after, on request): runs the same board lookup for an existing application with no
+  job link (30 an hour per user), so applications imported before this phase can get a suggestion too.
 
 ## Planned but not built
 

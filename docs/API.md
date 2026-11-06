@@ -58,7 +58,7 @@ schemas in `shared/src/responses.ts`; input shapes are in `shared/src/schemas.ts
 
 `postingSuggestion` on the detail is a posting an import found on the company's public job board (Greenhouse,
 Lever, Ashby, Rippling, SmartRecruiters, Breezy HR, Recruitee, Teamtailor or Personio) when the email had no
-link, or `null`. It is never applied without the user.
+link (or that "Find posting" found), or `null`. It is never applied without the user.
 
 Writes are limited to 600/hour per user (120/hour for the demo account). `needsFollowUp` and `isClosed` are
 computed on every response, in the user's time zone (rules in [DOMAIN.md](DOMAIN.md)).

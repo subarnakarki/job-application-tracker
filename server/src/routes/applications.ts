@@ -24,8 +24,10 @@ import {
   type Owner,
 } from '../repo/applications';
 import { toCsv } from '../repo/csv';
-import { deleteSuggestion } from '../repo/postingSuggestions';
-import { fillEmpty } from '../postings/fill';
+import { deleteSuggestion, saveSuggestion } from '../repo/postingSuggestions';
+import type { PageFetcher } from '../postings/fetchPage';
+import { findOnBoards, suggestionOf } from '../postings/lookup';
+import { fillEmpty, UNKNOWN_ROLE } from '../postings/fill';
 import { presentApplication, presentDetail } from '../repo/present';
 import { statsBySource } from '../repo/stats';
 
@@ -45,10 +47,28 @@ export const DEMO_WRITE_RULE: RateLimitRule = {
   windowMs: 60 * 60 * 1000,
 };
 
+/** "Find posting" reads up to 27 job boards at a time, so it has its own, smaller budget. */
+export const LOOKUP_RULE: RateLimitRule = {
+  name: 'posting-lookup',
+  limit: 30,
+  windowMs: 60 * 60 * 1000,
+};
+export const DEMO_LOOKUP_RULE: RateLimitRule = {
+  name: 'demo-posting-lookup',
+  limit: 5,
+  windowMs: 60 * 60 * 1000,
+};
+
+/** An email address in the contact field: its domain is a good guess at the company's board. */
+const emailIn = (contact: string | null) =>
+  /[^\s<>@]+@[a-z0-9.-]+\.[a-z]{2,}/i.exec(contact ?? '')?.[0];
+
 export interface ApplicationRouteDeps {
   db: Db | undefined;
   /** The app clock, for rate limits (infrastructure). Domain logic uses request.clock. */
   clock: Clock;
+  /** Reads companies' public job boards, for "Find posting" (none: answers 503). */
+  fetchBoard?: PageFetcher;
 }
 
 /** Same answer for "missing", "someone else's" and "not even an id", so ids cannot be probed. */
@@ -414,6 +434,66 @@ export function registerApplicationRoutes(app: FastifyInstance, deps: Applicatio
       await spendWrite(db, owner, reply);
       if (!(await deleteSuggestion(db, owner.userId, id))) throw notFound();
       return reply.code(204).send();
+    },
+  );
+
+  // "Find posting": the same job-board lookup an import does, for an application that exists.
+  // A match is saved as the suggestion (never applied); no match leaves everything as it was.
+  app.post(
+    '/api/applications/:id/suggestion/find',
+    {
+      config: {
+        auth: 'user',
+        contract: {
+          summary: "Look for an application's posting on the company's public job boards",
+          errors: {
+            404: 'No such application (or not yours)',
+            422: 'The application has no role to look for',
+            429: 'Too many lookups',
+          },
+          params: IdParams,
+          responses: { 200: ApplicationDetailSchema },
+        },
+      },
+    },
+    async (request, reply) => {
+      const db = requireDb();
+      const owner = ownerOf(request);
+      const id = idOf(request);
+      const found = await getApplication(db, owner.userId, id);
+      if (!found) throw notFound();
+      const { record } = found;
+      if (record.role.trim() === '' || record.role === UNKNOWN_ROLE) {
+        throw new ApiError(
+          422,
+          'no_role',
+          'Add the role first: the posting is found by the company and role.',
+        );
+      }
+      if (!deps.fetchBoard) throw new ApiError(503, 'unavailable', 'The service is not available');
+      const rule = owner.isDemo ? DEMO_LOOKUP_RULE : LOOKUP_RULE;
+      const limit = await consumeRateLimit(
+        db,
+        rateLimitKey(rule.name, owner.userId),
+        rule,
+        deps.clock.now(),
+      );
+      if (!limit.allowed) {
+        void reply.header('retry-after', String(limit.retryAfterSeconds));
+        throw new ApiError(429, 'rate_limited', 'Too many lookups. Try again later.');
+      }
+
+      const match = await findOnBoards(
+        { company: record.company, role: record.role, senderEmail: emailIn(record.contact) },
+        deps.fetchBoard,
+      );
+      // Only the outcome is logged, never the company or role.
+      request.log.info({ outcome: match ? match.source : 'none' }, 'posting lookup');
+      const suggestion = match
+        ? await saveSuggestion(db, owner.userId, id, suggestionOf(match), request.clock.now())
+        : found.suggestion;
+      void reply.header('etag', etag(record.version));
+      return presentDetail({ ...found, suggestion }, context(request, owner));
     },
   );
 

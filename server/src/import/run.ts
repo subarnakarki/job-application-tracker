@@ -30,7 +30,7 @@ import { BOARD_LABELS, siteOf } from '../postings/boards';
 import type { Details } from '../postings/details';
 import type { PageFetcher } from '../postings/fetchPage';
 import { fillEmpty, UNKNOWN_ROLE, type Fillable } from '../postings/fill';
-import { findOnBoards } from '../postings/lookup';
+import { findOnBoards, suggestionOf } from '../postings/lookup';
 import { isSignInSite, readPosting } from '../postings/preview';
 import { saveSuggestion } from '../repo/postingSuggestions';
 
@@ -159,22 +159,11 @@ async function lookUpBoards(deps: ImportDeps, owner: Owner, created: Created[]):
         fetchBoard,
       );
       if (!match) return;
-      const { details } = match;
       const saved = await saveSuggestion(
         deps.db,
         owner.userId,
         entry.applicationId,
-        {
-          source: match.source,
-          jobLink: match.jobLink,
-          role: details.role,
-          salaryMin: details.salary?.min ?? null,
-          salaryMax: details.salary?.max ?? null,
-          salaryCurrency: details.salary?.currency ?? null,
-          location: details.location,
-          workMode: details.workMode,
-          postedOn: details.postedOn,
-        },
+        suggestionOf(match),
         deps.clock.now(),
       );
       if (saved)

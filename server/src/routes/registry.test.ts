@@ -39,6 +39,7 @@ const ISOLATION_COVERAGE: Record<string, string> = {
   'DELETE /api/applications/:id': 'server/src/routes/applications.test.ts',
   'POST /api/applications/:id/suggestion/apply': 'server/src/routes/suggestions.test.ts',
   'DELETE /api/applications/:id/suggestion': 'server/src/routes/suggestions.test.ts',
+  'POST /api/applications/:id/suggestion/find': 'server/src/routes/findPosting.test.ts',
   'POST /api/applications/:id/interviews': 'server/src/routes/interviews.test.ts',
   'PATCH /api/applications/:id/interviews/:interviewId': 'server/src/routes/interviews.test.ts',
   'DELETE /api/applications/:id/interviews/:interviewId': 'server/src/routes/interviews.test.ts',

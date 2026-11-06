@@ -4,6 +4,7 @@ import { ApiRequestError } from '../api/client';
 import {
   useApplySuggestion,
   useDismissSuggestion,
+  useFindPosting,
   usePostingPreview,
   useUpdateApplication,
 } from '../api/hooks';
@@ -163,6 +164,49 @@ export function FillFromPostingButton({ application }: { application: Applicatio
         onClick={fill}
       >
         {busy ? 'Reading the posting…' : 'Fill from posting'}
+      </button>
+      {message && (
+        <p role="status" className="max-w-[28ch] text-right text-xs text-fg-2">
+          {message}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * "Find posting": for an application with no job link, looks for the role on the company's public
+ * job boards. A match shows up as the suggestion card; nothing is changed until it is used.
+ */
+export function FindPostingButton({ application }: { application: ApplicationDetail }) {
+  const find = useFindPosting(application.id);
+  const toast = useToast();
+  const [message, setMessage] = useState<string | null>(null);
+  if (application.jobLink || application.postingSuggestion) return null;
+
+  const look = () => {
+    setMessage(null);
+    find.mutate(undefined, {
+      onSuccess: (found) => {
+        if (found.postingSuggestion) toast('Found a possible posting');
+        else
+          setMessage(
+            "No matching posting on the company's public job boards. Add the job link by hand.",
+          );
+      },
+      onError: (error) => setMessage(failure(error)),
+    });
+  };
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <button
+        type="button"
+        className="btn-d min-h-12 px-6 text-[0.9375rem]"
+        disabled={find.isPending}
+        onClick={look}
+      >
+        {find.isPending ? 'Looking…' : 'Find posting'}
       </button>
       {message && (
         <p role="status" className="max-w-[28ch] text-right text-xs text-fg-2">

@@ -1,5 +1,6 @@
 import { BOARD_SOURCES, BOARDS, type BoardJob, type BoardSource } from './boards';
 import { locationOf, merge, type Details } from './details';
+import type { SuggestionInput } from '../repo/postingSuggestions';
 import type { PageFetcher } from './fetchPage';
 
 /** A posting found on the company's public job board that is probably the one applied for. */
@@ -7,6 +8,22 @@ export interface BoardMatch {
   source: BoardSource;
   jobLink: string;
   details: Details;
+}
+
+/** A match as it is saved: the posting's details, flattened. */
+export function suggestionOf(match: BoardMatch): SuggestionInput {
+  const { details } = match;
+  return {
+    source: match.source,
+    jobLink: match.jobLink,
+    role: details.role,
+    salaryMin: details.salary?.min ?? null,
+    salaryMax: details.salary?.max ?? null,
+    salaryCurrency: details.salary?.currency ?? null,
+    location: details.location,
+    workMode: details.workMode,
+    postedOn: details.postedOn,
+  };
 }
 
 export interface LookupQuery {

@@ -42,11 +42,12 @@ export function PrivacyPage() {
         <h2 className="mt-6 text-xl font-semibold tracking-[-0.03em]">Job postings</h2>
         <p>
           When you use &ldquo;Fill from link&rdquo; or &ldquo;Fill from posting&rdquo;, the server
-          reads that public job posting to fill in empty fields. After a Gmail import, it may read
-          the posting an email links to, or look the company and role up on the company&apos;s
-          public job board (such as Greenhouse or Lever); a posting found that way is only a
-          suggestion until you use it. The job board is asked only for the company&apos;s list of
-          open jobs; nothing from the email is sent to it.
+          reads that public job posting to fill in empty fields. After a Gmail import it may read
+          the posting an email links to. After an import, or when you use &ldquo;Find
+          posting&rdquo;, it may look the role up on the company&apos;s public job board (such as
+          Greenhouse or Lever); a posting found that way is only a suggestion until you use it. The
+          job board is asked only for the open jobs under the company&apos;s name; nothing else from
+          your emails or applications is sent to it.
         </p>
 
         <h2 className="mt-6 text-xl font-semibold tracking-[-0.03em]">Cookies</h2>

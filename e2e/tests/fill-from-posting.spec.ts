@@ -105,3 +105,49 @@ test('a posting found on a job board is shown, and can be dismissed', async ({
   await card.getByRole('button', { name: 'Not this job' }).click();
   await expect(card).toBeHidden();
 });
+
+test('find posting looks on the job boards and shows what it found', async ({
+  page,
+  api,
+  detailPage,
+}) => {
+  const application = await api.createApplication({ company: 'Initech', role: 'SDET' });
+  const suggestion = {
+    source: 'lever',
+    jobLink: 'https://jobs.lever.co/initech/42',
+    role: 'SDET',
+    salaryMin: null,
+    salaryMax: null,
+    salaryCurrency: null,
+    location: 'Remote',
+    workMode: 'Remote',
+    postedOn: null,
+    createdAt: new Date().toISOString(),
+  };
+  let found = false;
+  await page.route(`**/api/applications/${application.id}`, async (route) => {
+    const response = await route.fetch();
+    const body = (await response.json()) as ApplicationDetail;
+    await route.fulfill({
+      response,
+      json: { ...body, postingSuggestion: found ? suggestion : null },
+    });
+  });
+  let answer: 'none' | 'match' = 'none';
+  await page.route(`**/api/applications/${application.id}/suggestion/find`, async (route) => {
+    found = answer === 'match';
+    const current = await api.getApplication(application.id);
+    await route.fulfill({ json: { ...current, postingSuggestion: found ? suggestion : null } });
+  });
+
+  await detailPage.goto(application.id);
+  const button = page.getByRole('button', { name: 'Find posting' });
+  await button.click();
+  await expect(page.getByText(/No matching posting/)).toBeVisible();
+
+  answer = 'match';
+  await button.click();
+  const card = page.getByRole('region', { name: 'Possible posting found on Lever' });
+  await expect(card).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Find posting' })).toBeHidden();
+});

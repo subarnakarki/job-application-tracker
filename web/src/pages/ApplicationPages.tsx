@@ -13,7 +13,11 @@ import { ApplicationForm } from '../components/ApplicationForm';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { InterviewsSection } from '../components/InterviewsSection';
 import { Glow } from '../components/ui/Glow';
-import { FillFromPostingButton, SuggestionCard } from '../components/PostingDetails';
+import {
+  FillFromPostingButton,
+  FindPostingButton,
+  SuggestionCard,
+} from '../components/PostingDetails';
 import { PageHeader, RevealHeading } from '../components/ui/PageHeader';
 import { Pill } from '../components/ui/Pill';
 import { interviewText } from '../timeline';
@@ -158,6 +162,7 @@ export function ApplicationDetailPage() {
         </div>
         <div className="rise rise-4 flex flex-wrap items-start gap-3">
           <FillFromPostingButton application={application} />
+          <FindPostingButton application={application} />
           <Link to={`/applications/${id}/edit`} className="btn-w min-h-12 px-6 text-[0.9375rem]">
             Edit
           </Link>

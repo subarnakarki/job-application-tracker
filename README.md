@@ -24,7 +24,8 @@ Built by an SDET as a portfolio project, so the tests matter as much as the feat
   from the job posting the email links to, or a likely posting on the company's job board is suggested.
 - Job details from the posting: "Fill from link" in the form and "Fill from posting" on an application read a
   public posting (company career sites, Greenhouse, Lever, Ashby, Rippling and others) and fill only empty fields:
-  role, salary, location, work mode and posting date.
+  role, salary, location, work mode and posting date. "Find posting" looks an application without a link up on
+  the company's public job board and suggests the match.
 - Mobile-first, keyboard and screen-reader friendly, with a dark design (Inter, self-hosted) and
   respect for reduced-motion settings. Colours are tokens, so a light theme can be added later.
 

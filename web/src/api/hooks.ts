@@ -184,6 +184,19 @@ export function useApplySuggestion(id: string) {
   });
 }
 
+export function useFindPosting(id: string) {
+  const refresh = useRefresh();
+  return useMutation({
+    mutationFn: () =>
+      apiRequest(
+        `/api/applications/${encodeURIComponent(id)}/suggestion/find`,
+        ApplicationDetailSchema,
+        { method: 'POST', body: {} },
+      ),
+    onSuccess: refresh,
+  });
+}
+
 export function useDismissSuggestion(id: string) {
   const refresh = useRefresh();
   return useMutation({

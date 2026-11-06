@@ -91,10 +91,11 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const google = deps.google === undefined ? googleProviderFromEnv(env) : deps.google;
   registerGoogleRoutes(app, { db: deps.db, clock, env, google });
   registerMeRoutes(app, deps.db);
-  registerApplicationRoutes(app, { db: deps.db, clock });
+  const fetchPage = deps.fetchPage ?? createPageFetcher();
+  const fetchBoard = deps.fetchPage ?? createPageFetcher({ maxBytes: BOARD_MAX_BYTES });
+  registerApplicationRoutes(app, { db: deps.db, clock, fetchBoard });
   registerLeadRoutes(app, { db: deps.db, clock });
   registerInterviewRoutes(app, { db: deps.db, clock });
-  const fetchPage = deps.fetchPage ?? createPageFetcher();
   registerPostingRoutes(app, { db: deps.db, clock, fetchPage });
   registerImportRoutes(app, {
     db: deps.db,
@@ -107,7 +108,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     postings: {
       fetchPage,
       // A company's whole job board (every open job) can be several MB.
-      fetchBoard: deps.fetchPage ?? createPageFetcher({ maxBytes: BOARD_MAX_BYTES }),
+      fetchBoard,
     },
   });
   if (testRoutes) registerTestRoutes(app, { db: deps.db, clock });
