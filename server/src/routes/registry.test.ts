@@ -54,6 +54,7 @@ const ISOLATION_COVERAGE: Record<string, string> = {
   'POST /api/import/items/:id/apply': 'server/src/routes/import.test.ts',
   'POST /api/import/items/:id/dismiss': 'server/src/routes/import.test.ts',
   'GET /api/resume/analyses/:id': 'server/src/routes/resume.test.ts',
+  'POST /api/applications/:id/resume-match': 'server/src/routes/resume.test.ts',
   'DELETE /api/resume/analyses/:id': 'server/src/routes/resume.test.ts',
 };
 

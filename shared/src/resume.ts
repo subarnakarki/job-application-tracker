@@ -339,3 +339,51 @@ export const ResumeAnalysisListSchema = z.strictObject({
   items: z.array(ResumeAnalysisSummarySchema).max(RESUME_LIMITS.analysesKept),
 });
 export type ResumeAnalysisList = z.infer<typeof ResumeAnalysisListSchema>;
+
+// ---------------------------------------------------------------------------------------------
+// One posting (14c): the keywords of a real job posting, checked against the resume
+
+export const POSTING_KEYWORDS_MAX = 30;
+const POSTING_KEYWORDS_MIN = 5;
+
+/** What the model is asked to return for one posting. */
+export const PostingKeywordsAnswerSchema = z.strictObject({
+  keywords: z
+    .array(z.strictObject({ term: z.string(), group: z.enum(KEYWORD_GROUPS) }))
+    .describe('The terms this posting asks for, as written in it, most important first'),
+});
+export type PostingKeywordsAnswer = z.infer<typeof PostingKeywordsAnswerSchema>;
+
+export const ResumeMatchSchema = z.strictObject({
+  jobLink: z.string(),
+  keywords: z.array(ResumeKeywordSchema).max(POSTING_KEYWORDS_MAX),
+  found: z.number().int().min(0),
+  /** Share of the posting's keywords already in the resume, rounded. */
+  matchPercent: z.number().int().min(0).max(100),
+  model: z.string(),
+});
+export type ResumeMatch = z.infer<typeof ResumeMatchSchema>;
+
+/**
+ * Marks a posting's keywords found or missing in the resume (by code, like `acceptAnswer`), without
+ * duplicates. Null when the posting gave too few keywords to be worth a score.
+ */
+export function matchPosting(
+  answer: PostingKeywordsAnswer,
+  resumeText: string,
+): Pick<ResumeMatch, 'keywords' | 'found' | 'matchPercent'> | null {
+  const index = indexText(resumeText);
+  const seen = new Set<string>();
+  const keywords: ResumeKeyword[] = [];
+  for (const keyword of answer.keywords) {
+    const term = clip(keyword.term, RESUME_LIMITS.keyword);
+    const key = compactKey(term);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    keywords.push({ term, group: keyword.group, found: index.has(term) });
+    if (keywords.length === POSTING_KEYWORDS_MAX) break;
+  }
+  if (keywords.length < POSTING_KEYWORDS_MIN) return null;
+  const found = keywords.filter((keyword) => keyword.found).length;
+  return { keywords, found, matchPercent: Math.round((found / keywords.length) * 100) };
+}

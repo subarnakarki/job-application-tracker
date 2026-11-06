@@ -1,5 +1,7 @@
 import {
+  matchPosting,
   RESUME_LIMITS,
+  ResumeMatchSchema,
   RESUME_MEDIA_TYPES,
   ResumeAnalysisListSchema,
   ResumeAnalysisSchema,
@@ -13,6 +15,11 @@ import { consumeRateLimit, rateLimitKey, type RateLimitRule } from '../auth/rate
 import type { Clock } from '../clock';
 import type { Db } from '../db/types';
 import { ApiError, parseInput } from '../http/errors';
+import type { PageFetcher } from '../postings/fetchPage';
+import { PreviewError, type PreviewFailure } from '../postings/preview';
+import { readPostingText } from '../postings/text';
+import { getApplication } from '../repo/applications';
+import { PREVIEW_RULE } from './postings';
 import {
   deleteAnalysis,
   deleteResume,
@@ -79,9 +86,19 @@ export interface ResumeRouteDeps {
   clock: Clock;
   /** Null when there is no Anthropic key: uploads still work, analysis says it is off. */
   analyzer: ResumeAnalyzer | null;
+  /** Reads job postings for "Check my resume" (the guarded fetcher). */
+  fetchPage: PageFetcher;
 }
 
+const POSTING_MESSAGES: Record<PreviewFailure, string> = {
+  unsupported_site:
+    "This site needs a sign-in to show its postings, so it can't be read here. Use the company's own job page link.",
+  unreadable: "The job link couldn't be read. Check it, or try again later.",
+  no_posting_data: 'No job description was found at the job link.',
+};
+
 const notFound = () => new ApiError(404, 'not_found', 'Analysis not found');
+const applicationNotFound = () => new ApiError(404, 'not_found', 'Application not found');
 const demoRefused = () =>
   new ApiError(403, 'demo_restricted', 'The shared demo account cannot upload a resume');
 
@@ -392,6 +409,91 @@ export function registerResumeRoutes(app: FastifyInstance, deps: ResumeRouteDeps
       const user = userOf(request);
       if (!(await deleteAnalysis(requireDb(), user.id, idOf(request)))) throw notFound();
       return reply.code(204).send();
+    },
+  );
+
+  app.post(
+    '/api/applications/:id/resume-match',
+    {
+      config: {
+        auth: 'user',
+        contract: {
+          summary: "Check the resume against the application's job posting (stores nothing)",
+          errors: {
+            403: 'Not available to the demo account',
+            404: 'No such application (or not yours), or analysis is not configured',
+            409: 'No resume uploaded yet',
+            422: 'The application has no job link, or the posting could not be read',
+            429: 'The daily analysis limit or the link-reading limit is reached',
+            502: 'The posting could not be analysed',
+            503: 'The Anthropic key was rejected',
+          },
+          params: IdParams,
+          responses: { 200: ResumeMatchSchema },
+        },
+      },
+    },
+    async (request, reply) => {
+      const db = requireDb();
+      const user = userOf(request);
+      const id = (request.params as { id?: string }).id;
+      if (!id || !UUID.test(id)) throw applicationNotFound();
+      const found = await getApplication(db, user.id, id.toLowerCase());
+      if (!found) throw applicationNotFound();
+      if (user.isDemo) throw demoRefused();
+      if (!deps.analyzer)
+        throw new ApiError(404, 'not_available', 'Resume analysis is not available on this server');
+      const jobLink = found.record.jobLink;
+      if (!jobLink)
+        throw new ApiError(
+          422,
+          'no_job_link',
+          'Add the job posting link to this application first',
+        );
+      const resume = await getResumeText(db, user.id);
+      if (!resume) throw new ApiError(409, 'no_resume', 'Upload a resume first');
+
+      await spend(db, PREVIEW_RULE, user.id, reply, 'Too many links read. Try again later.');
+      let postingText: string;
+      const host = new URL(jobLink).hostname;
+      try {
+        postingText = await readPostingText(jobLink, deps.fetchPage);
+      } catch (error) {
+        if (!(error instanceof PreviewError)) throw error;
+        request.log.info({ host, outcome: error.code }, 'resume match');
+        throw new ApiError(422, error.code, POSTING_MESSAGES[error.code]);
+      }
+
+      await spend(db, ANALYSIS_RULE, user.id, reply, 'You can run 5 resume checks a day.');
+      await spend(
+        db,
+        ANALYSIS_GLOBAL_RULE,
+        'all',
+        reply,
+        'Resume analysis is busy today. Try again tomorrow.',
+      );
+      let outcome;
+      try {
+        outcome = await deps.analyzer.postingKeywords(postingText);
+      } catch (error) {
+        if (error instanceof AnalyzerUnavailableError)
+          throw new ApiError(503, 'unavailable', 'Resume analysis is not available right now');
+        throw error;
+      }
+      const match = outcome.kind === 'keywords' ? matchPosting(outcome.answer, resume.text) : null;
+      if (outcome.kind !== 'keywords' || !match) {
+        request.log.warn(
+          { host, outcome: 'failed', reason: outcome.kind === 'failed' ? outcome.reason : 'few' },
+          'resume match',
+        );
+        throw new ApiError(
+          502,
+          'analysis_failed',
+          "The posting's keywords could not be read. Try again later.",
+        );
+      }
+      request.log.info({ host, outcome: 'ok', keywords: match.keywords.length }, 'resume match');
+      return { jobLink, model: outcome.model, ...match };
     },
   );
 }

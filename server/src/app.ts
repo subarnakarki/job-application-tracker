@@ -119,6 +119,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     db: deps.db,
     clock,
     analyzer: deps.resumeAnalyzer === undefined ? analyzerFromEnv(env) : deps.resumeAnalyzer,
+    fetchPage,
   });
   if (testRoutes) registerTestRoutes(app, { db: deps.db, clock });
 

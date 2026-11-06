@@ -4,13 +4,19 @@ import {
   ResumeAnalysisListSchema,
   ResumeAnalysisSchema,
   ResumeEnvelopeSchema,
+  ResumeMatchSchema,
   ResumeSchema,
   type ResumeAnswer,
 } from '@jat/shared';
 import type { LightMyRequestResponse } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { rateLimitKey } from '../auth/rateLimit';
-import { AnalyzerUnavailableError, type AnalyzeOutcome } from '../resume/analyze';
+import { FetchError, type PageFetcher } from '../postings/fetchPage';
+import {
+  AnalyzerUnavailableError,
+  type AnalyzeOutcome,
+  type PostingKeywordsOutcome,
+} from '../resume/analyze';
 import { createTestApp, SAME_ORIGIN, type TestApp } from '../test/app';
 import { TEST_DATABASE_URL } from '../test/testDb';
 import { ANALYSIS_GLOBAL_RULE, ANALYSIS_RULE, UPLOAD_BODY_LIMIT } from './resume';
@@ -64,19 +70,40 @@ const analyzer = {
     if (!result) throw new Error('fixture answer was refused');
     return Promise.resolve({ kind: 'result', result, model: 'claude-opus-5-5' });
   },
+  postings: [] as string[],
+  postingKeywords(text: string): Promise<PostingKeywordsOutcome> {
+    this.postings.push(text);
+    if (this.next === 'unavailable') return Promise.reject(new AnalyzerUnavailableError('bad key'));
+    if (this.next === 'failed') return Promise.resolve({ kind: 'failed', reason: 'Declined' });
+    const terms = ['Playwright', 'TypeScript', 'Kubernetes', 'Selenium', 'ISTQB'];
+    return Promise.resolve({
+      kind: 'keywords',
+      answer: { keywords: terms.map((term) => ({ term, group: 'tool' as const })) },
+      model: 'claude-opus-5-5',
+    });
+  },
 };
+
+const POSTING_URL = 'https://careers.example.com/jobs/sdet';
+const POSTING_HTML = `<main><h1>Senior SDET</h1><p>${'We need Playwright and Selenium. '.repeat(10)}</p></main>`;
+/** Job pages the tests may read; anything else fails like an unreachable site. */
+const fetchPage: PageFetcher = (url) =>
+  url === POSTING_URL
+    ? Promise.resolve({ url, contentType: 'text/html', text: POSTING_HTML })
+    : Promise.reject(new FetchError('network', 'tests never reach the network'));
 
 describe.skipIf(!TEST_DATABASE_URL)('resume API (real app, real database)', () => {
   let t: TestApp;
 
   beforeAll(async () => {
-    t = await createTestApp({ resumeAnalyzer: analyzer });
+    t = await createTestApp({ resumeAnalyzer: analyzer, fetchPage });
   });
   afterAll(async () => {
     await t.close();
   });
   beforeEach(() => {
     analyzer.texts = [];
+    analyzer.postings = [];
     analyzer.next = 'ok';
   });
 
@@ -306,6 +333,85 @@ describe.skipIf(!TEST_DATABASE_URL)('resume API (real app, real database)', () =
       expect((await send('DELETE', `/api/resume/analyses/${id}`, cookie)).statusCode).toBe(204);
       expect((await send('GET', `/api/resume/analyses/${id}`, cookie)).statusCode).toBe(404);
       expect((await send('DELETE', `/api/resume/analyses/${id}`, cookie)).statusCode).toBe(404);
+    });
+  });
+
+  describe('checking it against a posting (14c)', () => {
+    const createApplication = async (cookie: string, jobLink: string | null) => {
+      const response = await t.app.inject({
+        method: 'POST',
+        url: '/api/applications',
+        headers: { ...SAME_ORIGIN, cookie },
+        payload: { company: 'Initech', role: 'Senior SDET', ...(jobLink ? { jobLink } : {}) },
+      });
+      return response.json<{ id: string }>().id;
+    };
+    const check = (cookie: string, id: string) =>
+      send('POST', `/api/applications/${id}/resume-match`, cookie);
+
+    it('reads the posting, and marks its keywords found or missing in the resume', async () => {
+      const { cookie } = await t.login();
+      await uploadFile(cookie, 'resume.pdf');
+      const id = await createApplication(cookie, POSTING_URL);
+
+      const response = await check(cookie, id);
+
+      expect(response.statusCode).toBe(200);
+      expect(parsed(ResumeMatchSchema)(response)).toEqual({
+        jobLink: POSTING_URL,
+        model: 'claude-opus-5-5',
+        // The resume has Playwright, TypeScript, Kubernetes and Selenium, not ISTQB.
+        keywords: [
+          { term: 'Playwright', group: 'tool', found: true },
+          { term: 'TypeScript', group: 'tool', found: true },
+          { term: 'Kubernetes', group: 'tool', found: true },
+          { term: 'Selenium', group: 'tool', found: true },
+          { term: 'ISTQB', group: 'tool', found: false },
+        ],
+        found: 4,
+        matchPercent: 80,
+      });
+      expect(analyzer.postings[0]).toContain('Senior SDET We need Playwright and Selenium.');
+    });
+
+    it('needs a job link and a resume, and explains an unreadable posting', async () => {
+      const { cookie } = await t.login();
+      const noLink = await createApplication(cookie, null);
+      const deadLink = await createApplication(cookie, 'https://careers.example.com/gone');
+
+      const noResume = await check(cookie, deadLink);
+      expect(noResume.statusCode).toBe(409);
+
+      await upload(cookie, { kind: 'text', text: pasted('match') });
+      const missing = await check(cookie, noLink);
+      expect(missing.statusCode).toBe(422);
+      expect(missing.json()).toMatchObject({ error: 'no_job_link' });
+      const unreadable = await check(cookie, deadLink);
+      expect(unreadable.statusCode).toBe(422);
+      expect(unreadable.json()).toMatchObject({ error: 'no_posting_data' });
+      expect(analyzer.postings).toEqual([]);
+    });
+
+    it('fails without saving when the keywords cannot be read', async () => {
+      const { cookie } = await t.login();
+      await upload(cookie, { kind: 'text', text: pasted('match fails') });
+      const id = await createApplication(cookie, POSTING_URL);
+      analyzer.next = 'failed';
+      expect((await check(cookie, id)).statusCode).toBe(502);
+    });
+
+    it("answers 404 for someone else's application, and reads nothing", async () => {
+      const owner = await t.login();
+      const id = await createApplication(owner.cookie, POSTING_URL);
+      const other = await t.login();
+      await upload(other.cookie, { kind: 'text', text: pasted('other') });
+
+      for (const target of [id, MISSING_ID, 'not-a-uuid']) {
+        const response = await check(other.cookie, target);
+        expect(response.statusCode, target).toBe(404);
+        expect(response.json()).toEqual({ error: 'not_found', message: 'Application not found' });
+      }
+      expect(analyzer.postings).toEqual([]);
     });
   });
 

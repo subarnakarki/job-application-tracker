@@ -2,6 +2,8 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
   acceptAnswer,
+  matchPosting,
+  POSTING_KEYWORDS_MAX,
   indexText,
   keywordInText,
   keywordTokens,
@@ -203,5 +205,36 @@ describe('ResumeUploadSchema', () => {
     ['an unknown kind', { kind: 'link', url: 'https://example.com' }],
   ])('refuses %s', (_label, body) => {
     expect(ResumeUploadSchema.safeParse(body).success).toBe(false);
+  });
+});
+
+describe('matchPosting', () => {
+  const resume = 'Playwright, TypeScript, k8s and CI/CD at Acme.';
+  const keywords = (...terms: string[]) => ({
+    keywords: terms.map((term) => ({ term, group: 'hard_skill' as const })),
+  });
+
+  it('scores the share of keywords already in the resume', () => {
+    expect(
+      matchPosting(keywords('Playwright', 'Kubernetes', 'CICD', 'Selenium', 'Go language'), resume),
+    ).toEqual({
+      keywords: [
+        { term: 'Playwright', group: 'hard_skill', found: true },
+        { term: 'Kubernetes', group: 'hard_skill', found: true },
+        { term: 'CICD', group: 'hard_skill', found: true },
+        { term: 'Selenium', group: 'hard_skill', found: false },
+        { term: 'Go language', group: 'hard_skill', found: false },
+      ],
+      found: 3,
+      matchPercent: 60,
+    });
+  });
+
+  it('drops duplicates and blanks, and needs at least five keywords', () => {
+    expect(
+      matchPosting(keywords('Playwright', 'playwright', ' ', 'k8s', 'Kubernetes', 'Rust'), resume),
+    ).toBeNull();
+    const many = Array.from({ length: 40 }, (_, index) => `Skill${String(index)}`);
+    expect(matchPosting(keywords(...many), resume)?.keywords).toHaveLength(POSTING_KEYWORDS_MAX);
   });
 });
