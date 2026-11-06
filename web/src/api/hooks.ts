@@ -11,6 +11,10 @@ import {
   LeadNoteSchema,
   PipelineSchema,
   PostingPreviewSchema,
+  ResumeAnalysisListSchema,
+  ResumeAnalysisSchema,
+  ResumeEnvelopeSchema,
+  ResumeSchema,
   StatsSchema,
   UserEnvelopeSchema,
   type Application,
@@ -25,6 +29,7 @@ import {
   type LeadPatch,
   type ListQuery,
   type Pipeline,
+  type ResumeUpload,
   type Status,
   type User,
 } from '@jat/shared';
@@ -482,5 +487,71 @@ export function usePostingPreview() {
   return useMutation({
     mutationFn: (url: string) =>
       apiRequest('/api/postings/preview', PostingPreviewSchema, { method: 'POST', body: { url } }),
+  });
+}
+
+// Resume match (Phase 14)
+
+export function useResume() {
+  return useQuery({
+    queryKey: ['resume'],
+    queryFn: () => apiRequest('/api/resume', ResumeEnvelopeSchema),
+  });
+}
+
+export function useUploadResume() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (upload: ResumeUpload) =>
+      apiRequest('/api/resume', ResumeSchema, { method: 'PUT', body: upload }),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['resume'] }),
+  });
+}
+
+export function useDeleteResume() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiRequest('/api/resume', null, { method: 'DELETE' }),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['resume'] }),
+  });
+}
+
+export function useResumeAnalyses() {
+  return useQuery({
+    queryKey: ['resume-analyses'],
+    queryFn: () => apiRequest('/api/resume/analyses', ResumeAnalysisListSchema),
+  });
+}
+
+export function useResumeAnalysis(id: string | null) {
+  return useQuery({
+    queryKey: ['resume-analysis', id],
+    queryFn: () =>
+      apiRequest(`/api/resume/analyses/${encodeURIComponent(id ?? '')}`, ResumeAnalysisSchema),
+    enabled: id !== null,
+  });
+}
+
+export function useAnalyseResume() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiRequest('/api/resume/analyses', ResumeAnalysisSchema, { method: 'POST', body: {} }),
+    onSuccess: (analysis) => {
+      client.setQueryData(['resume-analysis', analysis.id], analysis);
+      return client.invalidateQueries({ queryKey: ['resume-analyses'] });
+    },
+  });
+}
+
+export function useDeleteResumeAnalysis() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiRequest(`/api/resume/analyses/${encodeURIComponent(id)}`, null, { method: 'DELETE' }),
+    onSuccess: (_result, id) => {
+      client.removeQueries({ queryKey: ['resume-analysis', id] });
+      return client.invalidateQueries({ queryKey: ['resume-analyses'] });
+    },
   });
 }

@@ -1,6 +1,6 @@
 import type { ApplicationDetail } from '@jat/shared';
 import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { formatDate, formatDateTime } from '../format';
 import { ApiRequestError } from '../api/client';
 import {
@@ -42,6 +42,9 @@ function formMessage(error: unknown): string | null {
 export function NewApplicationPage() {
   const create = useCreateApplication();
   const navigate = useNavigate();
+  // "Track this title" on the resume page opens the form with the role filled in.
+  const [params] = useSearchParams();
+  const role = params.get('role')?.trim().slice(0, 200) ?? '';
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <PageHeader
@@ -49,7 +52,7 @@ export function NewApplicationPage() {
         subtitle="Paste a posting link to fill the basics, then add the rest."
       />
       <ApplicationForm
-        initial={EMPTY_FORM}
+        initial={role ? { ...EMPTY_FORM, role } : EMPTY_FORM}
         submitLabel="Save application"
         fillFromLink
         busy={create.isPending}

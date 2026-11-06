@@ -15,6 +15,7 @@ import { ImportResultsPage } from './pages/ImportResultsPage';
 import { EditLeadPage, LeadPage, LeadsPage, NewLeadPage } from './pages/LeadPages';
 import { LoginPage } from './pages/LoginPage';
 import { PrivacyPage } from './pages/PrivacyPage';
+import { ResumePage } from './pages/ResumePage';
 import { StatsPage } from './pages/StatsPage';
 
 export function AppRoutes() {
@@ -32,6 +33,7 @@ export function AppRoutes() {
         <Route path="leads/:id" element={<LeadPage />} />
         <Route path="leads/:id/edit" element={<EditLeadPage />} />
         <Route path="stats" element={<StatsPage />} />
+        <Route path="resume" element={<ResumePage />} />
         <Route path="import/:runId" element={<ImportResultsPage />} />
         <Route path="account" element={<AccountPage />} />
         <Route path="*" element={<NotFoundPage />} />

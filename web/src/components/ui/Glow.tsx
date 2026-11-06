@@ -10,7 +10,7 @@ export function Glow({
   as: Tag = 'div',
   className = '',
   ...rest
-}: ComponentPropsWithoutRef<'div'> & { as?: 'div' | 'section' }) {
+}: ComponentPropsWithoutRef<'div'> & { as?: 'div' | 'section' | 'article' }) {
   const spotlight = useSpotlight();
   return <Tag {...rest} {...spotlight} className={`glow ${className}`} />;
 }

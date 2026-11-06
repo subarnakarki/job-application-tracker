@@ -8,6 +8,7 @@ const NAV = [
   { to: '/', label: 'Applications', owns: ['/applications', '/import'] },
   { to: '/leads', label: 'Leads', owns: ['/leads'] },
   { to: '/stats', label: 'Stats', owns: ['/stats'] },
+  { to: '/resume', label: 'Resume', owns: ['/resume'] },
   { to: '/account', label: 'Account', owns: ['/account'] },
 ] as const;
 

@@ -326,6 +326,27 @@
     gap: 0.5rem;
   }
 
+  /* A resume keyword: found in the resume, or missing from it. The mark and the hidden text say which,
+     so colour is never the only signal. */
+  .kw {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125rem;
+    min-height: 1.75rem;
+    padding: 0.125rem 0.625rem;
+    border-radius: 9999px;
+    font-size: 0.8125rem;
+  }
+  .kw-found {
+    color: var(--color-green);
+    background: rgb(47 214 122 / 0.1);
+    box-shadow: inset 0 0 0 1px rgb(47 214 122 / 0.24);
+  }
+  .kw-missing {
+    color: var(--color-fg-2);
+    box-shadow: var(--shadow-line-2);
+  }
+
   /* Five bars, filled up to the current stage in its colour. */
   .stage-bars {
     display: inline-flex;
@@ -584,6 +605,7 @@
   .pill-follow,
   .pill-iv,
   .pill-neutral,
+  .kw,
   dialog.dlg {
     border: 1px solid CanvasText;
   }
