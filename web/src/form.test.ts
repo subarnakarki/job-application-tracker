@@ -59,7 +59,33 @@ describe('fill from link', () => {
     salaryMin: 120000,
     salaryMax: 150000,
     salaryCurrency: 'EUR',
+    location: null,
+    workMode: null,
+    postedOn: null,
   };
+
+  it('fills location, work mode and posting date too, but only when they are empty', () => {
+    const found = {
+      ...preview,
+      location: 'Boston, MA',
+      workMode: 'Hybrid' as const,
+      postedOn: '2026-10-01',
+    };
+    const fresh = fillEmpty(EMPTY_FORM, found);
+    expect(fresh.values).toMatchObject({
+      location: 'Boston, MA',
+      workMode: 'Hybrid',
+      postedOn: '2026-10-01',
+    });
+    expect(fresh.filled).toBe(8);
+
+    const typed = fillEmpty({ ...EMPTY_FORM, location: 'Remote', workMode: 'Remote' }, found);
+    expect(typed.values).toMatchObject({
+      location: 'Remote',
+      workMode: 'Remote',
+      postedOn: '2026-10-01',
+    });
+  });
 
   it('fills only empty fields and never overwrites what was typed', () => {
     const typed = { ...EMPTY_FORM, company: 'My own name for it' };

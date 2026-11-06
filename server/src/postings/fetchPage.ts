@@ -49,7 +49,9 @@ export interface FetchOptions {
 export type PageFetcher = (url: string) => Promise<FetchedPage>;
 
 const REDIRECTS = new Set([301, 302, 303, 307, 308]);
-const READABLE = /^(text\/html|application\/xhtml\+xml|application\/(ld\+)?json|text\/plain)/i;
+// HTML pages, JSON APIs (and JSON Feed), and the XML feeds some job boards publish.
+const READABLE =
+  /^(text\/html|application\/xhtml\+xml|application\/(ld\+|feed\+)?json|text\/plain|(text|application)\/xml)/i;
 
 /** http(s) on the default ports only, with no credentials in the link. */
 function checkUrl(raw: string, extraPorts: string[] = []): URL {

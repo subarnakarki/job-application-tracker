@@ -142,7 +142,10 @@ export function fillEmpty(
 ): { values: FormValues; filled: number } {
   const next = { ...values };
   let filled = 0;
-  const put = (field: 'company' | 'role' | 'jobLink', value: string | null) => {
+  const put = (
+    field: 'company' | 'role' | 'jobLink' | 'location' | 'postedOn',
+    value: string | null,
+  ) => {
     if (value && next[field].trim() === '') {
       next[field] = value;
       filled++;
@@ -151,6 +154,12 @@ export function fillEmpty(
   put('company', preview.company);
   put('role', preview.role);
   put('jobLink', preview.jobLink);
+  put('location', preview.location);
+  put('postedOn', preview.postedOn);
+  if (preview.workMode && next.workMode === '') {
+    next.workMode = preview.workMode;
+    filled++;
+  }
   if (
     preview.salaryMin !== null &&
     preview.salaryMax !== null &&

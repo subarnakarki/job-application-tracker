@@ -44,6 +44,9 @@ describe.skipIf(!TEST_DATABASE_URL)('POST /api/postings/preview (real app, stub 
       salaryMin: null,
       salaryMax: null,
       salaryCurrency: null,
+      location: null,
+      workMode: null,
+      postedOn: null,
     });
     const listed = await t.app.inject({
       method: 'GET',

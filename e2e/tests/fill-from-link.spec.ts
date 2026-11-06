@@ -18,6 +18,9 @@ test('fill from link fills only empty fields, then saves', async ({
         salaryMin: 140000,
         salaryMax: 170000,
         salaryCurrency: 'USD',
+        location: 'Boston, MA',
+        workMode: 'Hybrid',
+        postedOn: '2026-10-01',
       }),
     }),
   );
@@ -27,10 +30,12 @@ test('fill from link fills only empty fields, then saves', async ({
   await page.getByLabel('Job posting link').fill('https://jobs.example.com/sdet-42');
   await page.getByRole('button', { name: 'Fill from link' }).click();
 
-  await expect(page.getByText(/Filled 4 fields from the posting/)).toBeVisible();
+  await expect(page.getByText(/Filled 7 fields from the posting/)).toBeVisible();
   await expect(formPage.company).toHaveValue('Initech Labs');
   await expect(formPage.role).toHaveValue('Senior SDET');
   await expect(page.getByLabel('Salary from')).toHaveValue('140000');
+  await expect(page.getByLabel('Location')).toHaveValue('Boston, MA');
+  await expect(page.getByLabel('Work mode')).toHaveValue('Hybrid');
   await formPage.save.click();
   await expect(detailPage.heading('Initech Labs')).toBeVisible();
 });

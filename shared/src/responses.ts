@@ -268,5 +268,8 @@ export const PostingPreviewSchema = z.strictObject({
   salaryMin: z.number().int().min(0).nullable(),
   salaryMax: z.number().int().min(0).nullable(),
   salaryCurrency: z.string().nullable(),
+  location: z.string().nullable(),
+  workMode: z.enum(WORK_MODES).nullable(),
+  postedOn: calendarDate.nullable(),
 });
 export type PostingPreview = z.infer<typeof PostingPreviewSchema>;

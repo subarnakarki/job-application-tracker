@@ -56,6 +56,9 @@ describe('fill from link: schema.org JobPosting on the page', () => {
       salaryMin: 140000,
       salaryMax: 175000,
       salaryCurrency: 'USD',
+      location: null,
+      workMode: null,
+      postedOn: null,
     });
   });
 
@@ -108,11 +111,12 @@ describe('fill from link: schema.org JobPosting on the page', () => {
 describe('fill from link: job-board APIs', () => {
   it('Greenhouse: reads its public API, since its pages carry no JobPosting data', async () => {
     const fetch = pages({
-      'https://boards-api.greenhouse.io/v1/boards/gitlab/jobs/8638232002': JSON.stringify({
-        title: 'Senior Backend Engineer',
-        company_name: 'GitLab',
-        absolute_url: 'https://job-boards.greenhouse.io/gitlab/jobs/8638232002',
-      }),
+      'https://boards-api.greenhouse.io/v1/boards/gitlab/jobs/8638232002?pay_transparency=true':
+        JSON.stringify({
+          title: 'Senior Backend Engineer',
+          company_name: 'GitLab',
+          absolute_url: 'https://job-boards.greenhouse.io/gitlab/jobs/8638232002',
+        }),
     });
     const preview = await previewPosting(
       'https://job-boards.greenhouse.io/gitlab/jobs/8638232002',
@@ -124,7 +128,7 @@ describe('fill from link: job-board APIs', () => {
       salaryMin: null,
     });
     expect(fetch.asked).toEqual([
-      'https://boards-api.greenhouse.io/v1/boards/gitlab/jobs/8638232002',
+      'https://boards-api.greenhouse.io/v1/boards/gitlab/jobs/8638232002?pay_transparency=true',
     ]);
   });
 
