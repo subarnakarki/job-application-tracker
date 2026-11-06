@@ -14,7 +14,8 @@ import {
   type KeyboardCoordinateGetter,
 } from '@dnd-kit/core';
 import { CLOSED_STATUSES, STATUSES, type Application, type Status } from '@jat/shared';
-import { useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { STAGE_COLOR } from '../stage';
 import { useMediaQuery } from '../useMediaQuery';
 import { Link } from 'react-router';
 import { FollowUpFlag } from './StatusBadge';
@@ -66,6 +67,10 @@ const isClosed = (status: Status) => (CLOSED_STATUSES as readonly Status[]).incl
  */
 export function BoardView({ items, onMove }: Props) {
   const [dragging, setDragging] = useState<Application | null>(null);
+  // The card that was just dropped, for a short "pop" in its new column.
+  const [dropped, setDropped] = useState<string | null>(null);
+  const droppedTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(droppedTimer.current), []);
   // Phones get one stage at a time, as tabs; moves there use each card's Move to menu.
   const phone = useMediaQuery('(max-width: 639px)');
   const [tab, setTab] = useState<Status | null>(null);
@@ -121,7 +126,12 @@ export function BoardView({ items, onMove }: Props) {
     const application = byId.get(String(active.id));
     // Not cleared here: the end announcement reads it too. The next drag start clears it.
     const to = dropTarget(over);
-    if (application && to && to !== application.status) onMove(application, to);
+    if (application && to && to !== application.status) {
+      onMove(application, to);
+      setDropped(application.id);
+      window.clearTimeout(droppedTimer.current);
+      droppedTimer.current = window.setTimeout(() => setDropped(null), 900);
+    }
   };
 
   return (
@@ -150,26 +160,37 @@ export function BoardView({ items, onMove }: Props) {
               status={selected}
               items={items.filter((item) => item.status === selected)}
               onMove={onMove}
+              dropped={dropped}
               fullWidth
               draggable={false}
             />
           </div>
         </div>
       ) : (
-        <div
-          role="region"
-          aria-label="Board"
-          className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-4"
-        >
-          {STATUSES.map((status) => (
-            <Column
-              key={status}
-              status={status}
-              items={items.filter((item) => item.status === status)}
-              onMove={onMove}
-            />
-          ))}
-        </div>
+        <>
+          <p className="-mt-2 mb-3 text-xs text-fg-3">
+            Drag a card to another stage, or focus{' '}
+            <kbd className="rounded-[5px] border border-line-2 px-1.5 font-[inherit] text-fg-2">
+              ⠿
+            </kbd>{' '}
+            and use Space and the arrow keys.
+          </p>
+          <div
+            role="region"
+            aria-label="Board"
+            className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-4"
+          >
+            {STATUSES.map((status) => (
+              <Column
+                key={status}
+                status={status}
+                items={items.filter((item) => item.status === status)}
+                onMove={onMove}
+                dropped={dropped}
+              />
+            ))}
+          </div>
+        </>
       )}
       <DragOverlay>{dragging && <CardBody application={dragging} preview />}</DragOverlay>
     </DndContext>
@@ -226,13 +247,12 @@ function StageTabs({
                 choose(target);
               }
             }}
-            className={`min-h-11 shrink-0 snap-start rounded-lg border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${
-              active
-                ? 'border-blue-600 bg-blue-600 text-white'
-                : 'border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900'
+            className={`flex min-h-11 shrink-0 snap-start items-center gap-2 rounded-full px-4 text-[0.8125rem] transition-colors ${
+              active ? 'bg-white text-black' : 'text-fg-2 shadow-line hover:text-fg'
             }`}
           >
-            {status} <span className="tabular-nums">{count}</span>
+            {status}{' '}
+            <span className={`tabular-nums ${active ? 'text-black' : 'text-fg-3'}`}>{count}</span>
           </button>
         );
       })}
@@ -244,12 +264,14 @@ function Column({
   status,
   items,
   onMove,
+  dropped,
   fullWidth = false,
   draggable = true,
 }: {
   status: Status;
   items: Application[];
   onMove: Props['onMove'];
+  dropped: string | null;
   fullWidth?: boolean;
   draggable?: boolean;
 }) {
@@ -259,28 +281,52 @@ function Column({
     <section
       ref={setNodeRef}
       aria-labelledby={headingId}
-      className={`flex flex-col ${fullWidth ? 'w-full' : 'w-64 shrink-0 snap-start lg:w-auto lg:min-w-40 lg:flex-1 lg:shrink'} gap-2 rounded-xl border p-2 ${
-        isOver
-          ? 'border-blue-600 bg-blue-50 dark:bg-blue-950'
-          : 'border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900'
-      } ${isClosed(status) ? 'opacity-70' : ''}`}
+      style={{ '--c': STAGE_COLOR[status] } as CSSProperties}
+      className={`board-col flex flex-col ${fullWidth ? 'w-full' : 'w-64 shrink-0 snap-start lg:w-auto lg:min-w-40 lg:flex-1 lg:shrink'} gap-2 rounded-[1.125rem] p-1 ${
+        isOver ? 'board-col-over' : ''
+      }`}
     >
-      <h2 id={headingId} className="flex items-center justify-between px-1 text-sm font-semibold">
+      <h2
+        id={headingId}
+        className={`flex items-center gap-2 px-1.5 pt-1.5 pb-1 text-[0.8125rem] font-medium transition-colors ${
+          isOver ? 'text-fg' : isClosed(status) ? 'text-fg-3' : 'text-fg-2'
+        }`}
+      >
+        <i
+          aria-hidden="true"
+          className="size-1.5 shrink-0 rounded-full"
+          style={{ background: 'var(--c)', boxShadow: '0 0 10px var(--c)' }}
+        />
         <span>{status}</span>
-        <span className="tabular-nums text-slate-500 dark:text-slate-400">{items.length}</span>
+        <span
+          className={`ml-auto text-fg-3 tabular-nums ${
+            dropped && items.some((item) => item.id === dropped) ? 'count-bump' : ''
+          }`}
+        >
+          {items.length}
+        </span>
       </h2>
       {items.length === 0 && (
-        <p className="px-1 py-4 text-center text-xs text-slate-500 dark:text-slate-400">
+        <p className="rounded-[0.875rem] border border-dashed border-line-2 px-1.5 py-2.5 text-center text-xs text-fg-3">
           No applications
         </p>
       )}
       <ul className="flex flex-col gap-2">
         {items.map((application) =>
           draggable ? (
-            <DraggableCard key={application.id} application={application} onMove={onMove} />
+            <DraggableCard
+              key={application.id}
+              application={application}
+              onMove={onMove}
+              justDropped={dropped === application.id}
+            />
           ) : (
             <li key={application.id}>
-              <CardBody application={application} onMove={onMove} />
+              <CardBody
+                application={application}
+                onMove={onMove}
+                justDropped={dropped === application.id}
+              />
             </li>
           ),
         )}
@@ -292,9 +338,11 @@ function Column({
 function DraggableCard({
   application,
   onMove,
+  justDropped,
 }: {
   application: Application;
   onMove: Props['onMove'];
+  justDropped: boolean;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: application.id,
@@ -309,18 +357,19 @@ function DraggableCard({
       // so Space in the menu or Enter on the link never starts one.
       onMouseDown={listeners?.['onMouseDown'] as React.MouseEventHandler | undefined}
       onTouchStart={listeners?.['onTouchStart'] as React.TouchEventHandler | undefined}
-      className={isDragging ? 'opacity-40' : ''}
+      className={`transition-[opacity,transform] duration-200 ${isDragging ? 'scale-[0.98] opacity-[0.28]' : ''}`}
     >
       <CardBody
         application={application}
         onMove={onMove}
+        justDropped={justDropped}
         handle={
           <button
             type="button"
             {...attributes}
             onKeyDown={listeners?.['onKeyDown'] as React.KeyboardEventHandler | undefined}
             aria-label={`Drag ${application.company}`}
-            className="cursor-grab rounded px-1 text-slate-400 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-blue-600 dark:hover:text-slate-200"
+            className="-mt-1 -mr-1.5 grid size-7 cursor-grab place-items-center rounded-lg text-fg-3 transition-colors hover:bg-white/10 hover:text-fg"
           >
             <span aria-hidden="true">⠿</span>
           </button>
@@ -335,36 +384,37 @@ function CardBody({
   onMove,
   handle,
   preview = false,
+  justDropped = false,
 }: {
   application: Application;
   onMove?: Props['onMove'];
   handle?: React.ReactNode;
   preview?: boolean;
+  justDropped?: boolean;
 }) {
   return (
     <div
-      className={`flex flex-col gap-1 rounded-lg border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-950 ${
-        preview ? 'rotate-1 shadow-lg' : ''
-      }`}
+      style={{ '--c': STAGE_COLOR[application.status] } as CSSProperties}
+      className={`glow flex flex-col gap-1.5 rounded-2xl p-3.5 text-sm ${
+        preview ? 'board-card-lifted' : 'transition-transform duration-300 hover:-translate-y-0.5'
+      } ${justDropped ? 'board-card-dropped' : ''}`}
     >
       <div className="flex items-start justify-between gap-2">
         {preview ? (
-          <span className="font-semibold">{application.company}</span>
+          <span className="font-medium tracking-[-0.02em]">{application.company}</span>
         ) : (
           <Link
             to={`/applications/${application.id}`}
-            className="font-semibold hover:underline focus-visible:outline-2 focus-visible:outline-blue-600"
+            className="font-medium tracking-[-0.02em] hover:underline"
           >
             {application.company}
           </Link>
         )}
         {handle}
       </div>
-      <p className="text-slate-600 dark:text-slate-300">{application.role}</p>
+      <p className="text-[0.8125rem] text-fg-2">{application.role}</p>
       {interviewText(application) && (
-        <p className="text-xs font-medium text-violet-800 dark:text-violet-300">
-          {interviewText(application)}
-        </p>
+        <p className="text-xs font-medium text-[#d4a6ff]">{interviewText(application)}</p>
       )}
       {application.needsFollowUp && (
         <div>
@@ -376,6 +426,7 @@ function CardBody({
           company={application.company}
           status={application.status}
           onMove={(to) => onMove(application, to)}
+          className="mt-1 w-full"
         />
       )}
     </div>

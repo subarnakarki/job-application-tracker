@@ -5,6 +5,8 @@ interface Props {
   company: string;
   status: Status;
   disabled?: boolean;
+  /** Classes for the wrapper; the default gives the menu room for its longest stage name. */
+  className?: string;
   onMove: (to: Status) => void;
 }
 
@@ -12,9 +14,9 @@ interface Props {
  * "Move to…": changes an application's stage in one step. A native select, so it works the same
  * with a mouse, a finger, the keyboard and a screen reader; the stage bars and chevron are decoration.
  */
-export function StatusMenu({ company, status, disabled, onMove }: Props) {
+export function StatusMenu({ company, status, disabled, className = 'min-w-40', onMove }: Props) {
   return (
-    <span className="relative inline-flex min-w-40 items-center">
+    <span className={`relative inline-flex items-center ${className}`}>
       <span className="pointer-events-none absolute left-3.5 flex">
         <StageBars status={status} />
       </span>
