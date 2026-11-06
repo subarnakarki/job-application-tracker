@@ -28,5 +28,5 @@ export function strategyFor(request: {
 }
 
 /** Bump to drop every cached file on the next activation. */
-export const CACHE_NAME = 'jat-shell-v1';
+export const CACHE_NAME = 'jat-shell-v2';
 export const SHELL_URL = '/index.html';
