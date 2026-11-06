@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import {
   useDeleteAccount,
@@ -128,6 +128,17 @@ export function AccountPage() {
   const deleteAccount = useDeleteAccount();
   const navigate = useNavigate();
   const [confirming, setConfirming] = useState(false);
+  // Starting an import sends the whole page to Google and back, so a second click before the page
+  // leaves would start it twice. The button stays off until this page is shown again.
+  const [importStarting, setImportStarting] = useState(false);
+  useEffect(() => {
+    // Coming back with the browser's Back button restores this page as it was left.
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) setImportStarting(false);
+    };
+    window.addEventListener('pageshow', onPageShow);
+    return () => window.removeEventListener('pageshow', onPageShow);
+  }, []);
   const importStatus = useImportStatus();
   const importRuns = useImportRuns();
   const runs = importRuns.data?.items ?? [];
@@ -197,8 +208,16 @@ export function AccountPage() {
                       undo each one.
                     </p>
                     <div>
-                      <a href="/api/import/gmail/start" className="btn-w">
-                        Import from Gmail
+                      <a
+                        href="/api/import/gmail/start"
+                        className={`btn-w ${importStarting ? 'pointer-events-none opacity-60' : ''}`}
+                        aria-disabled={importStarting || undefined}
+                        onClick={(event) => {
+                          if (importStarting) event.preventDefault();
+                          else setImportStarting(true);
+                        }}
+                      >
+                        {importStarting ? 'Importing…' : 'Import from Gmail'}
                       </a>
                     </div>
                   </>
