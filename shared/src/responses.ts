@@ -188,3 +188,50 @@ export const DataExportSchema = z.strictObject({
   imports: z.strictObject({ runs: z.array(ImportRunSchema), items: z.array(ImportItemSchema) }),
 });
 export type DataExport = z.infer<typeof DataExportSchema>;
+
+export const LeadNoteSchema = z.strictObject({
+  id: z.uuid(),
+  heldOn: calendarDate,
+  body: z.string(),
+  createdAt: instant,
+  updatedAt: instant,
+});
+export type LeadNote = z.infer<typeof LeadNoteSchema>;
+
+export const LeadSchema = z.strictObject({
+  id: z.uuid(),
+  name: z.string(),
+  company: z.string().nullable(),
+  email: z.string().nullable(),
+  phone: z.string().nullable(),
+  profileLink: z.string().nullable(),
+  createdAt: instant,
+  updatedAt: instant,
+  noteCount: z.number().int().min(0),
+  /** The newest note (by day, then by when it was written), for the list. */
+  latestNote: z.strictObject({ heldOn: calendarDate, body: z.string() }).nullable(),
+  applicationCount: z.number().int().min(0),
+});
+export type Lead = z.infer<typeof LeadSchema>;
+
+export const LeadDetailSchema = LeadSchema.extend({
+  /** Newest first. */
+  notes: z.array(LeadNoteSchema),
+  /** The applications that came through this lead, most recently updated first. */
+  applications: z.array(
+    z.strictObject({
+      id: z.uuid(),
+      company: z.string(),
+      role: z.string(),
+      status: z.enum(STATUSES),
+    }),
+  ),
+});
+export type LeadDetail = z.infer<typeof LeadDetailSchema>;
+
+/** `GET /api/leads`: every lead (at most the per-user cap, so no paging), by name. */
+export const LeadListSchema = z.strictObject({
+  items: z.array(LeadSchema),
+  total: z.number().int().min(0),
+});
+export type LeadList = z.infer<typeof LeadListSchema>;

@@ -182,3 +182,80 @@ export const TimeZoneSchema = z.string().refine(isValidTimeZone, 'Unknown time z
 /** `PATCH /api/me`: the only setting a user can change so far. */
 export const UserSettingsPatchSchema = z.strictObject({ timeZone: TimeZoneSchema });
 export type UserSettingsPatch = z.output<typeof UserSettingsPatchSchema>;
+
+// ---------------------------------------------------------------------------------------------
+// Networking leads: the people helping with the search, and notes from each conversation.
+
+const noNul = (value: string) => !value.includes('\u0000');
+
+const optionalLink = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .transform((value) => (value === '' ? null : value))
+    .nullable()
+    .refine((value) => value === null || isHttpUrl(value), 'Must be an http(s) link');
+
+const optionalEmail = z
+  .string()
+  .trim()
+  .max(LIMITS.email)
+  .transform((value) => (value === '' ? null : value))
+  .nullable()
+  .refine(
+    (value) => value === null || /^[^@\s]+@[^@\s]+$/.test(value),
+    'Must be an email address such as sam@example.com',
+  );
+
+const leadFields = {
+  name: requiredText(LIMITS.leadName),
+  company: optionalText(LIMITS.leadCompany),
+  email: optionalEmail,
+  phone: optionalText(LIMITS.phone),
+  profileLink: optionalLink(LIMITS.profileLink),
+};
+
+export const LeadInputSchema = z.strictObject({
+  name: leadFields.name,
+  company: leadFields.company.default(null),
+  email: leadFields.email.default(null),
+  phone: leadFields.phone.default(null),
+  profileLink: leadFields.profileLink.default(null),
+});
+export type LeadInput = z.output<typeof LeadInputSchema>;
+
+/** An absent key leaves the value unchanged; `null` clears it (the name cannot be cleared). */
+export const LeadPatchSchema = z.strictObject({
+  name: leadFields.name.optional(),
+  company: leadFields.company.optional(),
+  email: leadFields.email.optional(),
+  phone: leadFields.phone.optional(),
+  profileLink: leadFields.profileLink.optional(),
+});
+export type LeadPatch = z.output<typeof LeadPatchSchema>;
+
+const noteBody = z
+  .string()
+  .trim()
+  .min(1, 'Required')
+  .max(LIMITS.leadNote)
+  .refine(noNul, 'Must not contain NUL characters');
+
+/** A note's day: never in the future, which the API checks against the user's own today. */
+export const LeadNoteInputSchema = z.strictObject({
+  heldOn: dateOnly,
+  body: noteBody,
+});
+export type LeadNoteInput = z.output<typeof LeadNoteInputSchema>;
+
+export const LeadNotePatchSchema = z.strictObject({
+  heldOn: dateOnly.optional(),
+  body: noteBody.optional(),
+});
+export type LeadNotePatch = z.output<typeof LeadNotePatchSchema>;
+
+/** Why a note's day is not acceptable, or null. Both are YYYY-MM-DD, which compare as strings. */
+export function noteDateProblem(heldOn: string, today: string): string | null {
+  return heldOn > today ? 'A note cannot be dated in the future' : null;
+}

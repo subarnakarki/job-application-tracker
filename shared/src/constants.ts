@@ -61,6 +61,15 @@ export const LIMITS = {
   notes: 10_000,
   search: 200,
   salaryMax: 100_000_000,
+  leadsPerUser: 500,
+  leadsPerDemoUser: 30,
+  notesPerLead: 200,
+  leadName: 200,
+  leadCompany: 200,
+  email: 320,
+  phone: 50,
+  profileLink: 2000,
+  leadNote: 5000,
 } as const;
 
 export function isClosed(status: Status): boolean {
