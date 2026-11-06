@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  assembleDraft,
   DEFAULT_QUERY,
   googleSearchUrl,
   isRunDue,
@@ -10,9 +11,12 @@ import {
   pickOption,
   profileAnswer,
   profileQuestionKind,
+  questionsForModel,
   sortJob,
   uniqueJobRefs,
+  type ApplicationQuestion,
   type JobFacts,
+  type ModelDraft,
   type JobSearchProfile,
   type SortRules,
 } from './jobSearch';
@@ -369,5 +373,109 @@ describe('screening questions answered from the profile', () => {
     ).toBe("I don't wish to answer");
     expect(pickOption('US citizen', ['Yes', 'No'])).toBeNull();
     expect(pickOption('anything', [])).toBe('anything');
+  });
+});
+
+describe('assembleDraft', () => {
+  const q = (
+    label: string,
+    kind: ApplicationQuestion['kind'] = 'text',
+    options: string[] = [],
+    required = true,
+  ): ApplicationQuestion => ({ label, kind, options, required });
+  const model: ModelDraft = {
+    answers: [
+      { question: 'Why do you want to work here?', answer: 'Because of X.', needsCandidate: false },
+      { question: 'Have you worked here before?', answer: 'No', needsCandidate: false },
+      { question: 'Gender', answer: 'Woman', needsCandidate: false },
+      { question: 'Do you hold a security clearance?', answer: '', needsCandidate: true },
+    ],
+    coverLetter: 'Dear team, ...',
+    whyInterested: 'The mission.',
+  };
+
+  it('answers profile questions by code and the rest from the draft', () => {
+    const { draft, needsYou } = assembleDraft(
+      [
+        q('First Name'),
+        q('Resume/CV', 'file'),
+        q('Cover Letter', 'file', [], false),
+        q('Will you require visa sponsorship?', 'single_select', ['Yes', 'No']),
+        q('Why do you want to work here?', 'long_text'),
+        q('Have you worked here before?', 'single_select', ['Yes', 'No']),
+        q('Gender', 'single_select', ['Man', 'Woman', 'Decline to self-identify'], false),
+      ],
+      PROFILE,
+      model,
+    );
+    expect(needsYou).toBe(false);
+    expect(draft.answers).toEqual([
+      { question: 'First Name', answer: 'Pat', source: 'profile', option: null },
+      {
+        question: 'Resume/CV',
+        answer: 'Attach the resume file from the queue',
+        source: 'profile',
+        option: null,
+      },
+      { question: 'Cover Letter', answer: 'Dear team, ...', source: 'draft', option: null },
+      {
+        question: 'Will you require visa sponsorship?',
+        answer: 'No',
+        source: 'profile',
+        option: 'No',
+      },
+      {
+        question: 'Why do you want to work here?',
+        answer: 'Because of X.',
+        source: 'draft',
+        option: null,
+      },
+      { question: 'Have you worked here before?', answer: 'No', source: 'draft', option: 'No' },
+      // EEO: always the saved answer, never the model's.
+      {
+        question: 'Gender',
+        answer: 'Decline to self-identify',
+        source: 'profile',
+        option: 'Decline to self-identify',
+      },
+    ]);
+  });
+
+  it('marks a required question it cannot answer as needs you', () => {
+    const result = assembleDraft(
+      [q('Do you hold a security clearance?'), q('Unasked question')],
+      PROFILE,
+      model,
+    );
+    expect(result.needsYou).toBe(true);
+    expect(result.draft.answers.map((answer) => answer.source)).toEqual(['needs_you', 'needs_you']);
+  });
+
+  it('needs you when a profile answer matches none of the options', () => {
+    const result = assembleDraft(
+      [q('Are you authorized to work in the US?', 'single_select', ['Yes', 'No'])],
+      PROFILE,
+      model,
+    );
+    expect(result.needsYou).toBe(true);
+    expect(result.draft.answers[0]).toMatchObject({ answer: 'US citizen', source: 'needs_you' });
+  });
+
+  it('leaves an optional question it cannot answer empty without holding the job back', () => {
+    expect(
+      assembleDraft(
+        [q('Pronouns?', 'text', [], false), q('Anything else?', 'long_text', [], false)],
+        PROFILE,
+        model,
+      ).needsYou,
+    ).toBe(false);
+  });
+
+  it('sends the model only the questions code cannot answer', () => {
+    expect(
+      questionsForModel([q('Email'), q('Why us?'), q('VeteranStatus', 'single_select')]).map(
+        (question) => question.label,
+      ),
+    ).toEqual(['Why us?']);
   });
 });

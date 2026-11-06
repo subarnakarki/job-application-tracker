@@ -553,3 +553,79 @@ export const ApplicationDraftSchema = z.strictObject({
   whyInterested: z.string().max(2000),
 });
 export type ApplicationDraft = z.infer<typeof ApplicationDraftSchema>;
+
+/** What the model drafts for the questions code does not answer. */
+export const ModelDraftSchema = z.strictObject({
+  answers: z.array(
+    z.strictObject({
+      question: z.string(),
+      answer: z.string().describe('Empty when the resume does not support an answer'),
+      needsCandidate: z
+        .boolean()
+        .describe('True when only the candidate can answer (facts the resume does not state)'),
+    }),
+  ),
+  coverLetter: z.string().describe('Under 200 words, specific to this job, grounded in the resume'),
+  whyInterested: z.string().describe('Two or three sentences, grounded in the posting and resume'),
+});
+export type ModelDraft = z.infer<typeof ModelDraftSchema>;
+
+/** The questions the model is asked: those code cannot answer from the profile. */
+export function questionsForModel(questions: ApplicationQuestion[]): ApplicationQuestion[] {
+  return questions.filter((question) => profileQuestionKind(question.label) === null);
+}
+
+const RESUME_ANSWER = 'Attach the resume file from the queue';
+
+/**
+ * The full draft: profile questions answered by code (an EEO question always gets the saved
+ * answer, whatever the model said), the rest from the model, and anything without a usable answer
+ * marked needs_you. For a fixed-choice question the exact option is picked, or it needs you.
+ */
+export function assembleDraft(
+  questions: ApplicationQuestion[],
+  profile: JobSearchProfile,
+  model: ModelDraft,
+): { draft: ApplicationDraft; needsYou: boolean } {
+  const fromModel = new Map(model.answers.map((entry) => [entry.question.trim(), entry]));
+  const clip = (value: string, max: number) => [...value.trim()].slice(0, max).join('');
+  let needsYou = false;
+
+  const answers: DraftAnswer[] = questions.map((question) => {
+    const kind = profileQuestionKind(question.label);
+    const choices = question.kind.endsWith('select') ? question.options : [];
+    let answer: string | null;
+    let source: DraftAnswer['source'];
+    if (kind === 'resume') {
+      answer = RESUME_ANSWER;
+      source = 'profile';
+    } else if (kind === 'cover_letter') {
+      answer = clip(model.coverLetter, 4000) || null;
+      source = 'draft';
+    } else if (kind) {
+      answer = profileAnswer(kind, profile);
+      source = 'profile';
+    } else {
+      const drafted = fromModel.get(question.label.trim());
+      answer = drafted && !drafted.needsCandidate ? clip(drafted.answer, 4000) || null : null;
+      source = 'draft';
+    }
+    const option = answer !== null && choices.length > 0 ? pickOption(answer, choices) : null;
+    const usable = answer !== null && (choices.length === 0 || option !== null);
+    if (!usable) {
+      // An optional question can stay empty; a required one waits for the candidate.
+      if (question.required) needsYou = true;
+      return { question: question.label, answer: answer ?? '', source: 'needs_you', option: null };
+    }
+    return { question: question.label, answer: answer ?? '', source, option };
+  });
+
+  return {
+    draft: {
+      answers,
+      coverLetter: clip(model.coverLetter, 5000),
+      whyInterested: clip(model.whyInterested, 2000),
+    },
+    needsYou,
+  };
+}
