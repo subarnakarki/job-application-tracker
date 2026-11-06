@@ -21,9 +21,15 @@ import {
   serializeImportCookie,
   type GmailAuthorizer,
 } from '../import/gmailAuth';
-import { runImport } from '../import/run';
+import { ImportAlreadyRunningError, runImport } from '../import/run';
 import type { Owner } from '../repo/applications';
-import { getRun, listRuns, type ImportItem, type ImportRun } from '../repo/imports';
+import {
+  getRun,
+  hasRunningImport,
+  listRuns,
+  type ImportItem,
+  type ImportRun,
+} from '../repo/imports';
 import { origin, sameToken } from './google';
 
 export const GMAIL_CALLBACK_PATH = '/api/import/gmail/callback';
@@ -162,6 +168,9 @@ export function registerImportRoutes(app: FastifyInstance, deps: ImportRouteDeps
       const authorizer = deps.authorizer;
       const user = request.auth?.user;
       if (!authorizer || !user) throw notFound();
+      // Already importing (another tab, a double click): do not send them to Google again.
+      if (await hasRunningImport(db(), owner.userId, deps.clock.now()))
+        return reply.redirect(failTo('import_running'), 302);
       const pending = { state: randomToken(), verifier: randomToken(), userId: owner.userId };
       void reply.header('set-cookie', serializeImportCookie(pending));
       return reply.redirect(
@@ -225,6 +234,10 @@ export function registerImportRoutes(app: FastifyInstance, deps: ImportRouteDeps
         );
         return await reply.redirect(`/import/${runId}`, 302);
       } catch (error) {
+        if (error instanceof ImportAlreadyRunningError) {
+          request.log.warn('Gmail import refused: one is already running for this user');
+          return reply.redirect(failTo('import_running'), 302);
+        }
         if (error instanceof GmailAuthError) {
           request.log.warn({ reason: error.message }, 'Gmail access refused');
           return reply.redirect(failTo(error.reason), 302);

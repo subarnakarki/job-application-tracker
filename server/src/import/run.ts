@@ -9,10 +9,10 @@ import {
 } from '../repo/applications';
 import {
   claimMessage,
-  createRun,
   finishRun,
   lastFinishedRunStart,
   releasePending,
+  startRun,
   updateItem,
   type ItemFields,
 } from '../repo/imports';
@@ -25,6 +25,14 @@ export interface ImportDeps {
   gmail: GmailClient;
   classifier: EmailClassifier;
   clock: Clock;
+}
+
+/** This user already has an import running: only one at a time. */
+export class ImportAlreadyRunningError extends Error {
+  constructor() {
+    super('An import is already running');
+    this.name = 'ImportAlreadyRunningError';
+  }
 }
 
 /** Emails fetched and classified at the same time (the applying is one at a time). */
@@ -83,8 +91,20 @@ export async function runImport(
   accessToken: string,
 ): Promise<string> {
   const { db, gmail, classifier, clock } = deps;
-  const since = await lastFinishedRunStart(db, owner.userId);
-  const runId = await createRun(db, owner.userId, clock.now());
+  // Claim the run first (one at a time per user), so a second request does no work at all.
+  const runId = await startRun(db, owner.userId, clock.now());
+  if (!runId) throw new ImportAlreadyRunningError();
+  let since: Date | null;
+  try {
+    since = await lastFinishedRunStart(db, owner.userId);
+  } catch (error) {
+    await finishRun(db, owner.userId, runId, {
+      status: 'failed',
+      emailsScanned: 0,
+      now: clock.now(),
+    });
+    throw error;
+  }
   try {
     const ids = await gmail.listMessageIds(accessToken, gmailQuery(since), MAX_MESSAGES);
     const claimed: { itemId: string; messageId: string }[] = [];

@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Classification, EmailClassifier } from '../import/classify';
 import type { GmailClient, GmailMessage } from '../import/gmail';
 import { GmailAuthError, type GmailAuthorizer } from '../import/gmailAuth';
+import { finishRun, startRun } from '../repo/imports';
 import { createTestApp, SAME_ORIGIN, setCookies, T0, type TestApp } from '../test/app';
 import { TEST_DATABASE_URL } from '../test/testDb';
 
@@ -162,6 +163,37 @@ describe.skipIf(!TEST_DATABASE_URL)(
       const response = await runImport(cookie, user.id);
 
       expect(response.headers.location).toBe('/account?import=gmail_not_granted');
+    });
+
+    it('does not start a second import while one is running', async () => {
+      const { cookie, user } = await importer();
+      inbox.owner = user.id;
+      // The user is already on their way to Google (say, a second tab) when another import starts.
+      const start = await get('/api/import/gmail/start', cookie);
+      const state = new URL(String(start.headers.location)).searchParams.get('state') ?? '';
+      const importCookie = (setCookies(start)[0] ?? '').split(';')[0] ?? '';
+      const running = (await startRun(t.db, user.id, t.clock.now())) ?? '';
+
+      // A new start is not sent to Google again...
+      const second = await get('/api/import/gmail/start', cookie);
+      expect(second.statusCode).toBe(302);
+      expect(second.headers.location).toBe('/account?import=import_running');
+      // ...and the callback of the earlier trip is refused too, with nothing imported.
+      const callback = await get(
+        `/api/import/gmail/callback?code=abc&state=${state}`,
+        `${cookie}; ${importCookie}`,
+      );
+      expect(callback.headers.location).toBe('/account?import=import_running');
+      const runs = await get('/api/import/runs', cookie);
+      expect(runs.json<{ items: unknown[] }>().items).toHaveLength(1);
+
+      // Once the running one is done, a new import works again.
+      await finishRun(t.db, user.id, running, {
+        status: 'finished',
+        emailsScanned: 0,
+        now: t.clock.now(),
+      });
+      expect((await runImport(cookie, user.id)).headers.location).toMatch(/^\/import\//);
     });
 
     it('has no daily limit for an allowed user (each email is still handled once)', async () => {

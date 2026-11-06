@@ -19,6 +19,7 @@ const IMPORT_MESSAGES: Record<string, string> = {
   gmail_not_granted: 'Gmail access was not granted, so nothing was imported.',
   gmail_expired: 'That import link expired. Start it again from here.',
   gmail_failed: 'Gmail could not be read just now. Try again shortly.',
+  import_running: 'An import is already running. Wait for it to finish, then check the results.',
   google_failed: 'Google did not confirm the access. Try again.',
   classifier_unavailable: 'The email classifier is unavailable right now. Nothing was changed.',
 };

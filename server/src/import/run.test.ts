@@ -6,14 +6,20 @@ import {
   updateApplication,
   type Owner,
 } from '../repo/applications';
-import { getRun, type ImportItem } from '../repo/imports';
+import {
+  finishRun,
+  getRun,
+  IMPORT_STALE_AFTER_MS,
+  startRun,
+  type ImportItem,
+} from '../repo/imports';
 import { mutableClock, T0 } from '../test/app';
 import { insertUser } from '../test/factories';
 import { createTestDb, TEST_DATABASE_URL, type TestDb } from '../test/testDb';
 import { applyItem, dismissItem, undoItem } from './actions';
 import { ClassifierUnavailableError, type Classification, type EmailClassifier } from './classify';
 import { GmailError, type GmailClient, type GmailMessage } from './gmail';
-import { runImport, type ImportDeps } from './run';
+import { ImportAlreadyRunningError, runImport, type ImportDeps } from './run';
 import type { EmailVerdict } from './verdict';
 
 const HOUR = 60 * 60 * 1000;
@@ -238,6 +244,61 @@ describe.skipIf(!TEST_DATABASE_URL)('Gmail import (real Postgres, fake Gmail and
     expect(second?.items).toEqual([]);
     expect(inbox.queries[0]).toMatch(/^newer_than:30d/);
     expect(inbox.queries[1]).toMatch(/^after:\d+/);
+  });
+
+  describe('one import at a time', () => {
+    it('refuses a second import while one is running, and allows it once that one is done', async () => {
+      const first = await startRun(testDb.db, owner.userId, clock.now());
+      expect(first).toBeTruthy();
+      inbox.add(email('waits', 1), verdict({ kind: 'application_confirmation', company: 'Waits' }));
+
+      await expect(runImport(deps, owner, 'token')).rejects.toBeInstanceOf(
+        ImportAlreadyRunningError,
+      );
+      expect(inbox.queries).toEqual([]); // refused before it asked Gmail for anything
+
+      await finishRun(testDb.db, owner.userId, first ?? '', {
+        status: 'finished',
+        emailsScanned: 0,
+        now: clock.now(),
+      });
+      const items = await itemsOf(await runImport(deps, owner, 'token'));
+      expect(items.get('waits')?.outcome).toBe('created');
+    });
+
+    it('lets exactly one of several simultaneous starts through', async () => {
+      const results = await Promise.all(
+        Array.from({ length: 6 }, () => startRun(testDb.db, owner.userId, clock.now())),
+      );
+
+      expect(results.filter((id) => id !== null)).toHaveLength(1);
+    });
+
+    it('does not make other users wait', async () => {
+      await startRun(testDb.db, owner.userId, clock.now());
+      const other = await insertUser(testDb.db);
+
+      expect(await startRun(testDb.db, other.id, clock.now())).toBeTruthy();
+    });
+
+    it('takes a run left running for ages as dead, and marks it failed', async () => {
+      const stuck = (await startRun(testDb.db, owner.userId, clock.now())) ?? '';
+      clock.advance(IMPORT_STALE_AFTER_MS - 1000);
+      expect(await startRun(testDb.db, owner.userId, clock.now())).toBeNull();
+
+      clock.advance(2000);
+      expect(await startRun(testDb.db, owner.userId, clock.now())).toBeTruthy();
+      expect((await getRun(testDb.db, owner.userId, stuck))?.run.status).toBe('failed');
+    });
+
+    it('frees the slot when a run fails', async () => {
+      inbox.add(email('bad', 1), new ClassifierUnavailableError('bad key'));
+      await expect(runImport(deps, owner, 'token')).rejects.toBeInstanceOf(
+        ClassifierUnavailableError,
+      );
+
+      expect(await startRun(testDb.db, owner.userId, clock.now())).toBeTruthy();
+    });
   });
 
   it('sends an unreadable email to review instead of failing the run', async () => {

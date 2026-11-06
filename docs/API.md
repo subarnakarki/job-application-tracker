@@ -81,3 +81,9 @@ Imported changes are recorded with actor `gmail`. Item actions answer 409 `impor
 ## Health
 
 `GET /api/health` (never touches the database) and `GET /api/health/db` (proves the database answers).
+
+**One import at a time:** a user can have only one import running. The check and the new run are made together
+under a per-user database lock, so two requests at the same moment cannot both start. While one runs, `start`
+and the callback redirect to `/account?import=import_running` without asking Google or Gmail for anything. A run
+still marked running after 10 minutes is taken as dead (the function limit is 300 s) and marked failed, so a
+crash cannot block imports for ever.

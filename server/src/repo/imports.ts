@@ -1,5 +1,5 @@
 import type { Status } from '@jat/shared';
-import type { Queryable } from '../db/types';
+import type { Db, Queryable } from '../db/types';
 import type { VerdictKind } from '../import/verdict';
 
 /**
@@ -113,7 +113,42 @@ const toItem = (row: ItemRow): ImportItem => ({
   appliedVersion: row.applied_version,
 });
 
-export async function createRun(db: Queryable, userId: string, now: Date): Promise<string> {
+/**
+ * A run still marked "running" after this long is taken for dead (the import function's limit is
+ * 300 s), so a crashed run cannot block imports for ever.
+ */
+export const IMPORT_STALE_AFTER_MS = 10 * 60 * 1000;
+
+const NOT_STALE = `started_at > $2::timestamptz - ($3::double precision * interval '1 millisecond')`;
+
+/** Whether this user has an import that is running right now. */
+export async function hasRunningImport(db: Queryable, userId: string, now: Date): Promise<boolean> {
+  const result = await db.query(
+    `select 1 from import_runs where user_id = $1 and status = 'running' and ${NOT_STALE} limit 1`,
+    [userId, now, IMPORT_STALE_AFTER_MS],
+  );
+  return result.rows.length > 0;
+}
+
+/**
+ * Starts a run, unless this user already has one running (then null). Checked and created under a
+ * per-user lock, so two requests at the same moment can never both start one. Runs that were left
+ * "running" long ago are marked failed first.
+ */
+export async function startRun(db: Db, userId: string, now: Date): Promise<string | null> {
+  return db.transaction(async (tx) => {
+    await tx.query("select pg_advisory_xact_lock(hashtext('jat:import:' || $1))", [userId]);
+    await tx.query(
+      `update import_runs set status = 'failed', finished_at = $2
+        where user_id = $1 and status = 'running' and not (${NOT_STALE})`,
+      [userId, now, IMPORT_STALE_AFTER_MS],
+    );
+    if (await hasRunningImport(tx, userId, now)) return null;
+    return createRun(tx, userId, now);
+  });
+}
+
+async function createRun(db: Queryable, userId: string, now: Date): Promise<string> {
   const result = await db.query<{ id: string }>(
     'insert into import_runs (user_id, started_at) values ($1, $2) returning id',
     [userId, now],
