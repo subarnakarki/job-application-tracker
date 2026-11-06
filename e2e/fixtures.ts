@@ -36,6 +36,12 @@ export class Api {
     return (await response.json()) as ApplicationDetail;
   }
 
+  /** Stores pasted resume text for the signed-in user. */
+  async uploadResumeText(text: string) {
+    const response = await this.request.put('/api/resume', { data: { kind: 'text', text } });
+    expect(response.status(), await response.text()).toBe(200);
+  }
+
   async getApplication(id: string) {
     const response = await this.request.get(`/api/applications/${id}`);
     expect(response.status(), await response.text()).toBe(200);

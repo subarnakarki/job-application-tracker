@@ -89,3 +89,48 @@ test('a scanned PDF is refused with a way forward, and pasted text works instead
   await expect(page.getByText(/^Pasted text · Pasted text · [\d,]+ characters/)).toBeVisible();
   await expect(page.getByRole('link', { name: 'Download' })).toHaveCount(0);
 });
+
+test("check my resume against an application's posting", async ({ page, api, detailPage }) => {
+  await api.uploadResumeText(
+    'Pat Example. Senior SDET with Playwright, TypeScript and CI/CD experience. '.repeat(4),
+  );
+  const application = await api.createApplication({
+    company: 'Initech',
+    role: 'Senior SDET',
+    jobLink: 'https://careers.example.com/jobs/sdet',
+  });
+  await page.route('**/api/resume', async (route) => {
+    const response = await route.fetch();
+    const body = (await response.json()) as Record<string, unknown>;
+    return route.fulfill({ response, json: { ...body, analysisAvailable: true } });
+  });
+  // The server's reading of the posting is covered by API tests; the browser's answer is mocked.
+  await page.route(`**/api/applications/${application.id}/resume-match`, (route) =>
+    route.fulfill({
+      status: 200,
+      json: {
+        jobLink: 'https://careers.example.com/jobs/sdet',
+        model: 'claude-opus-5-5',
+        keywords: [
+          { term: 'Playwright', group: 'tool', found: true },
+          { term: 'TypeScript', group: 'hard_skill', found: true },
+          { term: 'Selenium', group: 'tool', found: true },
+          { term: 'ISTQB', group: 'certification', found: false },
+        ],
+        found: 3,
+        matchPercent: 75,
+      },
+    }),
+  );
+
+  await detailPage.goto(application.id);
+  await page.getByRole('button', { name: 'Check my resume' }).click();
+
+  await expect(
+    page.getByText(/of this posting's keywords are in your resume \(3 of 4\)/),
+  ).toBeVisible();
+  await expect(page.getByText('75%')).toBeVisible();
+  await expect(
+    page.getByRole('list', { name: 'Posting keywords' }).getByRole('listitem').last(),
+  ).toHaveText('+ISTQB (missing)');
+});

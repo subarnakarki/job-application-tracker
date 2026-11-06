@@ -12,6 +12,7 @@ import {
 import { ApplicationForm } from '../components/ApplicationForm';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { InterviewsSection } from '../components/InterviewsSection';
+import { ResumeMatchSection } from '../components/ResumeMatchSection';
 import { Glow } from '../components/ui/Glow';
 import {
   FillFromPostingButton,
@@ -235,6 +236,7 @@ export function ApplicationDetailPage() {
 
         <div className="flex flex-col gap-3">
           <InterviewsSection application={application} />
+          <ResumeMatchSection application={application} />
 
           <Glow as="section" aria-labelledby="history-heading" className="rise rise-5 p-5">
             <h2 id="history-heading" className="text-[0.8125rem] font-medium text-fg-2">
