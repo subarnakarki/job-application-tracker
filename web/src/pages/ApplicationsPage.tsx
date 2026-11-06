@@ -216,7 +216,7 @@ export function ApplicationsPage() {
             </label>
             <select
               id="sort"
-              className="inp text-sm"
+              className="inp select-chevron text-sm"
               value={filters.sort ?? 'updated_desc'}
               onChange={(event) => setFilters({ sort: event.target.value as Sort })}
             >

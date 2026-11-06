@@ -42,16 +42,13 @@ export function LoginPage() {
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-6 px-4">
       <div>
         <h1 className="text-2xl font-semibold">{APP_NAME}</h1>
-        <p className="mt-2 text-slate-600 dark:text-slate-300">
+        <p className="mt-2 text-fg-2">
           Track your job applications through the hiring pipeline, and see which ones need a
           follow-up.
         </p>
       </div>
       {error && (
-        <p
-          role="alert"
-          className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800 dark:bg-rose-950 dark:text-rose-200"
-        >
+        <p role="alert" className="rounded-lg bg-red/10 p-3 text-sm text-red">
           {error}
         </p>
       )}
@@ -71,7 +68,7 @@ export function LoginPage() {
           {demo.isPending ? 'Signing in…' : 'Try the demo'}
         </button>
       </div>
-      <p className="text-xs text-slate-500 dark:text-slate-400">
+      <p className="text-xs text-fg-3">
         Your applications are private to your Google account. The demo account is shared by everyone
         who tries it.{' '}
         <Link to="/privacy" className="underline">

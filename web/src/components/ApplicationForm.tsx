@@ -2,6 +2,7 @@ import { SOURCES, STATUSES, type ApplicationInput } from '@jat/shared';
 import { useId, useState, type ReactNode } from 'react';
 import { ApiRequestError } from '../api/client';
 import { useLeads, usePostingPreview } from '../api/hooks';
+import { useSpotlight } from '../useSpotlight';
 import { fillEmpty, validate, type FieldErrors, type FormValues } from '../form';
 
 interface Props {
@@ -37,6 +38,9 @@ export function ApplicationForm({
   const [clientErrors, setClientErrors] = useState<FieldErrors>({});
   const errors = { ...serverErrors, ...clientErrors };
   const id = useId();
+  const spotlight = useSpotlight();
+  // Fields the posting just filled flash once, so it is clear what changed.
+  const [flashed, setFlashed] = useState<ReadonlySet<string>>(new Set());
   const leads = useLeads();
   const preview = usePostingPreview();
   const [postingUrl, setPostingUrl] = useState('');
@@ -48,6 +52,13 @@ export function ApplicationForm({
       onSuccess: (found) => {
         const result = fillEmpty(values, found);
         setValues(result.values);
+        setFlashed(
+          new Set(
+            (Object.keys(result.values) as (keyof FormValues)[]).filter(
+              (name) => result.values[name] !== values[name],
+            ),
+          ),
+        );
         setFillMessage({
           ok: true,
           text:
@@ -81,8 +92,8 @@ export function ApplicationForm({
     const errorId = `${controlId}-error`;
     const error = errors[name];
     return (
-      <div className="flex flex-col gap-1">
-        <label htmlFor={controlId} className="text-sm font-medium">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor={controlId} className="text-[0.8125rem] font-medium text-fg-2">
           {label}
         </label>
         {control({
@@ -92,11 +103,11 @@ export function ApplicationForm({
           onChange: set(name),
           'aria-invalid': error ? true : undefined,
           'aria-describedby': error ? errorId : undefined,
-          className: `input ${error ? 'border-rose-600' : ''}`,
+          className: `inp select-chevron ${flashed.has(name) ? 'inp-filled' : ''}`,
         })}
-        {hint && !error && <p className="text-xs text-slate-500 dark:text-slate-400">{hint}</p>}
+        {hint && !error && <p className="text-xs text-fg-3">{hint}</p>}
         {error && (
-          <p id={errorId} className="text-sm text-rose-700 dark:text-rose-400">
+          <p id={errorId} className="text-sm text-red">
             {error}
           </p>
         )}
@@ -122,8 +133,8 @@ export function ApplicationForm({
       }}
     >
       {fillFromLink && (
-        <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900">
-          <label htmlFor={`${id}-posting`} className="text-sm font-medium">
+        <div {...spotlight} className="glow fill-wash flex flex-col gap-2 p-5">
+          <label htmlFor={`${id}-posting`} className="text-[0.8125rem] font-medium text-fg-2">
             Job posting link
           </label>
           <div className="flex flex-wrap gap-2">
@@ -132,7 +143,7 @@ export function ApplicationForm({
               type="url"
               inputMode="url"
               placeholder="https://"
-              className="input min-w-0 flex-1"
+              className="inp min-w-0 flex-1"
               value={postingUrl}
               onChange={(event) => setPostingUrl(event.target.value)}
               onKeyDown={(event) => {
@@ -145,7 +156,7 @@ export function ApplicationForm({
             />
             <button
               type="button"
-              className="btn-secondary"
+              className="btn-d"
               disabled={preview.isPending || postingUrl.trim() === ''}
               onClick={fill}
             >
@@ -154,116 +165,107 @@ export function ApplicationForm({
           </div>
           <p aria-live="polite" className="text-sm">
             {fillMessage && (
-              <span
-                className={
-                  fillMessage.ok
-                    ? 'text-emerald-800 dark:text-emerald-300'
-                    : 'text-rose-700 dark:text-rose-400'
-                }
-              >
-                {fillMessage.text}
-              </span>
+              <span className={fillMessage.ok ? 'text-green' : 'text-red'}>{fillMessage.text}</span>
             )}
           </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-fg-3">
             Works with most company career sites, Greenhouse, Lever and Ashby. Not LinkedIn. Only
             empty fields are filled.
           </p>
         </div>
       )}
       {formError && (
-        <p
-          role="alert"
-          className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800 dark:bg-rose-950 dark:text-rose-200"
-        >
+        <p role="alert" className="rounded-xl bg-red/10 p-3 text-sm text-red">
           {formError}
         </p>
       )}
-      <div className="grid gap-4 sm:grid-cols-2">
-        {field('company', 'Company *', (props) => (
-          <input {...props} autoComplete="organization" />
-        ))}
-        {field('role', 'Role *', (props) => (
-          <input {...props} />
-        ))}
-        {field('status', 'Status', (props) => (
-          <select {...props}>
-            {STATUSES.map((status) => (
-              <option key={status}>{status}</option>
-            ))}
-          </select>
-        ))}
-        {field('source', 'Source', (props) => (
-          <select {...props}>
-            {SOURCES.map((source) => (
-              <option key={source}>{source}</option>
-            ))}
-          </select>
-        ))}
-        {field(
-          'dateApplied',
-          'Date applied',
-          (props) => (
-            <input {...props} type="date" />
-          ),
-          'Filled in automatically when you first mark it Applied',
-        )}
-        {field('jobLink', 'Job link', (props) => (
-          <input {...props} type="url" inputMode="url" placeholder="https://" />
-        ))}
-        {field('salaryMin', 'Salary from', (props) => (
-          <input {...props} type="number" inputMode="numeric" min={0} step={1} />
-        ))}
-        {field('salaryMax', 'Salary to', (props) => (
-          <input {...props} type="number" inputMode="numeric" min={0} step={1} />
-        ))}
-        {field(
-          'salaryCurrency',
-          'Currency',
-          (props) => (
-            <input {...props} maxLength={3} />
-          ),
-          '3 letters, e.g. USD',
-        )}
-        {field('contact', 'Contact', (props) => (
-          <input {...props} />
-        ))}
-        {field(
-          'leadId',
-          'Lead',
-          (props) => (
+      <div {...spotlight} className="glow flex flex-col gap-4 p-5 sm:p-6">
+        <div className="grid gap-4 sm:grid-cols-2">
+          {field('company', 'Company *', (props) => (
+            <input {...props} autoComplete="organization" />
+          ))}
+          {field('role', 'Role *', (props) => (
+            <input {...props} />
+          ))}
+          {field('status', 'Status', (props) => (
             <select {...props}>
-              <option value="">No lead</option>
-              {/* Keep the current choice selectable while the list loads. */}
-              {values.leadId && !leadOptions.some((lead) => lead.id === values.leadId) && (
-                <option value={values.leadId}>Current lead</option>
-              )}
-              {leadOptions.map((lead) => (
-                <option key={lead.id} value={lead.id}>
-                  {lead.company ? `${lead.name} (${lead.company})` : lead.name}
-                </option>
+              {STATUSES.map((status) => (
+                <option key={status}>{status}</option>
               ))}
             </select>
-          ),
-          'The person who helped you get here',
-        )}
-        {field('nextStep', 'Next step', (props) => (
-          <input {...props} />
+          ))}
+          {field('source', 'Source', (props) => (
+            <select {...props}>
+              {SOURCES.map((source) => (
+                <option key={source}>{source}</option>
+              ))}
+            </select>
+          ))}
+          {field(
+            'dateApplied',
+            'Date applied',
+            (props) => (
+              <input {...props} type="date" />
+            ),
+            'Filled in automatically when you first mark it Applied',
+          )}
+          {field('jobLink', 'Job link', (props) => (
+            <input {...props} type="url" inputMode="url" placeholder="https://" />
+          ))}
+          {field('salaryMin', 'Salary from', (props) => (
+            <input {...props} type="number" inputMode="numeric" min={0} step={1} />
+          ))}
+          {field('salaryMax', 'Salary to', (props) => (
+            <input {...props} type="number" inputMode="numeric" min={0} step={1} />
+          ))}
+          {field(
+            'salaryCurrency',
+            'Currency',
+            (props) => (
+              <input {...props} maxLength={3} />
+            ),
+            '3 letters, e.g. USD',
+          )}
+          {field('contact', 'Contact', (props) => (
+            <input {...props} />
+          ))}
+          {field(
+            'leadId',
+            'Lead',
+            (props) => (
+              <select {...props}>
+                <option value="">No lead</option>
+                {/* Keep the current choice selectable while the list loads. */}
+                {values.leadId && !leadOptions.some((lead) => lead.id === values.leadId) && (
+                  <option value={values.leadId}>Current lead</option>
+                )}
+                {leadOptions.map((lead) => (
+                  <option key={lead.id} value={lead.id}>
+                    {lead.company ? `${lead.name} (${lead.company})` : lead.name}
+                  </option>
+                ))}
+              </select>
+            ),
+            'The person who helped you get here',
+          )}
+          {field('nextStep', 'Next step', (props) => (
+            <input {...props} />
+          ))}
+          {field('nextStepDate', 'Next step date', (props) => (
+            <input {...props} type="date" />
+          ))}
+        </div>
+        {field('notes', 'Notes', (props) => (
+          <textarea {...props} rows={5} />
         ))}
-        {field('nextStepDate', 'Next step date', (props) => (
-          <input {...props} type="date" />
-        ))}
-      </div>
-      {field('notes', 'Notes', (props) => (
-        <textarea {...props} rows={5} />
-      ))}
-      <div className="flex flex-wrap gap-3">
-        <button type="submit" disabled={busy} className="btn-primary">
-          {busy ? 'Saving…' : submitLabel}
-        </button>
-        <button type="button" onClick={onCancel} className="btn-secondary">
-          Cancel
-        </button>
+        <div className="flex flex-wrap gap-3 pt-1">
+          <button type="submit" disabled={busy} className="btn-w min-h-12 px-6 text-[0.9375rem]">
+            {busy ? 'Saving…' : submitLabel}
+          </button>
+          <button type="button" onClick={onCancel} className="btn-d min-h-12 px-6 text-[0.9375rem]">
+            Cancel
+          </button>
+        </div>
       </div>
     </form>
   );

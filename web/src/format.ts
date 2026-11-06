@@ -57,6 +57,14 @@ export function formatWeekdayDate(
   return (year === currentYear ? WEEKDAY_DAY : WEEKDAY_DAY_YEAR).format(date);
 }
 
+const MONTH_SHORT = new Intl.DateTimeFormat(undefined, { month: 'short', timeZone: 'UTC' });
+
+/** The short month of a calendar date, "Nov". */
+export function formatMonthShort(calendarDate: string): string {
+  const date = new Date(`${calendarDate}T00:00:00Z`);
+  return Number.isNaN(date.getTime()) ? '' : MONTH_SHORT.format(date);
+}
+
 /** An instant (an ISO timestamp), in the viewer's own time zone, with the time. */
 export function formatDateTime(instant: string): string {
   const date = new Date(instant);

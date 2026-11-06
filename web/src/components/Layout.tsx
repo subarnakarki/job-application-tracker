@@ -108,7 +108,7 @@ export function Layout() {
             </p>
           )}
         </header>
-        <main className={`mx-auto px-4 py-6 ${width}`}>
+        <main className={`mx-auto px-4 py-6 md:px-6 md:py-8 ${width}`}>
           <Outlet />
         </main>
       </div>

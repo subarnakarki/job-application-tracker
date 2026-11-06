@@ -49,7 +49,7 @@ function serverFieldErrors(error: unknown): Errors {
   return error instanceof ApiRequestError && error.body?.issues ? issuesOf(error.body.issues) : {};
 }
 
-const linkClass = 'text-blue-700 underline dark:text-blue-400';
+const linkClass = 'text-blue-link underline';
 
 export function LeadsPage() {
   const [search, setSearch] = useState('');
@@ -69,7 +69,7 @@ export function LeadsPage() {
           Add lead
         </Link>
       </div>
-      <p className="text-sm text-slate-600 dark:text-slate-300">
+      <p className="text-sm text-fg-2">
         The people helping you find a job: recruiters, referrers, friends. Keep notes from each
         conversation and link the applications they led to.
       </p>
@@ -87,13 +87,11 @@ export function LeadsPage() {
         />
       </div>
       {leads.isPending && <p>Loading…</p>}
-      {leads.isError && (
-        <p className="text-rose-700 dark:text-rose-400">Could not load your leads.</p>
-      )}
+      {leads.isError && <p className="text-red">Could not load your leads.</p>}
       {leads.isSuccess && leads.data.total === 0 && (
-        <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center dark:border-slate-700">
+        <div className="rounded-xl border border-dashed border-line-2 p-8 text-center">
           <p className="font-medium">{q ? 'No leads match.' : 'No leads yet.'}</p>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+          <p className="mt-1 text-sm text-fg-2">
             {q ? 'Try another search.' : 'Add the first person helping you.'}
           </p>
         </div>
@@ -103,21 +101,19 @@ export function LeadsPage() {
           <li key={lead.id}>
             <Link
               to={`/leads/${lead.id}`}
-              className="block rounded-xl border border-slate-200 p-4 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-blue-600 dark:border-slate-800 dark:hover:bg-slate-900"
+              className="block rounded-xl border border-line p-4 hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-blue"
             >
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <span className="font-semibold">{lead.name}</span>
-                <span className="text-xs text-slate-500 dark:text-slate-400">
+                <span className="text-xs text-fg-3">
                   {lead.applicationCount === 1
                     ? '1 application'
                     : `${lead.applicationCount} applications`}
                 </span>
               </div>
-              {lead.company && (
-                <p className="text-sm text-slate-600 dark:text-slate-300">{lead.company}</p>
-              )}
+              {lead.company && <p className="text-sm text-fg-2">{lead.company}</p>}
               {lead.latestNote && (
-                <p className="mt-1 line-clamp-2 text-sm text-slate-500 dark:text-slate-400">
+                <p className="mt-1 line-clamp-2 text-sm text-fg-3">
                   {formatDate(lead.latestNote.heldOn)}: {lead.latestNote.body}
                 </p>
               )}
@@ -187,14 +183,14 @@ function LeadForm({
           id={controlId}
           type={type}
           autoComplete={autoComplete}
-          className={`input ${problem ? 'border-rose-600' : ''}`}
+          className={`input ${problem ? 'border-red' : ''}`}
           value={values[name]}
           aria-invalid={problem ? true : undefined}
           aria-describedby={problem ? `${controlId}-error` : undefined}
           onChange={(event) => setValues((current) => ({ ...current, [name]: event.target.value }))}
         />
         {problem && (
-          <p id={`${controlId}-error`} className="text-sm text-rose-700 dark:text-rose-400">
+          <p id={`${controlId}-error`} className="text-sm text-red">
             {problem}
           </p>
         )}
@@ -221,10 +217,7 @@ function LeadForm({
       }}
     >
       {message && (
-        <p
-          role="alert"
-          className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800 dark:bg-rose-950 dark:text-rose-200"
-        >
+        <p role="alert" className="rounded-lg bg-red/10 p-3 text-sm text-red">
           {message}
         </p>
       )}
@@ -352,7 +345,7 @@ function NoteForm({
           onChange={(event) => setValues((current) => ({ ...current, heldOn: event.target.value }))}
         />
         {errors['heldOn'] && (
-          <p id={`${id}-day-error`} className="text-sm text-rose-700 dark:text-rose-400">
+          <p id={`${id}-day-error`} className="text-sm text-red">
             {errors['heldOn']}
           </p>
         )}
@@ -371,7 +364,7 @@ function NoteForm({
           onChange={(event) => setValues((current) => ({ ...current, body: event.target.value }))}
         />
         {errors['body'] && (
-          <p id={`${id}-body-error`} className="text-sm text-rose-700 dark:text-rose-400">
+          <p id={`${id}-body-error`} className="text-sm text-red">
             {errors['body']}
           </p>
         )}
@@ -397,7 +390,7 @@ function NoteItem({ leadId, note, today }: { leadId: string; note: LeadNote; tod
   const remove = useDeleteLeadNote(leadId);
   if (editing) {
     return (
-      <li className="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+      <li className="rounded-lg border border-line p-3">
         <NoteForm
           initial={{ heldOn: note.heldOn, body: note.body }}
           today={today}
@@ -413,7 +406,7 @@ function NoteItem({ leadId, note, today }: { leadId: string; note: LeadNote; tod
     );
   }
   return (
-    <li className="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+    <li className="rounded-lg border border-line p-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <time dateTime={note.heldOn} className="text-sm font-medium">
           {formatDate(note.heldOn)}
@@ -456,7 +449,7 @@ export function LeadPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">{lead.name}</h1>
-          {lead.company && <p className="text-slate-600 dark:text-slate-300">{lead.company}</p>}
+          {lead.company && <p className="text-fg-2">{lead.company}</p>}
         </div>
         <div className="flex gap-3">
           <Link to={`/leads/${id}/edit`} className="btn-primary">
@@ -472,9 +465,7 @@ export function LeadPage() {
         <dl className="grid gap-3 sm:grid-cols-3">
           {lead.email && (
             <div>
-              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Email
-              </dt>
+              <dt className="text-xs font-medium uppercase tracking-wide text-fg-3">Email</dt>
               <dd className="break-words">
                 <a href={`mailto:${lead.email}`} className={linkClass}>
                   {lead.email}
@@ -484,9 +475,7 @@ export function LeadPage() {
           )}
           {lead.phone && (
             <div>
-              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Phone
-              </dt>
+              <dt className="text-xs font-medium uppercase tracking-wide text-fg-3">Phone</dt>
               <dd>
                 <a href={`tel:${lead.phone}`} className={linkClass}>
                   {lead.phone}
@@ -496,9 +485,7 @@ export function LeadPage() {
           )}
           {lead.profileLink && (
             <div>
-              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Profile
-              </dt>
+              <dt className="text-xs font-medium uppercase tracking-wide text-fg-3">Profile</dt>
               <dd className="break-words">
                 <a
                   href={lead.profileLink}
@@ -528,7 +515,7 @@ export function LeadPage() {
           onSubmit={(input, reset) => addNote.mutate(input, { onSuccess: reset })}
         />
         {lead.notes.length === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">No notes yet.</p>
+          <p className="text-sm text-fg-3">No notes yet.</p>
         ) : (
           <ul className="flex flex-col gap-2">
             {lead.notes.map((note) => (
@@ -543,7 +530,7 @@ export function LeadPage() {
           Applications
         </h2>
         {lead.applications.length === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-sm text-fg-3">
             None yet. Choose this lead on an application to link it.
           </p>
         ) : (

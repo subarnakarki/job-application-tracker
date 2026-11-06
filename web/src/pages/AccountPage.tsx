@@ -47,7 +47,7 @@ export function AccountPage() {
     <div className="flex max-w-xl flex-col gap-8">
       <div>
         <h1 className="text-2xl font-semibold">Account</h1>
-        <p className="mt-1 text-slate-600 dark:text-slate-300">
+        <p className="mt-1 text-fg-2">
           {user.name ? `${user.name} · ` : ''}
           {user.email}
         </p>
@@ -57,7 +57,7 @@ export function AccountPage() {
         <h2 id="zone-heading" className="text-lg font-semibold">
           Time zone
         </h2>
-        <p className="text-sm text-slate-600 dark:text-slate-300">
+        <p className="text-sm text-fg-2">
           Dates such as &quot;needs follow-up&quot; are worked out in{' '}
           <strong>{user.timeZone}</strong>.
         </p>
@@ -74,14 +74,14 @@ export function AccountPage() {
           </div>
         )}
         {updateZone.isError && (
-          <p role="alert" className="text-sm text-rose-700 dark:text-rose-400">
+          <p role="alert" className="text-sm text-red">
             Could not change the time zone. Try again.
           </p>
         )}
       </section>
 
       {user.isDemo ? (
-        <p className="text-sm text-slate-600 dark:text-slate-300">
+        <p className="text-sm text-fg-2">
           The shared demo account cannot be exported or deleted. Sign in with Google for your own
           private account.
         </p>
@@ -93,13 +93,13 @@ export function AccountPage() {
                 Import from Gmail
               </h2>
               {importReason && (
-                <p role="alert" className="text-sm text-rose-700 dark:text-rose-400">
+                <p role="alert" className="text-sm text-red">
                   {IMPORT_MESSAGES[importReason] ?? 'The import did not finish. Try again.'}
                 </p>
               )}
               {importStatus.data?.available && (
                 <>
-                  <p className="text-sm text-slate-600 dark:text-slate-300">
+                  <p className="text-sm text-fg-2">
                     Reads job emails from the last 30 days (or since your last import) once, with
                     read-only access. Each email&apos;s text is sent to Anthropic&apos;s Claude to
                     classify it; bodies are not stored. Clear results are applied, and you can undo
@@ -125,18 +125,16 @@ export function AccountPage() {
                   <li key={run.id}>
                     <Link
                       to={`/import/${run.id}`}
-                      className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-blue-600 dark:border-slate-700 dark:hover:bg-slate-900"
+                      className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 rounded-lg border border-line-2 px-3 py-2 text-sm hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-blue"
                     >
                       <span className="font-medium">
                         {formatDateTime(run.startedAt)}
                         {run.status === 'failed' && ' · did not finish'}
                       </span>
-                      <span className="text-slate-600 dark:text-slate-300">
+                      <span className="text-fg-2">
                         {run.changed} changed ·{' '}
                         {run.needsReview > 0 ? (
-                          <strong className="text-amber-800 dark:text-amber-300">
-                            {run.needsReview} to review
-                          </strong>
+                          <strong className="text-amber">{run.needsReview} to review</strong>
                         ) : (
                           '0 to review'
                         )}{' '}
@@ -153,7 +151,7 @@ export function AccountPage() {
             <h2 id="export-heading" className="text-lg font-semibold">
               Your data
             </h2>
-            <p className="text-sm text-slate-600 dark:text-slate-300">
+            <p className="text-sm text-fg-2">
               Download everything the app holds about you, including all applications and their
               history, as one JSON file.
             </p>
@@ -168,7 +166,7 @@ export function AccountPage() {
             <h2 id="delete-heading" className="text-lg font-semibold">
               Delete account
             </h2>
-            <p className="text-sm text-slate-600 dark:text-slate-300">
+            <p className="text-sm text-fg-2">
               Removes your account, every application and its history, and signs you out everywhere.
               This cannot be undone.
             </p>
@@ -182,7 +180,7 @@ export function AccountPage() {
       )}
 
       <p className="text-sm">
-        <Link to="/privacy" className="text-blue-700 underline dark:text-blue-400">
+        <Link to="/privacy" className="text-blue-link underline">
           Privacy
         </Link>
       </p>

@@ -7,8 +7,10 @@ import {
 import { useId, useState } from 'react';
 import { ApiRequestError } from '../api/client';
 import { useAddInterview, useDeleteInterview, useMe, useUpdateInterview } from '../api/hooks';
-import { formatDate } from '../format';
+import { formatDate, formatMonthShort } from '../format';
 import { ConfirmDialog } from './ConfirmDialog';
+import { Glow } from './ui/Glow';
+import { Pill } from './ui/Pill';
 
 interface Values {
   heldOn: string;
@@ -16,7 +18,7 @@ interface Values {
   notes: string;
 }
 
-const linkClass = 'text-blue-700 underline dark:text-blue-400';
+const linkClass = 'link flex min-h-11 items-center px-2 text-[0.8125rem] underline';
 
 function problemOf(error: unknown): string | null {
   if (!error) return null;
@@ -52,7 +54,7 @@ function InterviewForm({
   return (
     <form
       noValidate
-      className="flex flex-col gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-800"
+      className="flex flex-col gap-3 rounded-2xl bg-s2 p-3.5 shadow-line"
       onSubmit={(event) => {
         event.preventDefault();
         const result = InterviewInputSchema.safeParse(values);
@@ -68,37 +70,37 @@ function InterviewForm({
       }}
     >
       {message && (
-        <p role="alert" className="text-sm text-rose-700 dark:text-rose-400">
+        <p role="alert" className="text-sm text-red">
           {message}
         </p>
       )}
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
-          <label htmlFor={`${id}-day`} className="text-sm font-medium">
+          <label htmlFor={`${id}-day`} className="text-[0.8125rem] font-medium text-fg-2">
             Day
           </label>
           <input
             id={`${id}-day`}
             type="date"
-            className="input"
+            className="inp"
             value={values.heldOn}
             onChange={set('heldOn')}
             aria-invalid={fieldErrors['heldOn'] ? true : undefined}
             aria-describedby={fieldErrors['heldOn'] ? `${id}-day-error` : undefined}
           />
           {fieldErrors['heldOn'] && (
-            <p id={`${id}-day-error`} className="text-sm text-rose-700 dark:text-rose-400">
+            <p id={`${id}-day-error`} className="text-sm text-red">
               {fieldErrors['heldOn']}
             </p>
           )}
         </div>
         <div className="flex flex-col gap-1">
-          <label htmlFor={`${id}-label`} className="text-sm font-medium">
+          <label htmlFor={`${id}-label`} className="text-[0.8125rem] font-medium text-fg-2">
             Round
           </label>
           <input
             id={`${id}-label`}
-            className="input"
+            className="inp"
             placeholder="e.g. Hiring manager"
             value={values.label}
             onChange={set('label')}
@@ -106,22 +108,22 @@ function InterviewForm({
         </div>
       </div>
       <div className="flex flex-col gap-1">
-        <label htmlFor={`${id}-notes`} className="text-sm font-medium">
+        <label htmlFor={`${id}-notes`} className="text-[0.8125rem] font-medium text-fg-2">
           Interview notes
         </label>
         <textarea
           id={`${id}-notes`}
           rows={3}
-          className="input"
+          className="inp"
           value={values.notes}
           onChange={set('notes')}
         />
       </div>
       <div className="flex flex-wrap gap-3">
-        <button type="submit" disabled={busy} className="btn-primary">
+        <button type="submit" disabled={busy} className="btn-w">
           {busy ? 'Saving…' : submitLabel}
         </button>
-        <button type="button" onClick={onCancel} className="btn-secondary">
+        <button type="button" onClick={onCancel} className="btn-d">
           Cancel
         </button>
       </div>
@@ -167,29 +169,38 @@ function InterviewItem({
   }
   const upcoming = interview.heldOn >= today;
   return (
-    <li className="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className="text-sm">
-          <time dateTime={interview.heldOn} className="font-medium">
-            {formatDate(interview.heldOn)}
-          </time>
-          {interview.label && <span> · {interview.label}</span>}
-          {upcoming && (
-            <span className="ml-2 rounded bg-violet-100 px-1.5 py-0.5 text-xs text-violet-900 dark:bg-violet-950 dark:text-violet-200">
-              Upcoming
-            </span>
-          )}
-        </span>
-        <span className="flex gap-3 text-sm">
-          <button type="button" className={linkClass} onClick={() => setEditing(true)}>
-            Edit
-          </button>
-          <button type="button" className={linkClass} onClick={() => setConfirming(true)}>
-            Remove
-          </button>
-        </span>
+    <li className="flex gap-3.5 border-t border-line py-3 first:border-t-0">
+      <time dateTime={interview.heldOn} className="w-11 flex-none text-center">
+        <span className="sr-only">{formatDate(interview.heldOn)}</span>
+        <b
+          aria-hidden="true"
+          className="block text-[1.375rem] leading-none font-semibold tracking-[-0.04em]"
+        >
+          {Number(interview.heldOn.slice(8, 10))}
+        </b>
+        <small aria-hidden="true" className="text-[0.6875rem] text-fg-3">
+          {formatMonthShort(interview.heldOn)}
+        </small>
+      </time>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <span className="flex flex-wrap items-center gap-1.5 text-[0.9375rem]">
+            {interview.label ?? 'Interview'}
+            {upcoming && <Pill tone="iv">Upcoming</Pill>}
+          </span>
+          <span className="flex gap-1 text-sm">
+            <button type="button" className={linkClass} onClick={() => setEditing(true)}>
+              Edit
+            </button>
+            <button type="button" className={linkClass} onClick={() => setConfirming(true)}>
+              Remove
+            </button>
+          </span>
+        </div>
+        {interview.notes && (
+          <p className="mt-1 text-[0.8125rem] whitespace-pre-wrap text-fg-2">{interview.notes}</p>
+        )}
       </div>
-      {interview.notes && <p className="mt-1 whitespace-pre-wrap text-sm">{interview.notes}</p>}
       <ConfirmDialog
         open={confirming}
         title="Remove this interview?"
@@ -212,13 +223,17 @@ export function InterviewsSection({ application }: { application: ApplicationDet
   const interviews = [...application.interviews].reverse();
 
   return (
-    <section aria-labelledby="interviews-heading" className="flex flex-col gap-3">
+    <Glow
+      as="section"
+      aria-labelledby="interviews-heading"
+      className="rise rise-4 flex flex-col gap-3 p-5"
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="interviews-heading" className="text-lg font-semibold">
+        <h2 id="interviews-heading" className="text-[0.8125rem] font-medium text-fg-2">
           Interviews
         </h2>
         {!adding && (
-          <button type="button" className="btn-secondary" onClick={() => setAdding(true)}>
+          <button type="button" className="btn-d" onClick={() => setAdding(true)}>
             Add interview
           </button>
         )}
@@ -234,11 +249,11 @@ export function InterviewsSection({ application }: { application: ApplicationDet
         />
       )}
       {interviews.length === 0 && !adding ? (
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+        <p className="text-sm text-fg-2">
           None yet. Log each interview, or schedule the next one ahead.
         </p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col">
           {interviews.map((interview) => (
             <InterviewItem
               key={interview.id}
@@ -249,6 +264,6 @@ export function InterviewsSection({ application }: { application: ApplicationDet
           ))}
         </ul>
       )}
-    </section>
+    </Glow>
   );
 }

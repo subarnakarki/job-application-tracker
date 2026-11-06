@@ -12,7 +12,10 @@ import {
 import { ApplicationForm } from '../components/ApplicationForm';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { InterviewsSection } from '../components/InterviewsSection';
-import { RevealHeading } from '../components/ui/PageHeader';
+import { Glow } from '../components/ui/Glow';
+import { PageHeader, RevealHeading } from '../components/ui/PageHeader';
+import { Pill } from '../components/ui/Pill';
+import { interviewText } from '../timeline';
 import { FollowUpFlag, StatusBadge } from '../components/StatusBadge';
 import { EMPTY_FORM, toFormValues, toPatch, type FieldErrors } from '../form';
 import { timeline } from '../timeline';
@@ -35,8 +38,11 @@ export function NewApplicationPage() {
   const create = useCreateApplication();
   const navigate = useNavigate();
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold">Add application</h1>
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+      <PageHeader
+        title="Add application"
+        subtitle="Paste a posting link to fill the basics, then add the rest."
+      />
       <ApplicationForm
         initial={EMPTY_FORM}
         submitLabel="Save application"
@@ -72,8 +78,8 @@ export function EditApplicationPage() {
   const navigate = useNavigate();
   if (!application) return <p>{message}</p>;
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold">Edit {application.company}</h1>
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+      <PageHeader title={`Edit ${application.company}`} />
       <ApplicationForm
         initial={toFormValues(application)}
         submitLabel="Save changes"
@@ -92,15 +98,19 @@ export function EditApplicationPage() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  children,
+  wide = false,
+}: {
+  label: string;
+  children: React.ReactNode;
+  wide?: boolean;
+}) {
   return (
-    <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-        {label}
-      </dt>
-      <dd className="mt-0.5 break-words">
-        {children || <span className="text-slate-400">–</span>}
-      </dd>
+    <div className={`border-t border-line py-3 first:border-t-0 ${wide ? 'sm:col-span-2' : ''}`}>
+      <dt className="text-xs text-fg-3">{label}</dt>
+      <dd className="mt-0.5 break-words">{children || <span className="text-fg-3">–</span>}</dd>
     </div>
   );
 }
@@ -119,120 +129,127 @@ export function ApplicationDetailPage() {
   const remove = useDeleteApplication(id);
   const navigate = useNavigate();
   const [confirming, setConfirming] = useState(false);
-  if (!application) return <p>{message}</p>;
+  if (!application) return <p className="text-fg-2">{message}</p>;
+  const interview = application.nextInterviewOn ? interviewText(application) : null;
 
   return (
     <div className="flex flex-col gap-6">
-      <Link
-        to="/"
-        className="self-start text-sm text-blue-700 underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-blue-600 dark:text-blue-400"
-      >
+      <Link to="/" className="back-link">
         ← Back to applications
       </Link>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">{application.company}</h1>
-          <p className="text-slate-600 dark:text-slate-300">{application.role}</p>
-          <div className="mt-2 flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+        <div className="min-w-0">
+          <div className="rise mb-3.5 flex flex-wrap items-center gap-2">
+            {interview && (
+              <Pill tone="iv" dot>
+                {interview}
+              </Pill>
+            )}
             <StatusBadge status={application.status} />
             {application.needsFollowUp && <FollowUpFlag />}
           </div>
+          <RevealHeading text={application.company} />
+          <p className="rise rise-3 mt-3 text-[1.0625rem] tracking-[-0.015em] text-fg-2">
+            {application.role}
+          </p>
         </div>
-        <div className="flex gap-3">
-          <Link to={`/applications/${id}/edit`} className="btn-primary">
+        <div className="rise rise-4 flex flex-wrap gap-3">
+          <Link to={`/applications/${id}/edit`} className="btn-w min-h-12 px-6 text-[0.9375rem]">
             Edit
           </Link>
-          <button type="button" className="btn-danger" onClick={() => setConfirming(true)}>
+          <button
+            type="button"
+            className="btn-d min-h-12 px-6 text-[0.9375rem]"
+            onClick={() => setConfirming(true)}
+          >
             Delete
           </button>
         </div>
       </div>
 
-      <dl className="grid gap-4 sm:grid-cols-2">
-        <Field label="Date applied">
-          {application.dateApplied && formatDate(application.dateApplied)}
-        </Field>
-        <Field label="Source">{application.source}</Field>
-        <Field label="Salary">{salary(application)}</Field>
-        <Field label="Contact">{application.contact}</Field>
-        <Field label="Lead">
-          {application.leadId && (
-            <Link
-              to={`/leads/${application.leadId}`}
-              className="text-blue-700 underline dark:text-blue-400"
-            >
-              {application.leadName}
-            </Link>
-          )}
-        </Field>
-        <Field label="Next step">
-          {[
-            application.nextStep,
-            application.nextStepDate && `(${formatDate(application.nextStepDate)})`,
-          ]
-            .filter(Boolean)
-            .join(' ')}
-        </Field>
-        <Field label="Job link">
-          {application.jobLink && (
-            <a
-              href={application.jobLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-700 underline dark:text-blue-400"
-            >
-              {application.jobLink}
-            </a>
-          )}
-        </Field>
-      </dl>
-      <Field label="Notes">
-        {application.notes && <span className="whitespace-pre-wrap">{application.notes}</span>}
-      </Field>
-
-      <InterviewsSection application={application} />
-
-      <section aria-labelledby="history-heading">
-        <h2 id="history-heading" className="text-lg font-semibold">
-          History
-        </h2>
-        <ol className="mt-2 flex flex-col gap-2 border-l-2 border-slate-200 pl-4 dark:border-slate-700">
-          {timeline(application.history, application.interviews).map((item) =>
-            item.kind === 'status' ? (
-              <li key={item.key} className="text-sm">
-                <span className="font-medium">
-                  {item.entry.fromStatus
-                    ? `${item.entry.fromStatus} → ${item.entry.toStatus}`
-                    : `Created as ${item.entry.toStatus}`}
-                </span>
-                <time
-                  dateTime={item.entry.occurredAt}
-                  className="ml-2 text-slate-500 dark:text-slate-400"
+      <div className="grid items-start gap-3 lg:grid-cols-[1.25fr_1fr]">
+        <Glow as="section" aria-labelledby="details-heading" className="rise rise-3 p-5">
+          <h2 id="details-heading" className="text-[0.8125rem] font-medium text-fg-2">
+            Details
+          </h2>
+          <dl className="mt-2 grid gap-x-6 sm:grid-cols-2">
+            <Field label="Date applied">
+              {application.dateApplied && formatDate(application.dateApplied)}
+            </Field>
+            <Field label="Source">{application.source}</Field>
+            <Field label="Salary">{salary(application)}</Field>
+            <Field label="Contact">{application.contact}</Field>
+            <Field label="Lead">
+              {application.leadId && (
+                <Link to={`/leads/${application.leadId}`} className="link underline">
+                  {application.leadName}
+                </Link>
+              )}
+            </Field>
+            <Field label="Next step">
+              {[
+                application.nextStep,
+                application.nextStepDate && `(${formatDate(application.nextStepDate)})`,
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            </Field>
+            <Field label="Job link" wide>
+              {application.jobLink && (
+                <a
+                  href={application.jobLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="link underline"
                 >
-                  {formatDateTime(item.entry.occurredAt)}
-                </time>
-                {item.entry.actor === 'gmail' && (
-                  <span className="ml-2 rounded bg-sky-100 px-1.5 py-0.5 text-xs text-sky-900 dark:bg-sky-950 dark:text-sky-200">
-                    from Gmail
-                  </span>
-                )}
-              </li>
-            ) : (
-              <li key={item.key} className="text-sm">
-                <span className="font-medium">
-                  Interview{item.interview.label ? `: ${item.interview.label}` : ''}
-                </span>
-                <time
-                  dateTime={item.interview.heldOn}
-                  className="ml-2 text-slate-500 dark:text-slate-400"
-                >
-                  {formatDate(item.interview.heldOn)}
-                </time>
-              </li>
-            ),
-          )}
-        </ol>
-      </section>
+                  {application.jobLink}
+                </a>
+              )}
+            </Field>
+            <Field label="Notes" wide>
+              {application.notes && (
+                <span className="whitespace-pre-wrap">{application.notes}</span>
+              )}
+            </Field>
+          </dl>
+        </Glow>
+
+        <div className="flex flex-col gap-3">
+          <InterviewsSection application={application} />
+
+          <Glow as="section" aria-labelledby="history-heading" className="rise rise-5 p-5">
+            <h2 id="history-heading" className="text-[0.8125rem] font-medium text-fg-2">
+              History
+            </h2>
+            <ol className="timeline mt-4 flex flex-col gap-4">
+              {timeline(application.history, application.interviews).map((item) =>
+                item.kind === 'status' ? (
+                  <li key={item.key} className="text-sm">
+                    <span className="font-medium">
+                      {item.entry.fromStatus
+                        ? `${item.entry.fromStatus} → ${item.entry.toStatus}`
+                        : `Created as ${item.entry.toStatus}`}
+                    </span>
+                    {item.entry.actor === 'gmail' && <Pill className="ml-2">from Gmail</Pill>}
+                    <time dateTime={item.entry.occurredAt} className="block text-xs text-fg-3">
+                      {formatDateTime(item.entry.occurredAt)}
+                    </time>
+                  </li>
+                ) : (
+                  <li key={item.key} className="text-sm">
+                    <span className="font-medium">
+                      Interview{item.interview.label ? `: ${item.interview.label}` : ''}
+                    </span>
+                    <time dateTime={item.interview.heldOn} className="block text-xs text-fg-3">
+                      {formatDate(item.interview.heldOn)}
+                    </time>
+                  </li>
+                ),
+              )}
+            </ol>
+          </Glow>
+        </div>
+      </div>
 
       <ConfirmDialog
         open={confirming}

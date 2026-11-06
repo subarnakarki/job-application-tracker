@@ -4,7 +4,7 @@ import { Link } from 'react-router';
 /** Plain-language privacy notice. Public: linked from the sign-in page. */
 export function PrivacyPage() {
   return (
-    <main className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8 text-slate-800 dark:text-slate-200">
+    <main className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8 text-fg">
       <h1 className="text-2xl font-semibold">Privacy</h1>
       <p>
         {APP_NAME} is a personal portfolio project. It keeps only what it needs to track your job
@@ -58,7 +58,7 @@ export function PrivacyPage() {
       </p>
 
       <p className="mt-4">
-        <Link to="/" className="text-blue-700 underline dark:text-blue-400">
+        <Link to="/" className="text-blue-link underline">
           Back to the app
         </Link>
       </p>

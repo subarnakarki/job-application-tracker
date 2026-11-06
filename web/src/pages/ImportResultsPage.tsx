@@ -31,12 +31,12 @@ function ItemCard({ item, runId }: { item: ImportItem; runId: string }) {
   const linkable = item.applicationId && item.outcome !== 'undone';
 
   return (
-    <li className="flex flex-col gap-2 rounded-lg border border-slate-300 p-3 dark:border-slate-700">
+    <li className="flex flex-col gap-2 rounded-lg border border-line-2 p-3">
       <h3 className="font-semibold">
         {linkable ? (
           <Link
             to={`/applications/${item.applicationId ?? ''}`}
-            className="underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-blue-600"
+            className="underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-blue"
           >
             {headline(item)}
           </Link>
@@ -45,7 +45,7 @@ function ItemCard({ item, runId }: { item: ImportItem; runId: string }) {
         )}
       </h3>
       {item.summary && <p className="text-sm">{item.summary}</p>}
-      <p className="text-sm text-slate-600 dark:text-slate-300">
+      <p className="text-sm text-fg-2">
         {item.reason && <span>{item.reason} · </span>}
         <span>
           &quot;{item.emailSubject || '(no subject)'}&quot; from {item.emailFrom || 'unknown'}
@@ -87,7 +87,7 @@ function ItemCard({ item, runId }: { item: ImportItem; runId: string }) {
         </div>
       )}
       {action.isError && (
-        <p role="alert" className="text-sm text-rose-700 dark:text-rose-400">
+        <p role="alert" className="text-sm text-red">
           {action.error.message}
         </p>
       )}
@@ -103,7 +103,7 @@ export function ImportResultsPage() {
   if (run.isPending) return <p className="text-sm">Loading…</p>;
   if (run.isError)
     return (
-      <p role="alert" className="text-sm text-rose-700 dark:text-rose-400">
+      <p role="alert" className="text-sm text-red">
         This import could not be found.
       </p>
     );
@@ -117,7 +117,7 @@ export function ImportResultsPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold">Gmail import</h1>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+        <p className="mt-1 text-sm text-fg-2">
           {details.emailsScanned} emails matched · {changed.length} changed · {review.length} to
           review · {ignored.length} skipped
         </p>
@@ -128,7 +128,7 @@ export function ImportResultsPage() {
           Changes made
         </h2>
         {changed.length === 0 ? (
-          <p className="text-sm text-slate-600 dark:text-slate-300">Nothing was changed.</p>
+          <p className="text-sm text-fg-2">Nothing was changed.</p>
         ) : (
           <ul className="flex flex-col gap-3" aria-label="Changes made">
             {changed.map((item) => (
@@ -143,7 +143,7 @@ export function ImportResultsPage() {
           Needs your review
         </h2>
         {review.length === 0 ? (
-          <p className="text-sm text-slate-600 dark:text-slate-300">Nothing to review.</p>
+          <p className="text-sm text-fg-2">Nothing to review.</p>
         ) : (
           <ul className="flex flex-col gap-3" aria-label="Needs your review">
             {review.map((item) => (
@@ -167,7 +167,7 @@ export function ImportResultsPage() {
       )}
 
       <p className="text-sm">
-        <Link to="/" className="text-blue-700 underline dark:text-blue-400">
+        <Link to="/" className="text-blue-link underline">
           Back to applications
         </Link>
       </p>
