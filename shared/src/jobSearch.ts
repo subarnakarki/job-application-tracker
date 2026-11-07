@@ -13,7 +13,23 @@ import { isHttpUrl } from './schemas';
 // ---------------------------------------------------------------------------------------------
 // Job boards the search covers
 
-export const SEARCH_SOURCES = ['greenhouse', 'lever', 'ashby', 'workday'] as const;
+export const SEARCH_SOURCES = [
+  'greenhouse',
+  'lever',
+  'ashby',
+  'rippling',
+  'smartrecruiters',
+  'breezy',
+  'recruitee',
+  'teamtailor',
+  'personio',
+  'workable',
+  'jobvite',
+  'workday',
+  'icims',
+  'taleo',
+  'successfactors',
+] as const;
 export type SearchSource = (typeof SEARCH_SOURCES)[number];
 
 /** Hosts per board, as `site:` and the web search tool's `allowed_domains` take them. */
@@ -21,18 +37,56 @@ export const SOURCE_HOSTS: Record<SearchSource, readonly string[]> = {
   greenhouse: ['job-boards.greenhouse.io', 'boards.greenhouse.io'],
   lever: ['jobs.lever.co'],
   ashby: ['jobs.ashbyhq.com'],
+  rippling: ['ats.rippling.com'],
+  smartrecruiters: ['jobs.smartrecruiters.com'],
+  breezy: ['breezy.hr'],
+  recruitee: ['recruitee.com'],
+  teamtailor: ['teamtailor.com'],
+  personio: ['jobs.personio.de', 'jobs.personio.com'],
+  workable: ['apply.workable.com'],
+  jobvite: ['jobs.jobvite.com'],
   workday: ['myworkdayjobs.com'],
+  icims: ['icims.com'],
+  taleo: ['taleo.net'],
+  successfactors: ['successfactors.com', 'successfactors.eu'],
 };
 
 export const SOURCE_LABELS: Record<SearchSource, string> = {
   greenhouse: 'Greenhouse',
   lever: 'Lever',
   ashby: 'Ashby',
+  rippling: 'Rippling',
+  smartrecruiters: 'SmartRecruiters',
+  breezy: 'Breezy HR',
+  recruitee: 'Recruitee',
+  teamtailor: 'Teamtailor',
+  personio: 'Personio',
+  workable: 'Workable',
+  jobvite: 'Jobvite',
   workday: 'Workday',
+  icims: 'iCIMS',
+  taleo: 'Taleo',
+  successfactors: 'SuccessFactors',
 };
 
-/** Workday needs an account at each company, so its jobs are always finished by hand. */
-export const FILLABLE_SOURCES: readonly SearchSource[] = ['greenhouse', 'lever', 'ashby'];
+/**
+ * Boards whose forms take an application without an account, so Claude in Chrome can fill them.
+ * The rest (Workday, iCIMS, Taleo, SuccessFactors) need an account at each company: their jobs are
+ * listed to finish by hand.
+ */
+export const FILLABLE_SOURCES: readonly SearchSource[] = [
+  'greenhouse',
+  'lever',
+  'ashby',
+  'rippling',
+  'smartrecruiters',
+  'breezy',
+  'recruitee',
+  'teamtailor',
+  'personio',
+  'workable',
+  'jobvite',
+];
 
 export const DEFAULT_QUERY = 'site:job-boards.greenhouse.io "product manager"';
 
@@ -155,6 +209,105 @@ export function jobRefOf(raw: string): JobRef | null {
       };
     return null;
   }
+  const ref = (source: SearchSource, board: string, jobId: string, link: string): JobRef => ({
+    source,
+    board: board.toLowerCase(),
+    jobId,
+    link: link.slice(0, LIMITS.jobLink),
+  });
+  // Some boards put a locale first: /en-US/acme/jobs/...
+  const unlocalised = /^[a-z]{2}(-[A-Za-z]{2})?$/.test(parts[0] ?? '') ? parts.slice(1) : parts;
+  if (host === 'ats.rippling.com') {
+    const [board, kind, id] = unlocalised;
+    if (board && kind === 'jobs' && id && SLUG.test(board) && UUID.test(id))
+      return ref(
+        'rippling',
+        board,
+        id.toLowerCase(),
+        `https://ats.rippling.com/${board}/jobs/${id.toLowerCase()}`,
+      );
+    return null;
+  }
+  if (host === 'jobs.smartrecruiters.com') {
+    const [company, posting] = parts;
+    const id = /^(\d{6,20})(-|$)/.exec(posting ?? '')?.[1];
+    if (company && id && SLUG.test(company))
+      return ref(
+        'smartrecruiters',
+        company,
+        id,
+        `https://jobs.smartrecruiters.com/${company}/${posting ?? id}`,
+      );
+    return null;
+  }
+  const breezy = /^([a-z0-9-]+)\.breezy\.hr$/.exec(host)?.[1];
+  if (breezy) {
+    const id = parts[0] === 'p' ? /^([0-9a-f]{6,20})(-|$)/.exec(parts[1] ?? '')?.[1] : undefined;
+    return id ? ref('breezy', breezy, id, `https://${host}/p/${parts[1] ?? id}`) : null;
+  }
+  const recruitee = /^([a-z0-9-]+)\.recruitee\.com$/.exec(host)?.[1];
+  if (recruitee) {
+    const slug = parts[0] === 'o' ? parts[1] : undefined;
+    return slug && SLUG.test(slug)
+      ? ref('recruitee', recruitee, slug, `https://${host}/o/${slug}`)
+      : null;
+  }
+  const teamtailor = /^([a-z0-9-]+)\.teamtailor\.com$/.exec(host)?.[1];
+  if (teamtailor) {
+    const [kind, posting] = unlocalised;
+    const id = kind === 'jobs' ? /^(\d{3,20})(-|$)/.exec(posting ?? '')?.[1] : undefined;
+    return id ? ref('teamtailor', teamtailor, id, `https://${host}/jobs/${posting ?? id}`) : null;
+  }
+  const personio = /^([a-z0-9-]+)\.jobs\.personio\.(de|com)$/.exec(host)?.[1];
+  if (personio) {
+    const id = parts[0] === 'job' && /^\d{1,20}$/.test(parts[1] ?? '') ? parts[1] : undefined;
+    return id ? ref('personio', personio, id, `https://${host}/job/${id}`) : null;
+  }
+  if (host === 'apply.workable.com') {
+    // /acme/j/ABC123/ (the account is needed to read the job)
+    const [account, kind, code] = parts;
+    if (account && kind === 'j' && code && SLUG.test(account) && /^[A-Z0-9]{6,20}$/i.test(code))
+      return ref(
+        'workable',
+        account,
+        code.toUpperCase(),
+        `https://apply.workable.com/${account}/j/${code.toUpperCase()}/`,
+      );
+    return null;
+  }
+  if (host === 'jobs.jobvite.com') {
+    const [company, kind, id] = parts;
+    if (company && kind === 'job' && id && SLUG.test(company) && /^[A-Za-z0-9]{4,20}$/.test(id))
+      return ref('jobvite', company, id, `https://jobs.jobvite.com/${company}/job/${id}`);
+    return null;
+  }
+  if (host.endsWith('.icims.com')) {
+    // careers-acme.icims.com/jobs/1234/qa-engineer/job
+    const id = parts[0] === 'jobs' && /^\d{1,12}$/.test(parts[1] ?? '') ? parts[1] : undefined;
+    const board = host.split('.')[0]?.replace(/^careers-/, '') ?? host;
+    return id
+      ? ref('icims', board, id, `https://${host}/jobs/${id}/${parts[2] ?? 'job'}/job`)
+      : null;
+  }
+  if (host.endsWith('.taleo.net')) {
+    const id = url.searchParams.get('job');
+    const board = host.split('.')[0] ?? host;
+    return id && /^[A-Za-z0-9-]{1,40}$/.test(id) && /jobdetail/i.test(url.pathname)
+      ? ref('taleo', board, id, `https://${host}${url.pathname}?job=${id}`)
+      : null;
+  }
+  if (/^career\d*\.successfactors\.(com|eu)$/.test(host)) {
+    const id = url.searchParams.get('career_job_req_id');
+    const company = url.searchParams.get('company');
+    return id && company && /^\d{1,12}$/.test(id) && SLUG.test(company)
+      ? ref(
+          'successfactors',
+          company,
+          id,
+          `https://${host}/career?company=${company}&career_job_req_id=${id}&career_ns=job_listing`,
+        )
+      : null;
+  }
   if (host.endsWith('.myworkdayjobs.com')) {
     // https://acme.wd5.myworkdayjobs.com/en-US/External/job/Boston-MA/QA-Engineer_R123
     const jobAt = parts.indexOf('job');
@@ -189,6 +342,255 @@ export function uniqueJobRefs(links: string[]): JobRef[] {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Where a job is: the United States or not
+
+const US_STATES: [string, string][] = [
+  ['AL', 'Alabama'],
+  ['AK', 'Alaska'],
+  ['AZ', 'Arizona'],
+  ['AR', 'Arkansas'],
+  ['CA', 'California'],
+  ['CO', 'Colorado'],
+  ['CT', 'Connecticut'],
+  ['DE', 'Delaware'],
+  ['FL', 'Florida'],
+  ['GA', 'Georgia'],
+  ['HI', 'Hawaii'],
+  ['ID', 'Idaho'],
+  ['IL', 'Illinois'],
+  ['IN', 'Indiana'],
+  ['IA', 'Iowa'],
+  ['KS', 'Kansas'],
+  ['KY', 'Kentucky'],
+  ['LA', 'Louisiana'],
+  ['ME', 'Maine'],
+  ['MD', 'Maryland'],
+  ['MA', 'Massachusetts'],
+  ['MI', 'Michigan'],
+  ['MN', 'Minnesota'],
+  ['MS', 'Mississippi'],
+  ['MO', 'Missouri'],
+  ['MT', 'Montana'],
+  ['NE', 'Nebraska'],
+  ['NV', 'Nevada'],
+  ['NH', 'New Hampshire'],
+  ['NJ', 'New Jersey'],
+  ['NM', 'New Mexico'],
+  ['NY', 'New York'],
+  ['NC', 'North Carolina'],
+  ['ND', 'North Dakota'],
+  ['OH', 'Ohio'],
+  ['OK', 'Oklahoma'],
+  ['OR', 'Oregon'],
+  ['PA', 'Pennsylvania'],
+  ['RI', 'Rhode Island'],
+  ['SC', 'South Carolina'],
+  ['SD', 'South Dakota'],
+  ['TN', 'Tennessee'],
+  ['TX', 'Texas'],
+  ['UT', 'Utah'],
+  ['VT', 'Vermont'],
+  ['VA', 'Virginia'],
+  ['WA', 'Washington'],
+  ['WV', 'West Virginia'],
+  ['WI', 'Wisconsin'],
+  ['WY', 'Wyoming'],
+  ['DC', 'District of Columbia'],
+  ['PR', 'Puerto Rico'],
+];
+const STATE_CODES = new Set(US_STATES.map(([code]) => code));
+const STATE_NAMES = US_STATES.map(([, name]) => name.toLowerCase());
+/** Cities postings often name without a state. */
+const US_CITIES = [
+  'new york city',
+  'nyc',
+  'san francisco',
+  'sf bay area',
+  'bay area',
+  'silicon valley',
+  'los angeles',
+  'seattle',
+  'boston',
+  'chicago',
+  'austin',
+  'denver',
+  'atlanta',
+  'miami',
+  'washington dc',
+  'washington, d.c.',
+  'san diego',
+  'san jose',
+  'palo alto',
+  'mountain view',
+  'philadelphia',
+  'pittsburgh',
+  'portland',
+  'phoenix',
+  'dallas',
+  'houston',
+  'nashville',
+  'raleigh',
+  'minneapolis',
+  'salt lake city',
+  'detroit',
+  'columbus',
+  'charlotte',
+];
+/** Places and regions that are clearly outside the United States. */
+const NOT_US = [
+  'canada',
+  'mexico',
+  'brazil',
+  'argentina',
+  'colombia',
+  'chile',
+  'peru',
+  'latam',
+  'latin america',
+  'united kingdom',
+  'uk',
+  'england',
+  'scotland',
+  'wales',
+  'ireland',
+  'london',
+  'dublin',
+  'europe',
+  'eu',
+  'emea',
+  'germany',
+  'berlin',
+  'munich',
+  'france',
+  'paris',
+  'spain',
+  'madrid',
+  'barcelona',
+  'portugal',
+  'lisbon',
+  'italy',
+  'netherlands',
+  'amsterdam',
+  'belgium',
+  'switzerland',
+  'zurich',
+  'austria',
+  'vienna',
+  'sweden',
+  'stockholm',
+  'norway',
+  'denmark',
+  'copenhagen',
+  'finland',
+  'helsinki',
+  'poland',
+  'warsaw',
+  'krakow',
+  'czech',
+  'prague',
+  'romania',
+  'bucharest',
+  'hungary',
+  'greece',
+  'turkey',
+  'istanbul',
+  'israel',
+  'tel aviv',
+  'ukraine',
+  'estonia',
+  'lithuania',
+  'latvia',
+  'india',
+  'bangalore',
+  'bengaluru',
+  'hyderabad',
+  'pune',
+  'mumbai',
+  'delhi',
+  'chennai',
+  'apac',
+  'asia',
+  'singapore',
+  'japan',
+  'tokyo',
+  'korea',
+  'seoul',
+  'china',
+  'beijing',
+  'shanghai',
+  'hong kong',
+  'taiwan',
+  'philippines',
+  'manila',
+  'vietnam',
+  'indonesia',
+  'malaysia',
+  'thailand',
+  'australia',
+  'sydney',
+  'melbourne',
+  'new zealand',
+  'auckland',
+  'south africa',
+  'cape town',
+  'nigeria',
+  'lagos',
+  'kenya',
+  'nairobi',
+  'egypt',
+  'uae',
+  'dubai',
+  'saudi',
+  'pakistan',
+  'bangladesh',
+  'toronto',
+  'vancouver',
+  'montreal',
+  'ottawa',
+  'calgary',
+];
+const US_COUNTRY = /^(us|usa|u\.s\.a?\.?|united states( of america)?|america)$/i;
+
+export type LocationVerdict = 'us' | 'not_us' | 'unknown';
+
+const hasPhrase = (text: string, phrase: string) =>
+  new RegExp(`(^|[^a-z])${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z]|$)`, 'i').test(
+    text,
+  );
+
+function placeVerdict(place: string): LocationVerdict {
+  const text = place.trim();
+  if (!text) return 'unknown';
+  // "United States", "USA", "U.S.", and "US" written in capitals (never the word "us").
+  if (/united states|\busa\b|\bu\.s\.a?\b/i.test(text) || /(^|[^A-Za-z])US([^A-Za-z]|$)/.test(text))
+    return 'us';
+  // "Boston, MA" or "Austin, Texas": a state after a comma or dash, or a full state name.
+  const afterComma = /[,\-–]\s*([A-Z]{2})\b/.exec(text)?.[1];
+  if (afterComma && STATE_CODES.has(afterComma)) return 'us';
+  if (STATE_NAMES.some((name) => hasPhrase(text, name))) {
+    // "New South Wales" and "Western Australia" are not US states.
+    if (!/new south wales|western australia/i.test(text)) return 'us';
+  }
+  if (US_CITIES.some((city) => hasPhrase(text, city))) return 'us';
+  if (NOT_US.some((name) => hasPhrase(text, name))) return 'not_us';
+  return 'unknown';
+}
+
+/**
+ * Whether a job is in the United States, from the country the board gives (when it does) or else
+ * the location text. A job in several places counts as US when any of them is. "Remote" alone
+ * says nothing about the country, so it is unknown, not outside.
+ */
+export function locationVerdict(location: string | null, country: string | null): LocationVerdict {
+  if (country?.trim()) return US_COUNTRY.test(country.trim()) ? 'us' : 'not_us';
+  if (!location) return 'unknown';
+  const verdicts = location.split(/[;|/•·]|\bor\b/).map(placeVerdict);
+  if (verdicts.includes('us')) return 'us';
+  if (verdicts.includes('not_us')) return 'not_us';
+  return 'unknown';
+}
+
+// ---------------------------------------------------------------------------------------------
 // Sorting jobs
 
 export const HIT_KINDS = ['target', 'keyword_only', 'finish_yourself', 'skipped'] as const;
@@ -200,10 +602,15 @@ export interface JobFacts {
   /** The posting's own text (description), when read. */
   text: string;
   workMode: WorkMode | null;
-  /** When the posting went up. Day-only dates are taken as the start of that day (UTC). */
+  /** When the posting went up. */
   postedAt: Date | null;
+  /** The board gives only the day (postedAt is that day's start, UTC): compared by day. */
+  postedDayOnly?: boolean;
   /** Already an application in the tracker (same link, or same company and role). */
   alreadyTracked: boolean;
+  location: string | null;
+  /** The country the board gives, when it does (a name or a code). */
+  country: string | null;
 }
 
 export interface SortRules {
@@ -213,6 +620,8 @@ export interface SortRules {
   queryTerms: string[];
   workModes: WorkMode[];
   timeframeDays: number;
+  /** Skip jobs clearly outside the United States. */
+  usOnly: boolean;
   now: Date;
 }
 
@@ -235,7 +644,10 @@ const anyIn = (terms: string[], text: string): string | undefined => {
 export function sortJob(job: JobFacts, rules: SortRules): Sorted {
   if (job.alreadyTracked) return { kind: 'skipped', reason: 'Already in your tracker' };
   if (job.postedAt) {
-    const oldest = rules.now.getTime() - rules.timeframeDays * 24 * 60 * 60 * 1000;
+    const DAY = 24 * 60 * 60 * 1000;
+    const cutoff = rules.now.getTime() - rules.timeframeDays * DAY;
+    // A day-only date is in range when that day is: posted "yesterday" is within 24 hours.
+    const oldest = job.postedDayOnly ? Math.floor(cutoff / DAY) * DAY : cutoff;
     if (job.postedAt.getTime() < oldest)
       return {
         kind: 'skipped',
@@ -244,6 +656,12 @@ export function sortJob(job: JobFacts, rules: SortRules): Sorted {
   }
   const skipped = anyIn(rules.skipTitles, job.title);
   if (skipped) return { kind: 'skipped', reason: `Title has "${skipped}", which you skip` };
+  const where = rules.usOnly ? locationVerdict(job.location, job.country) : 'us';
+  if (where === 'not_us')
+    return {
+      kind: 'skipped',
+      reason: `Outside the United States${job.location ? ` (${job.location.slice(0, 120)})` : ''}`,
+    };
   if (job.workMode && rules.workModes.length > 0 && !rules.workModes.includes(job.workMode))
     return { kind: 'skipped', reason: `${job.workMode}, which you don't want` };
 
@@ -261,7 +679,13 @@ export function sortJob(job: JobFacts, rules: SortRules): Sorted {
       kind: 'finish_yourself',
       reason: `${SOURCE_LABELS[job.source]} needs an account at each company`,
     };
-  return { kind: 'target', reason: 'Matches your titles' };
+  return {
+    kind: 'target',
+    reason:
+      where === 'unknown'
+        ? "Matches your titles; the location doesn't name a country, so check it is in the US"
+        : 'Matches your titles',
+  };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -341,6 +765,8 @@ export const JobSearchProfileSchema = z
     portfolio: link,
     website: link,
     workModes: z.array(z.enum(WORK_MODES)).min(1).max(3),
+    /** Skip jobs clearly outside the United States (on unless turned off). */
+    usOnly: z.boolean().default(true),
     /** Google-style queries, e.g. site:job-boards.greenhouse.io "product manager". */
     queries: z.array(required(300)).min(1).max(3),
     includeTitles: termList,
@@ -377,6 +803,7 @@ export type JobSearchProfile = z.infer<typeof JobSearchProfileSchema>;
 /** What the setup form starts with. */
 export const PROFILE_DEFAULTS = {
   workModes: ['Remote', 'Hybrid'] as WorkMode[],
+  usOnly: true,
   queries: [DEFAULT_QUERY],
   timeframeDays: 1 as const,
   cadence: 'weekdays' as const,

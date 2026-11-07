@@ -16,6 +16,7 @@ const PROFILE: JobSearchProfile = {
   portfolio: '',
   website: '',
   workModes: ['Remote', 'Hybrid'],
+  usOnly: true,
   queries: ['site:job-boards.greenhouse.io "product manager"'],
   includeTitles: [],
   skipTitles: ['intern'],
@@ -181,6 +182,7 @@ test('first run: the setup asks once, confirms everything, then opens the overvi
   await expect(confirm).toContainText('Female');
   await expect(confirm).toContainText('I am not a protected veteran');
   await expect(confirm).toContainText('Disability');
+  await expect(confirm).toContainText('United States onlyYes');
   await expect(confirm).toContainText('site:job-boards.greenhouse.io "product manager"');
   await page.getByRole('button', { name: 'Confirm and save' }).click();
 

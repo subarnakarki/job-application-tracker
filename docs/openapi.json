@@ -6640,7 +6640,18 @@
                         "greenhouse",
                         "lever",
                         "ashby",
-                        "workday"
+                        "rippling",
+                        "smartrecruiters",
+                        "breezy",
+                        "recruitee",
+                        "teamtailor",
+                        "personio",
+                        "workable",
+                        "jobvite",
+                        "workday",
+                        "icims",
+                        "taleo",
+                        "successfactors"
                       ]
                     },
                     "company": {
@@ -7024,7 +7035,18 @@
                         "greenhouse",
                         "lever",
                         "ashby",
-                        "workday"
+                        "rippling",
+                        "smartrecruiters",
+                        "breezy",
+                        "recruitee",
+                        "teamtailor",
+                        "personio",
+                        "workable",
+                        "jobvite",
+                        "workday",
+                        "icims",
+                        "taleo",
+                        "successfactors"
                       ]
                     },
                     "company": {
@@ -7421,7 +7443,18 @@
                         "greenhouse",
                         "lever",
                         "ashby",
-                        "workday"
+                        "rippling",
+                        "smartrecruiters",
+                        "breezy",
+                        "recruitee",
+                        "teamtailor",
+                        "personio",
+                        "workable",
+                        "jobvite",
+                        "workday",
+                        "icims",
+                        "taleo",
+                        "successfactors"
                       ]
                     },
                     "company": {
@@ -7785,7 +7818,18 @@
                         "greenhouse",
                         "lever",
                         "ashby",
-                        "workday"
+                        "rippling",
+                        "smartrecruiters",
+                        "breezy",
+                        "recruitee",
+                        "teamtailor",
+                        "personio",
+                        "workable",
+                        "jobvite",
+                        "workday",
+                        "icims",
+                        "taleo",
+                        "successfactors"
                       ]
                     },
                     "company": {
@@ -8159,7 +8203,18 @@
                         "greenhouse",
                         "lever",
                         "ashby",
-                        "workday"
+                        "rippling",
+                        "smartrecruiters",
+                        "breezy",
+                        "recruitee",
+                        "teamtailor",
+                        "personio",
+                        "workable",
+                        "jobvite",
+                        "workday",
+                        "icims",
+                        "taleo",
+                        "successfactors"
                       ]
                     },
                     "company": {
@@ -8533,7 +8588,18 @@
                         "greenhouse",
                         "lever",
                         "ashby",
-                        "workday"
+                        "rippling",
+                        "smartrecruiters",
+                        "breezy",
+                        "recruitee",
+                        "teamtailor",
+                        "personio",
+                        "workable",
+                        "jobvite",
+                        "workday",
+                        "icims",
+                        "taleo",
+                        "successfactors"
                       ]
                     },
                     "company": {
@@ -8941,6 +9007,10 @@
                                 ]
                               }
                             },
+                            "usOnly": {
+                              "default": true,
+                              "type": "boolean"
+                            },
                             "queries": {
                               "minItems": 1,
                               "maxItems": 3,
@@ -9074,6 +9144,7 @@
                             "portfolio",
                             "website",
                             "workModes",
+                            "usOnly",
                             "queries",
                             "includeTitles",
                             "skipTitles",
@@ -9249,6 +9320,10 @@
                         "On-site"
                       ]
                     }
+                  },
+                  "usOnly": {
+                    "default": true,
+                    "type": "boolean"
                   },
                   "queries": {
                     "minItems": 1,
@@ -9489,6 +9564,10 @@
                                 ]
                               }
                             },
+                            "usOnly": {
+                              "default": true,
+                              "type": "boolean"
+                            },
                             "queries": {
                               "minItems": 1,
                               "maxItems": 3,
@@ -9622,6 +9701,7 @@
                             "portfolio",
                             "website",
                             "workModes",
+                            "usOnly",
                             "queries",
                             "includeTitles",
                             "skipTitles",
@@ -9781,7 +9861,18 @@
                               "greenhouse",
                               "lever",
                               "ashby",
-                              "workday"
+                              "rippling",
+                              "smartrecruiters",
+                              "breezy",
+                              "recruitee",
+                              "teamtailor",
+                              "personio",
+                              "workable",
+                              "jobvite",
+                              "workday",
+                              "icims",
+                              "taleo",
+                              "successfactors"
                             ]
                           },
                           "company": {
@@ -10044,7 +10135,18 @@
                               "greenhouse",
                               "lever",
                               "ashby",
-                              "workday"
+                              "rippling",
+                              "smartrecruiters",
+                              "breezy",
+                              "recruitee",
+                              "teamtailor",
+                              "personio",
+                              "workable",
+                              "jobvite",
+                              "workday",
+                              "icims",
+                              "taleo",
+                              "successfactors"
                             ]
                           },
                           "company": {
@@ -10307,7 +10409,18 @@
                               "greenhouse",
                               "lever",
                               "ashby",
-                              "workday"
+                              "rippling",
+                              "smartrecruiters",
+                              "breezy",
+                              "recruitee",
+                              "teamtailor",
+                              "personio",
+                              "workable",
+                              "jobvite",
+                              "workday",
+                              "icims",
+                              "taleo",
+                              "successfactors"
                             ]
                           },
                           "company": {
@@ -10570,7 +10683,18 @@
                               "greenhouse",
                               "lever",
                               "ashby",
-                              "workday"
+                              "rippling",
+                              "smartrecruiters",
+                              "breezy",
+                              "recruitee",
+                              "teamtailor",
+                              "personio",
+                              "workable",
+                              "jobvite",
+                              "workday",
+                              "icims",
+                              "taleo",
+                              "successfactors"
                             ]
                           },
                           "company": {
@@ -11255,7 +11379,18 @@
                               "greenhouse",
                               "lever",
                               "ashby",
-                              "workday"
+                              "rippling",
+                              "smartrecruiters",
+                              "breezy",
+                              "recruitee",
+                              "teamtailor",
+                              "personio",
+                              "workable",
+                              "jobvite",
+                              "workday",
+                              "icims",
+                              "taleo",
+                              "successfactors"
                             ]
                           },
                           "company": {
@@ -11784,7 +11919,18 @@
                               "greenhouse",
                               "lever",
                               "ashby",
-                              "workday"
+                              "rippling",
+                              "smartrecruiters",
+                              "breezy",
+                              "recruitee",
+                              "teamtailor",
+                              "personio",
+                              "workable",
+                              "jobvite",
+                              "workday",
+                              "icims",
+                              "taleo",
+                              "successfactors"
                             ]
                           },
                           "company": {
@@ -15276,6 +15422,10 @@
                                     ]
                                   }
                                 },
+                                "usOnly": {
+                                  "default": true,
+                                  "type": "boolean"
+                                },
                                 "queries": {
                                   "minItems": 1,
                                   "maxItems": 3,
@@ -15409,6 +15559,7 @@
                                 "portfolio",
                                 "website",
                                 "workModes",
+                                "usOnly",
                                 "queries",
                                 "includeTitles",
                                 "skipTitles",
@@ -15591,7 +15742,18 @@
                                   "greenhouse",
                                   "lever",
                                   "ashby",
-                                  "workday"
+                                  "rippling",
+                                  "smartrecruiters",
+                                  "breezy",
+                                  "recruitee",
+                                  "teamtailor",
+                                  "personio",
+                                  "workable",
+                                  "jobvite",
+                                  "workday",
+                                  "icims",
+                                  "taleo",
+                                  "successfactors"
                                 ]
                               },
                               "company": {

@@ -24,6 +24,7 @@ export interface SetupValues {
   portfolio: string;
   website: string;
   workModes: WorkMode[];
+  usOnly: boolean;
   queries: string;
   includeTitles: string;
   skipTitles: string;
@@ -81,6 +82,7 @@ export function emptySetup(prefill: { name?: string | null; email?: string }): S
     portfolio: '',
     website: '',
     workModes: PROFILE_DEFAULTS.workModes,
+    usOnly: PROFILE_DEFAULTS.usOnly,
     queries: PROFILE_DEFAULTS.queries.join('\n'),
     includeTitles: '',
     skipTitles: '',

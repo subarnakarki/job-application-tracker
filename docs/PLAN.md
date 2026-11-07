@@ -718,6 +718,18 @@ Built as planned, with these changes and findings:
   `JOB_SEARCH_USER_IDS` (your user id) and `JOB_SEARCH_CRON_SECRET`; repository secrets `APP_URL` and
   `JOB_SEARCH_CRON_SECRET`; then the setup page, and paste the Claude in Chrome prompt from the overview.
 
+## Phase 15 additions (after release, on request)
+
+- **Self-identification answers by category** (gender, Hispanic/Latino, race or ethnicity, veteran, disability,
+  other), each defaulting to decline and matched to each form's own options; Greenhouse's newer
+  `demographic_questions` block is now read. **Redraft** on the queue.
+- **More boards** (migration 0010 makes the board a name, not a fixed list): Rippling, SmartRecruiters, Breezy HR,
+  Recruitee, Teamtailor and Personio through the Phase 13 readers; Workable from the account's public job list
+  (it rate-limits: one call answered, then 429, so a refused read falls back to the search result); Jobvite from
+  its page (no API, no JobPosting data, no posting date). Workday, iCIMS, Taleo and SuccessFactors are listed to
+  finish by hand. Boards that give only the posting day are compared by day.
+- **United States only**, on by default.
+
 ## Planned but not built
 
 | Item                                | Status                                                                                                    |

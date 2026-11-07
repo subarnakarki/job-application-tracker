@@ -30,16 +30,20 @@ const greenhouseJob = (
   title: string,
   postedHoursAgo: number,
   content = 'Own the roadmap. '.repeat(20),
+  location = 'Remote, United States',
 ) =>
   JSON.stringify({
     ...GREENHOUSE,
     title,
     content,
+    location: { name: location },
     first_published: new Date(T0.getTime() - postedHoursAgo * HOUR).toISOString(),
   });
 const apiUrl = (id: number) =>
   `https://boards-api.greenhouse.io/v1/boards/acme/jobs/${String(id)}?questions=true&pay_transparency=true`;
 const jobLink = (id: number) => `https://job-boards.greenhouse.io/acme/jobs/${String(id)}`;
+
+const ICIMS = 'https://careers-initech.icims.com/jobs/4321/senior-product-manager/job';
 
 const PAGES: Record<string, string> = {
   [apiUrl(101)]: greenhouseJob('Senior Product Manager', 3),
@@ -50,6 +54,7 @@ const PAGES: Record<string, string> = {
   ),
   [apiUrl(103)]: greenhouseJob('Product Manager, Growth', 72),
   [apiUrl(104)]: greenhouseJob('Product Manager Intern', 2),
+  [apiUrl(105)]: greenhouseJob('Product Manager, EMEA', 2, undefined, 'London, UK'),
 };
 const fetchPage: PageFetcher = (url) => {
   const text = PAGES[url];
@@ -74,6 +79,13 @@ const claude: StubClaude = {
     claude.searches.push({ query, sources });
     return Promise.resolve({
       links: [...claude.links, 'https://job-boards.greenhouse.io/acme', 'https://evil.example/x'],
+      results: {
+        // An iCIMS page the server cannot read: the job comes from this search result.
+        [ICIMS]: {
+          title: 'Senior Product Manager - Remote | Initech Careers',
+          pageAge: '5 hours ago',
+        },
+      },
       searches: 2,
     });
   },
@@ -107,6 +119,7 @@ const PROFILE: JobSearchProfile = {
   portfolio: '',
   website: '',
   workModes: ['Remote', 'Hybrid'],
+  usOnly: true,
   queries: [DEFAULT_QUERY],
   includeTitles: ['product manager'],
   skipTitles: ['intern'],
@@ -283,6 +296,39 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
       expect(answers.get('What is your current country of residence?')?.source).toBe('needs_you');
       expect(answers.get('Gender')).toMatchObject({ answer: 'Decline to self-identify' });
       expect(target.draft?.coverLetter).toBe('Dear Acme team, ...');
+    });
+
+    it('skips jobs outside the US, and keeps an unreadable page from its search result', async () => {
+      const { cookie } = await member();
+      // No site: in the query, so every board counts.
+      await send('PUT', '/api/job-search/profile', cookie, {
+        ...PROFILE,
+        queries: ['"product manager"'],
+      });
+      claude.links = [jobLink(105), ICIMS];
+
+      const { hits } = runOf(await run(cookie));
+
+      expect(byRole(hits, 'Product Manager, EMEA')).toMatchObject({
+        kind: 'skipped',
+        reason: 'Outside the United States (London, UK)',
+      });
+      // iCIMS needs an account, and its page could not be read: listed to finish by hand.
+      expect(byRole(hits, 'Senior Product Manager')).toMatchObject({
+        source: 'icims',
+        company: 'Initech',
+        kind: 'finish_yourself',
+        reason: 'iCIMS needs an account at each company (from the search result only)',
+        jobLink: ICIMS,
+      });
+    });
+
+    it('keeps jobs outside the US when United States only is off', async () => {
+      const { cookie } = await member();
+      await send('PUT', '/api/job-search/profile', cookie, { ...PROFILE, usOnly: false });
+      claude.links = [jobLink(105)];
+      const { hits } = runOf(await run(cookie));
+      expect(byRole(hits, 'Product Manager, EMEA').kind).toBe('target');
     });
 
     it('never shows a job twice, and refuses a second run while one is going', async () => {

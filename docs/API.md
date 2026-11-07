@@ -149,6 +149,15 @@ Open to the users in `JOB_SEARCH_USER_IDS` when `ANTHROPIC_API_KEY` is set; ever
 |        |                                    |        | else 404. Starts each due scheduled run (once per local day), then    |
 |        |                                    |        | keeps drafting. Called hourly by the "Job search schedule" workflow   |
 
+**Boards.** Searched and filled: Greenhouse, Lever, Ashby, Rippling, SmartRecruiters, Breezy HR, Recruitee,
+Teamtailor, Personio, Workable and Jobvite. Searched and listed to finish by hand (they need an account): Workday,
+iCIMS, Taleo and SuccessFactors. A query without `site:` searches them all. When a job's page cannot be read
+(Workable often refuses, some pages are drawn by script), the job is kept from its search result's title and age.
+
+**United States only** (on by default): a job is skipped when its country, or else its location, is clearly
+outside the US (`locationVerdict` in `shared/`); a job in several places counts when any is in the US, and one
+that only says "Remote" is kept with a note to check it. The search itself is also asked for US jobs.
+
 **Who answers what.** Contact details, work authorization, sponsorship, salary, relocation, start date, how you
 heard, age and every demographic or EEO question are answered from the profile by code
 (`profileQuestionKind` in `shared/`); the model never sees them. The model drafts the rest from the resume

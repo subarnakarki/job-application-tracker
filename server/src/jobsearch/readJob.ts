@@ -3,7 +3,7 @@ import { fromAshby, fromGreenhouse, fromLever } from '../postings/boards';
 import { asArray, cleanText, fieldOf, parseJson } from '../postings/details';
 import { FetchError, type PageFetcher } from '../postings/fetchPage';
 import { readPosting } from '../postings/preview';
-import { proseInJson, POSTING_TEXT_MAX } from '../postings/text';
+import { proseInJson, POSTING_TEXT_MAX, readPostingText } from '../postings/text';
 
 /**
  * Reads one job a search found, from its board's public API: the exact title, company, place,
@@ -17,6 +17,10 @@ export interface JobDetails {
   location: string | null;
   workMode: WorkMode | null;
   postedAt: Date | null;
+  /** Only the day is known (postedAt is its start, UTC). */
+  postedDayOnly?: boolean;
+  /** The country, when the board gives one (a name or a code). */
+  country: string | null;
   applyLink: string;
   /** Plain text of the posting, for sorting and drafting. */
   text: string;
@@ -143,6 +147,7 @@ export async function readJob(
         location: details.location,
         workMode: /\bremote\b/i.test(details.location ?? '') ? 'Remote' : null,
         postedAt: instant(fieldOf(job, 'first_published')) ?? instant(fieldOf(job, 'updated_at')),
+        country: null,
         // The board's own page works for every Greenhouse job, embedded on a careers site or not.
         applyLink: ref.link,
         text: textOf(job),
@@ -164,6 +169,7 @@ export async function readJob(
         location: details.location,
         workMode: details.workMode,
         postedAt: instant(fieldOf(posting, 'createdAt')),
+        country: stringOf(fieldOf(posting, 'country')),
         applyLink:
           typeof apply === 'string' && apply.startsWith('https://') ? apply : `${ref.link}/apply`,
         text: textOf(posting),
@@ -188,6 +194,9 @@ export async function readJob(
         location: details.location,
         workMode: details.workMode,
         postedAt: instant(fieldOf(job, 'publishedAt')),
+        country: stringOf(
+          fieldOf(fieldOf(fieldOf(job, 'address'), 'postalAddress'), 'addressCountry'),
+        ),
         applyLink:
           typeof apply === 'string' && apply.startsWith('https://')
             ? apply
@@ -196,25 +205,117 @@ export async function readJob(
         questions: null,
       };
     }
-    case 'workday': {
-      // Read through "Fill from link" (Workday's own JSON); the day is all it gives.
-      let details;
-      try {
-        details = await readPosting(ref.link, fetchPage);
-      } catch (error) {
-        throw new JobReadError(error instanceof Error ? error.message : 'workday');
-      }
-      if (!details.role) throw new JobReadError('workday: no title');
-      return {
-        company: details.company ?? companyFromSlug(ref.board),
-        role: details.role,
-        location: details.location,
-        workMode: details.workMode,
-        postedAt: details.postedOn ? new Date(`${details.postedOn}T00:00:00Z`) : null,
-        applyLink: ref.link,
-        text: '',
-        questions: null,
-      };
-    }
+    case 'workable':
+      return readWorkable(ref, fetchBoard);
+    case 'jobvite':
+      return readJobvite(ref, fetchPage);
+    default:
+      // Workday, Rippling, SmartRecruiters, Breezy, Recruitee, Teamtailor, Personio, iCIMS, Taleo
+      // and SuccessFactors: read through "Fill from link" (each board's API, else the page's
+      // JobPosting data). These give the day a job was posted, not the time.
+      return readThroughPosting(ref, fetchPage);
   }
+}
+
+const stringOf = (value: unknown): string | null =>
+  typeof value === 'string' && value.trim() ? value.trim() : null;
+
+const dayStart = (day: string | null) => (day ? new Date(`${day}T00:00:00Z`) : null);
+
+async function readThroughPosting(ref: JobRef, fetchPage: PageFetcher): Promise<JobDetails> {
+  let details;
+  try {
+    details = await readPosting(ref.link, fetchPage);
+  } catch (error) {
+    throw new JobReadError(error instanceof Error ? error.message : ref.source);
+  }
+  if (!details.role) throw new JobReadError(`${ref.source}: no title`);
+  // The text is a second read; a job is still usable without it.
+  const text =
+    ref.source === 'workday' ? '' : await readPostingText(ref.link, fetchPage).catch(() => '');
+  return {
+    company: details.company ?? companyFromSlug(ref.board),
+    role: details.role,
+    location: details.location,
+    workMode: details.workMode,
+    postedAt: dayStart(details.postedOn),
+    postedDayOnly: true,
+    country: null,
+    applyLink: ref.link,
+    text,
+    questions: null,
+  };
+}
+
+/**
+ * Workable: the account's public job list has every field but the description. Workable limits
+ * how often it may be read, so a refusal is common: the job then falls back to the search result.
+ */
+async function readWorkable(ref: JobRef, fetchBoard: PageFetcher): Promise<JobDetails> {
+  const board = await readJson(
+    fetchBoard,
+    `https://apply.workable.com/api/v1/widget/accounts/${ref.board}`,
+  );
+  const job = asArray(fieldOf(board, 'jobs')).find(
+    (entry) => String(fieldOf(entry, 'shortcode')).toUpperCase() === ref.jobId,
+  );
+  const role = job ? cleanText(fieldOf(job, 'title'), LIMITS.role) : null;
+  if (!job || !role) throw new JobReadError('workable: no such job');
+  const place = [fieldOf(job, 'city'), fieldOf(job, 'state'), fieldOf(job, 'country')]
+    .map(stringOf)
+    .filter(Boolean)
+    .join(', ');
+  const apply = fieldOf(job, 'application_url');
+  return {
+    company: cleanText(fieldOf(board, 'name'), LIMITS.company) ?? companyFromSlug(ref.board),
+    role,
+    location: place || null,
+    workMode: fieldOf(job, 'telecommuting') === true ? 'Remote' : null,
+    postedAt: instant(fieldOf(job, 'published_on')) ?? instant(fieldOf(job, 'created_at')),
+    country: stringOf(fieldOf(job, 'country')),
+    applyLink:
+      typeof apply === 'string' && apply.startsWith('https://') ? apply : `${ref.link}apply/`,
+    text: '',
+    questions: null,
+  };
+}
+
+/** The text inside the first element with this class. */
+function byClass(html: string, className: string, tag = '[a-z0-9]+'): string | null {
+  const match = new RegExp(
+    `<(${tag})[^>]*class=["'][^"']*\\b${className}\\b[^"']*["'][^>]*>([\\s\\S]*?)</\\1>`,
+    'i',
+  ).exec(html);
+  return match?.[2] ?? null;
+}
+
+/** Jobvite: no API and no JobPosting data, so the page itself is read. It gives no date. */
+export async function readJobvite(ref: JobRef, fetchPage: PageFetcher): Promise<JobDetails> {
+  let html: string;
+  try {
+    html = (await fetchPage(ref.link)).text;
+  } catch (error) {
+    if (error instanceof FetchError) throw new JobReadError(`${error.code}: ${error.message}`);
+    throw error;
+  }
+  const role = cleanText(byClass(html, 'jv-header', 'h2'), LIMITS.role);
+  if (!role) throw new JobReadError('jobvite: no title');
+  // "Sales | Omaha, Nebraska | Denver, Colorado": the department, then each place.
+  const meta = (byClass(html, 'jv-job-detail-meta', 'p') ?? '')
+    .split(/<span[^>]*jv-inline-separator[^>]*><\/span>/i)
+    .map((part) => cleanText(part, 200))
+    .filter((part): part is string => part !== null);
+  const places = meta.slice(1);
+  const company = cleanText(/<title>([^<]*?)\s+Careers\b/i.exec(html)?.[1], LIMITS.company);
+  return {
+    company: company ?? companyFromSlug(ref.board),
+    role,
+    location: places.length ? places.join('; ').slice(0, 200) : null,
+    workMode: places.some((place) => /^remote\b/i.test(place)) ? 'Remote' : null,
+    postedAt: null,
+    country: null,
+    applyLink: `${ref.link}/apply`,
+    text: cleanText(byClass(html, 'jv-job-detail-description', 'div'), POSTING_TEXT_MAX) ?? '',
+    questions: null,
+  };
 }

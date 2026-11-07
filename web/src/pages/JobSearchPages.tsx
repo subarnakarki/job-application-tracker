@@ -1,6 +1,9 @@
 import {
   chromePrompt,
+  FILLABLE_SOURCES,
   googleSearchUrl,
+  SEARCH_SOURCES,
+  SOURCE_HOSTS,
   SOURCE_LABELS,
   type ApplicationQuestion,
   type JobHit,
@@ -247,6 +250,7 @@ function Summary({ profile }: { profile: JobSearchProfile }) {
     ['Portfolio', profile.portfolio || '—'],
     ['Website', profile.website || '—'],
     ['Work mode', profile.workModes.join(', ')],
+    ['United States only', profile.usOnly ? 'Yes' : 'No, anywhere'],
     ['Search queries', profile.queries.join('\n')],
     ['Titles to include', profile.includeTitles.join(', ') || 'The query words'],
     ['Titles to skip', profile.skipTitles.join(', ') || '—'],
@@ -396,7 +400,11 @@ function SetupForm({ initial, onSaved }: { initial: SetupValues; onSaved: () => 
         <ListField
           name="queries"
           label="Search queries"
-          hint='One per line, at most 3, in Google style: site:job-boards.greenhouse.io "product manager". Boards: Greenhouse, Lever (jobs.lever.co), Ashby (jobs.ashbyhq.com), Workday (myworkdayjobs.com).'
+          hint={`One per line, at most 3, in Google style: site:job-boards.greenhouse.io "product manager". Without site:, every board is searched. Boards: ${SEARCH_SOURCES.map((source) => `${SOURCE_LABELS[source]} (${SOURCE_HOSTS[source][0] ?? ''})`).join(', ')}. ${SEARCH_SOURCES.filter(
+            (source) => !FILLABLE_SOURCES.includes(source),
+          )
+            .map((source) => SOURCE_LABELS[source])
+            .join(', ')} need an account, so their jobs are listed for you to finish.`}
           {...field}
         />
         <div className="grid gap-4 sm:grid-cols-2">
@@ -422,6 +430,11 @@ function SetupForm({ initial, onSaved }: { initial: SetupValues; onSaved: () => 
             { value: '7', label: 'The past week' },
           ]}
           onChange={(value) => set('timeframeDays', value)}
+        />
+        <Check
+          label="United States only (skip jobs clearly outside the US; jobs that only say Remote are kept for you to check)"
+          checked={values.usOnly}
+          onChange={(checked) => setValues((current) => ({ ...current, usOnly: checked }))}
         />
       </Fieldset>
 
@@ -785,7 +798,9 @@ export function JobSearchRunPage() {
                     {posted(hit)} · {SOURCE_LABELS[hit.source]}
                     {hit.location ? ` · ${hit.location}` : ''} · {STATE_LABELS[hit.state]}
                   </p>
-                  {kind !== 'target' && <p className="text-sm text-fg-3">{hit.reason}</p>}
+                  {(kind !== 'target' || hit.reason !== 'Matches your titles') && (
+                    <p className="text-sm text-fg-3">{hit.reason}</p>
+                  )}
                   <a
                     className="link text-sm break-all underline"
                     href={hit.jobLink}

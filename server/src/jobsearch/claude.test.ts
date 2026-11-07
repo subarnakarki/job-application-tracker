@@ -73,13 +73,17 @@ describe('claudeJobSearch.search', () => {
 
     const outcome = await claude.search('site:job-boards.greenhouse.io "SDET"', ['greenhouse'], 1);
 
-    expect(outcome).toEqual({
+    expect(outcome).toMatchObject({
       links: [
         'https://job-boards.greenhouse.io/acme/jobs/1',
         'https://job-boards.greenhouse.io/acme',
         'https://job-boards.greenhouse.io/beta/jobs/2.',
       ],
       searches: 3,
+    });
+    expect(outcome.results?.['https://job-boards.greenhouse.io/acme/jobs/1']).toEqual({
+      title: 'A job',
+      pageAge: null,
     });
     expect(requests[0]).toMatchObject({
       model: 'claude-opus-5-5',
@@ -116,7 +120,7 @@ describe('claudeJobSearch.search', () => {
       await claudeAnswering([
         { status: 200, body: message('end_turn', [errorResult]) },
       ]).claude.search('x', ['ashby'], 1),
-    ).toEqual({ links: [], searches: 0 });
+    ).toMatchObject({ links: [], searches: 0 });
 
     const apiError = (type: string) => ({ type: 'error', error: { type, message: 'x' } });
     expect(
@@ -125,7 +129,7 @@ describe('claudeJobSearch.search', () => {
         ['ashby'],
         1,
       ),
-    ).toEqual({ links: [], searches: 0 });
+    ).toMatchObject({ links: [], searches: 0 });
     await expect(
       claudeAnswering([{ status: 401, body: apiError('authentication_error') }]).claude.search(
         'x',

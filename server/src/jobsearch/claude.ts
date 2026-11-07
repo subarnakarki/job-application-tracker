@@ -17,6 +17,8 @@ export const SEARCHES_PER_QUERY = 5;
 export interface SearchOutcome {
   /** Every result link seen (search results and links in the answer); filtered by the caller. */
   links: string[];
+  /** What the search engine said about each result link: its title and age, when given. */
+  results?: Record<string, { title: string; pageAge: string | null }>;
   searches: number;
 }
 
@@ -30,7 +32,12 @@ export interface DraftRequest {
 
 /** Injected into the app, so tests never call Anthropic. */
 export interface JobSearchClaude {
-  search(query: string, sources: SearchSource[], timeframeDays: number): Promise<SearchOutcome>;
+  search(
+    query: string,
+    sources: SearchSource[],
+    timeframeDays: number,
+    usOnly?: boolean,
+  ): Promise<SearchOutcome>;
   draft(request: DraftRequest): Promise<ModelDraft | null>;
 }
 
@@ -94,15 +101,22 @@ const MAX_CONTINUATIONS = 3;
 
 export function claudeJobSearch(client: Anthropic): JobSearchClaude {
   return {
-    async search(query, sources, timeframeDays) {
+    async search(query, sources, timeframeDays, usOnly = false) {
       const allowed = [...new Set(sources.flatMap((source) => SOURCE_HOSTS[source]))];
       const messages: Anthropic.Beta.BetaMessageParam[] = [
         {
           role: 'user',
-          content: `Query: ${query}\nPosted within the last ${String(timeframeDays)} day${timeframeDays === 1 ? '' : 's'}.`,
+          content: [
+            `Query: ${query}`,
+            `Posted within the last ${String(timeframeDays)} day${timeframeDays === 1 ? '' : 's'}.`,
+            ...(usOnly
+              ? ['Only jobs in the United States, or remote within the United States.']
+              : []),
+          ].join('\n'),
         },
       ];
       const links: string[] = [];
+      const results: NonNullable<SearchOutcome['results']> = {};
       let searches = 0;
       try {
         for (let turn = 0; turn <= MAX_CONTINUATIONS; turn += 1) {
@@ -125,7 +139,10 @@ export function claudeJobSearch(client: Anthropic): JobSearchClaude {
           });
           for (const content of response.content) {
             if (content.type === 'web_search_tool_result' && Array.isArray(content.content))
-              for (const result of content.content) links.push(result.url);
+              for (const result of content.content) {
+                links.push(result.url);
+                results[result.url] = { title: result.title, pageAge: result.page_age };
+              }
             if (content.type === 'text') links.push(...(content.text.match(URL_IN_TEXT) ?? []));
           }
           searches += response.usage.server_tool_use?.web_search_requests ?? 0;
@@ -135,10 +152,10 @@ export function claudeJobSearch(client: Anthropic): JobSearchClaude {
       } catch (error) {
         rejectBadKey(error);
         // A failed search finds nothing; the run reports it and other queries still run.
-        if (error instanceof Anthropic.APIError) return { links, searches };
+        if (error instanceof Anthropic.APIError) return { links, results, searches };
         throw error;
       }
-      return { links, searches };
+      return { links, results, searches };
     },
 
     async draft(request) {

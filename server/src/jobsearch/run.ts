@@ -25,7 +25,7 @@ import {
 import { getResumeText } from '../repo/resumes';
 import { AnalyzerUnavailableError } from '../resume/analyze';
 import type { JobSearchClaude } from './claude';
-import { readJob, type JobDetails } from './readJob';
+import { companyFromSlug, readJob, type JobDetails } from './readJob';
 
 export interface JobSearchDeps {
   db: Db;
@@ -86,11 +86,22 @@ export async function runJobSearch(
     const seen = await seenJobKeys(db, owner.userId);
     const refs: JobRef[] = [];
     const queryTerms: string[] = [];
+    /** The search result's title and age per job, for jobs whose page cannot be read. */
+    const fromSearch = new Map<string, { title: string; pageAge: string | null }>();
     for (const query of profile.queries) {
       const parsed = parseQuery(query);
       queryTerms.push(...parsed.terms);
-      const found = await deps.claude.search(query, parsed.sources, profile.timeframeDays);
+      const found = await deps.claude.search(
+        query,
+        parsed.sources,
+        profile.timeframeDays,
+        profile.usOnly,
+      );
       searches += found.searches;
+      for (const [link, result] of Object.entries(found.results ?? {})) {
+        const ref = jobRefOf(link);
+        if (ref) fromSearch.set(`${ref.source}:${ref.board}:${ref.jobId}`, result);
+      }
       for (const ref of uniqueJobRefs(found.links)) {
         const key = `${ref.source}:${ref.board}:${ref.jobId}`;
         if (seen.has(key) || !parsed.sources.includes(ref.source)) continue;
@@ -105,6 +116,7 @@ export async function runJobSearch(
       queryTerms,
       workModes: profile.workModes,
       timeframeDays: profile.timeframeDays,
+      usOnly: profile.usOnly,
       now,
     };
     await pool(
@@ -113,11 +125,17 @@ export async function runJobSearch(
       () => Date.now() < deadline,
       async (ref) => {
         let job: JobDetails;
+        let fromResult = false;
         try {
           job = await readJob(ref, deps.fetchPage, deps.fetchBoard);
         } catch {
-          // A job that cannot be read (closed, or the board is down) is left for another day.
-          return;
+          // The page could not be read (closed, a board that refuses, a page drawn by script):
+          // the search result's title still says what the job is. Without one, it waits.
+          const result = fromSearch.get(`${ref.source}:${ref.board}:${ref.jobId}`);
+          const fallback = result ? jobFromSearchResult(ref, result, now) : null;
+          if (!fallback) return;
+          job = fallback;
+          fromResult = true;
         }
         const alreadyTracked = await isTracked(db, owner.userId, {
           links: [ref.link, job.applyLink],
@@ -131,10 +149,16 @@ export async function runJobSearch(
             text: job.text,
             workMode: job.workMode,
             postedAt: job.postedAt,
+            postedDayOnly: job.postedDayOnly ?? false,
             alreadyTracked,
+            location: job.location,
+            country: job.country,
           },
           rules,
         );
+        const reason = fromResult
+          ? `${sorted.reason} (from the search result only)`
+          : sorted.reason;
         await insertHit(
           db,
           owner.userId,
@@ -151,7 +175,7 @@ export async function runJobSearch(
             workMode: job.workMode,
             postedAt: job.postedAt,
             kind: sorted.kind,
-            reason: sorted.reason,
+            reason,
             questions: job.questions,
           },
           clock.now(),
@@ -247,4 +271,54 @@ export async function draftPending(
     },
   );
   return drafted;
+}
+
+/**
+ * A job from its search result alone: the title as the role (without "Job Application for" and
+ * the site's name after a dash or bar), the company from the board name, and the age when the
+ * search engine gave one.
+ */
+export function jobFromSearchResult(
+  ref: JobRef,
+  result: { title: string; pageAge: string | null },
+  now: Date,
+): JobDetails | null {
+  const role = result.title
+    .replace(/^job application for\s+/i, '')
+    .split(/\s+(?:[|–—-]|at)\s+/)[0]
+    ?.trim()
+    .slice(0, 200);
+  if (!role) return null;
+  return {
+    company: companyFromSlug(ref.board),
+    role,
+    location: null,
+    workMode: null,
+    postedAt: pageAgeToDate(result.pageAge, now),
+    postedDayOnly: true,
+    country: null,
+    applyLink: ref.link,
+    text: '',
+    questions: null,
+  };
+}
+
+/** "3 days ago", "1 week ago" or a date, as search engines give a page's age. */
+export function pageAgeToDate(pageAge: string | null, now: Date): Date | null {
+  if (!pageAge) return null;
+  const relative = /^(\d+)\s+(minute|hour|day|week|month)s?\s+ago$/i.exec(pageAge.trim());
+  if (relative) {
+    const unit = {
+      minute: 60e3,
+      hour: 3600e3,
+      day: 86400e3,
+      week: 7 * 86400e3,
+      month: 30 * 86400e3,
+    };
+    const ms =
+      Number(relative[1]) * unit[(relative[2] ?? 'day').toLowerCase() as keyof typeof unit];
+    return new Date(now.getTime() - ms);
+  }
+  const parsed = Date.parse(pageAge);
+  return Number.isFinite(parsed) ? new Date(parsed) : null;
 }

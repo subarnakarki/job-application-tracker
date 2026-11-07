@@ -4,10 +4,12 @@ import {
   eeoOption,
   chromePrompt,
   DEFAULT_QUERY,
+  SEARCH_SOURCES,
   googleSearchUrl,
   isRunDue,
   JobSearchProfileSchema,
   jobRefOf,
+  locationVerdict,
   localClock,
   parseQuery,
   pickOption,
@@ -46,7 +48,7 @@ describe('parseQuery', () => {
 
   it('searches every board when no known site is named, and ignores other operators', () => {
     expect(parseQuery('site:example.com "data analyst" intitle:remote')).toEqual({
-      sources: ['greenhouse', 'lever', 'ashby', 'workday'],
+      sources: [...SEARCH_SOURCES],
       terms: ['data analyst'],
       excluded: [],
     });
@@ -131,6 +133,7 @@ describe('sortJob', () => {
     queryTerms: [],
     workModes: ['Remote', 'Hybrid'],
     timeframeDays: 1,
+    usOnly: true,
     now: NOW,
   };
   const job = (overrides: Partial<JobFacts> = {}): JobFacts => ({
@@ -140,6 +143,8 @@ describe('sortJob', () => {
     workMode: 'Remote',
     postedAt: new Date('2026-11-06T02:00:00Z'),
     alreadyTracked: false,
+    location: 'Remote, United States',
+    country: null,
     ...overrides,
   });
 
@@ -201,6 +206,48 @@ describe('sortJob', () => {
       {},
       'finish_yourself',
       'Workday needs an account at each company',
+    ],
+    [
+      'a day-only date from yesterday, within 24 hours',
+      { postedAt: new Date('2026-11-05T00:00:00Z'), postedDayOnly: true },
+      {},
+      'target',
+      'Matches your titles',
+    ],
+    [
+      'a day-only date from two days ago',
+      { postedAt: new Date('2026-11-04T00:00:00Z'), postedDayOnly: true },
+      {},
+      'skipped',
+      'Posted more than 1 day ago',
+    ],
+    [
+      'a job outside the US',
+      { location: 'London, UK' },
+      {},
+      'skipped',
+      'Outside the United States (London, UK)',
+    ],
+    [
+      'a job outside the US by its country',
+      { location: 'Remote', country: 'FR' },
+      {},
+      'skipped',
+      'Outside the United States (Remote)',
+    ],
+    [
+      'a job outside the US, with US-only off',
+      { location: 'London, UK' },
+      { usOnly: false },
+      'target',
+      'Matches your titles',
+    ],
+    [
+      'a job that only says Remote',
+      { location: 'Remote' },
+      {},
+      'target',
+      "Matches your titles; the location doesn't name a country, so check it is in the US",
     ],
     [
       'the query words when no include list is set',
@@ -281,6 +328,7 @@ const PROFILE: JobSearchProfile = {
   portfolio: '',
   website: 'https://pat.example.com',
   workModes: ['Remote'],
+  usOnly: true,
   queries: [DEFAULT_QUERY],
   includeTitles: [],
   skipTitles: [],
@@ -648,5 +696,98 @@ describe('self-identification answers against real form options', () => {
       ['I am not a protected veteran', 'profile'],
       ['Asian', 'profile'],
     ]);
+  });
+});
+
+describe('locationVerdict', () => {
+  it.each([
+    ['Remote, United States', 'us'],
+    ['Boston, MA', 'us'],
+    ['Austin, Texas', 'us'],
+    ['Remote - US', 'us'],
+    ['New York City', 'us'],
+    ['San Francisco Bay Area; Remote', 'us'],
+    ['London, UK; New York, NY', 'us'],
+    ['Omaha, Nebraska', 'us'],
+    ['Washington, DC', 'us'],
+    ['London, UK', 'not_us'],
+    ['Remote - EMEA', 'not_us'],
+    ['Toronto, ON, Canada', 'not_us'],
+    ['Sydney, New South Wales, Australia', 'not_us'],
+    ['Bengaluru, India', 'not_us'],
+    ['Remote', 'unknown'],
+    ['Anywhere', 'unknown'],
+    ['Join us remotely', 'unknown'],
+  ])('%s -> %s', (location, verdict) => {
+    expect(locationVerdict(location, null)).toBe(verdict);
+  });
+
+  it('trusts the country the board gives over the text', () => {
+    expect(locationVerdict('Remote', 'US')).toBe('us');
+    expect(locationVerdict('Remote', 'United States')).toBe('us');
+    expect(locationVerdict('Boston', 'France')).toBe('not_us');
+    expect(locationVerdict(null, null)).toBe('unknown');
+  });
+});
+
+describe('jobRefOf for the other boards', () => {
+  it.each([
+    [
+      'https://ats.rippling.com/en-US/acme/jobs/7c9e6679-7425-40de-944b-e07fc1f90ae7',
+      'rippling',
+      'acme',
+      '7c9e6679-7425-40de-944b-e07fc1f90ae7',
+    ],
+    [
+      'https://jobs.smartrecruiters.com/Acme/744000012345678-qa-engineer',
+      'smartrecruiters',
+      'acme',
+      '744000012345678',
+    ],
+    ['https://acme.breezy.hr/p/0a1b2c3d4e5f-sdet', 'breezy', 'acme', '0a1b2c3d4e5f'],
+    ['https://acme.recruitee.com/o/senior-sdet', 'recruitee', 'acme', 'senior-sdet'],
+    [
+      'https://career.teamtailor.com/jobs/8660969-customer-success-manager',
+      'teamtailor',
+      'career',
+      '8660969',
+    ],
+    ['https://acme.jobs.personio.de/job/1234567?display=en', 'personio', 'acme', '1234567'],
+    [
+      'https://apply.workable.com/huggingface/j/81B46579FE/',
+      'workable',
+      'huggingface',
+      '81B46579FE',
+    ],
+    ['https://jobs.jobvite.com/nutanix/job/oFBIAfwi', 'jobvite', 'nutanix', 'oFBIAfwi'],
+    ['https://careers-acme.icims.com/jobs/4321/sdet/job?hub=7', 'icims', 'acme', '4321'],
+    [
+      'https://acme.taleo.net/careersection/2/jobdetail.ftl?job=123456&lang=en',
+      'taleo',
+      'acme',
+      '123456',
+    ],
+    [
+      'https://career4.successfactors.com/career?company=Acme&career_job_req_id=9876&career_ns=job_listing',
+      'successfactors',
+      'acme',
+      '9876',
+    ],
+  ])('reads %s', (link, source, board, jobId) => {
+    expect(jobRefOf(link)).toMatchObject({ source, board, jobId });
+  });
+
+  it.each([
+    'https://apply.workable.com/j/81B46579FE',
+    'https://jobs.jobvite.com/nutanix/jobs',
+    'https://acme.recruitee.com/',
+    'https://careers-acme.icims.com/jobs/search',
+  ])('ignores %s', (link) => {
+    expect(jobRefOf(link)).toBeNull();
+  });
+
+  it('searches every board when a query names none', () => {
+    expect(parseQuery('"SDET"').sources).toHaveLength(15);
+    expect(parseQuery('site:apply.workable.com SDET').sources).toEqual(['workable']);
   });
 });
