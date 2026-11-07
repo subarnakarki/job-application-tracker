@@ -414,7 +414,7 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
       });
     });
 
-    it('allows three runs by hand a day', async () => {
+    it('allows ten runs by hand a day', async () => {
       const { cookie } = await member();
       claude.links = [];
       for (let index = 0; index < MANUAL_RUN_RULE.limit; index += 1)

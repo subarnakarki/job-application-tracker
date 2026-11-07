@@ -133,7 +133,7 @@ Open to the users in `JOB_SEARCH_USER_IDS` when `ANTHROPIC_API_KEY` is set; ever
 | PUT    | `/api/job-search/profile`          | user   | The confirmed setup (`JobSearchProfileSchema`)                        |
 | POST   | `/api/job-search/runs`             | user   | Runs now: search, read, sort, draft for up to 240 s; 201 with the run |
 |        |                                    |        | and its jobs. 409 `not_set_up`, `no_resume` or `run_in_progress`.     |
-|        |                                    |        | 3 a day by hand; 50 runs a day in total                               |
+|        |                                    |        | 10 a day by hand; 50 runs a day in total                              |
 | GET    | `/api/job-search/runs`             | user   | The latest 10 runs with counts                                        |
 | GET    | `/api/job-search/runs/:id`         | user   | One run and every job it found                                        |
 | GET    | `/api/job-search/queue`            | user   | `{ ready, needsYou, finishYourself, keywordOnly, notDrafted }`        |

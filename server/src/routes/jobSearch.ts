@@ -42,10 +42,10 @@ import { getResume, getResumeText } from '../repo/resumes';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** Runs by hand: the schedule is the normal way, so a few a day is plenty. */
+/** Runs by hand, on top of the schedule. Each costs about $0.50 to $1.50 in model use. */
 export const MANUAL_RUN_RULE: RateLimitRule = {
   name: 'job-search-run',
-  limit: 3,
+  limit: 10,
   windowMs: DAY_MS,
 };
 /** Every run of every user: a ceiling on web search and drafting spend. */
