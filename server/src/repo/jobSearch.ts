@@ -431,3 +431,20 @@ export async function exportJobSearch(
   );
   return { profile: profile?.profile ?? null, runs, hits: hits.rows.map(toHit) };
 }
+
+/**
+ * The companies' boards this user's searches have turned up, most recently seen first: the
+ * watch list the sweep reads for fresh jobs.
+ */
+export async function watchedBoards(
+  db: Queryable,
+  userId: string,
+  limit: number,
+): Promise<{ source: SearchSource; board: string }[]> {
+  const result = await db.query<{ source: SearchSource; board: string }>(
+    `select source, board from job_search_hits where user_id = $1
+      group by source, board order by max(created_at) desc limit $2`,
+    [userId, limit],
+  );
+  return result.rows;
+}

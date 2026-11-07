@@ -28,7 +28,32 @@ export interface JobDetails {
   questions: ApplicationQuestion[] | null;
 }
 
-export class JobReadError extends Error {}
+/**
+ * Why a job could not be read. `gone` means the board itself says the job is not there (a 404 or
+ * 410, or missing from the board's own list): it is closed, and must never be kept. Anything else
+ * (refused, rate-limited, timed out, a page drawn by script) says nothing about the job.
+ */
+export class JobReadError extends Error {
+  constructor(
+    message: string,
+    readonly gone = false,
+  ) {
+    super(message);
+    this.name = 'JobReadError';
+  }
+}
+
+/** A board's "not found": the job was taken down. */
+const isGoneStatus = (text: string) => /http_status: (404|410)\b/.test(text);
+
+function readFailure(error: unknown): JobReadError {
+  if (error instanceof FetchError) {
+    const message = `${error.code}: ${error.message}`;
+    return new JobReadError(message, isGoneStatus(message));
+  }
+  const message = error instanceof Error ? error.message : 'unreadable';
+  return new JobReadError(message, isGoneStatus(message));
+}
 
 const MAX_OPTIONS = 300;
 
@@ -123,7 +148,7 @@ async function readJson(fetchPage: PageFetcher, url: string): Promise<unknown> {
   try {
     return parseJson((await fetchPage(url)).text);
   } catch (error) {
-    if (error instanceof FetchError) throw new JobReadError(`${error.code}: ${error.message}`);
+    if (error instanceof FetchError) throw readFailure(error);
     throw error;
   }
 }
@@ -140,7 +165,7 @@ export async function readJob(
         `https://boards-api.greenhouse.io/v1/boards/${ref.board}/jobs/${ref.jobId}?questions=true&pay_transparency=true`,
       );
       const details = fromGreenhouse(job);
-      if (!details.role) throw new JobReadError('greenhouse: no such job');
+      if (!details.role) throw new JobReadError('greenhouse: no such job', true);
       return {
         company: details.company ?? companyFromSlug(ref.board),
         role: details.role,
@@ -161,7 +186,7 @@ export async function readJob(
         `https://${host}/v0/postings/${ref.board}/${ref.jobId}`,
       );
       const details = fromLever(posting);
-      if (!details.role) throw new JobReadError('lever: no such job');
+      if (!details.role) throw new JobReadError('lever: no such job', true);
       const apply = fieldOf(posting, 'applyUrl');
       return {
         company: companyFromSlug(ref.board),
@@ -186,7 +211,7 @@ export async function readJob(
         (entry) => String(fieldOf(entry, 'id')).toLowerCase() === ref.jobId,
       );
       const details = job ? fromAshby(job) : null;
-      if (!job || !details?.role) throw new JobReadError('ashby: no such job');
+      if (!job || !details?.role) throw new JobReadError('ashby: no such job', true);
       const apply = fieldOf(job, 'applyUrl');
       return {
         company: companyFromSlug(ref.board),
@@ -227,7 +252,7 @@ async function readThroughPosting(ref: JobRef, fetchPage: PageFetcher): Promise<
   try {
     details = await readPosting(ref.link, fetchPage);
   } catch (error) {
-    throw new JobReadError(error instanceof Error ? error.message : ref.source);
+    throw readFailure(error);
   }
   if (!details.role) throw new JobReadError(`${ref.source}: no title`);
   // The text is a second read; a job is still usable without it.
@@ -260,7 +285,7 @@ async function readWorkable(ref: JobRef, fetchBoard: PageFetcher): Promise<JobDe
     (entry) => String(fieldOf(entry, 'shortcode')).toUpperCase() === ref.jobId,
   );
   const role = job ? cleanText(fieldOf(job, 'title'), LIMITS.role) : null;
-  if (!job || !role) throw new JobReadError('workable: no such job');
+  if (!job || !role) throw new JobReadError('workable: no such job', true);
   const place = [fieldOf(job, 'city'), fieldOf(job, 'state'), fieldOf(job, 'country')]
     .map(stringOf)
     .filter(Boolean)
@@ -295,11 +320,12 @@ export async function readJobvite(ref: JobRef, fetchPage: PageFetcher): Promise<
   try {
     html = (await fetchPage(ref.link)).text;
   } catch (error) {
-    if (error instanceof FetchError) throw new JobReadError(`${error.code}: ${error.message}`);
+    if (error instanceof FetchError) throw readFailure(error);
     throw error;
   }
   const role = cleanText(byClass(html, 'jv-header', 'h2'), LIMITS.role);
-  if (!role) throw new JobReadError('jobvite: no title');
+  // A closed Jobvite job lands on the company's job list, which has no job title.
+  if (!role) throw new JobReadError('jobvite: no title', true);
   // "Sales | Omaha, Nebraska | Denver, Colorado": the department, then each place.
   const meta = (byClass(html, 'jv-job-detail-meta', 'p') ?? '')
     .split(/<span[^>]*jv-inline-separator[^>]*><\/span>/i)

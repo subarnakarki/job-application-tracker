@@ -729,6 +729,11 @@ Built as planned, with these changes and findings:
   its page (no API, no JobPosting data, no posting date). Workday, iCIMS, Taleo and SuccessFactors are listed to
   finish by hand. Boards that give only the posting day are compared by day.
 - **United States only**, on by default.
+- **First live run (2026-11-07):** web search returned mostly months-old pages, and every job kept from a search
+  result alone was closed (the board answered 404; checked live). Fixes: a job its board says is gone is never
+  kept, and only Workable and the account-only sites may fall back to a search result. And each run now
+  **sweeps the boards** of every company found so far (this run's first, up to 40): their own lists hold only
+  open jobs with posting days, so fresh, matching jobs come from there; search results fill the remaining room.
 
 ## Planned but not built
 

@@ -66,12 +66,15 @@ const fetchPage: PageFetcher = (url) => {
 /** The model's side, chosen per test: what the search finds and how drafts answer. */
 interface StubClaude extends JobSearchClaude {
   links: string[];
+  /** Extra search results (title and age) for links, besides the iCIMS one. */
+  results: Record<string, { title: string; pageAge: string | null }>;
   searches: { query: string; sources: SearchSource[] }[];
   drafts: number;
   draftsFail: boolean;
 }
 const claude: StubClaude = {
   links: [101, 102, 103, 104].map(jobLink),
+  results: {},
   searches: [],
   drafts: 0,
   draftsFail: false,
@@ -80,6 +83,7 @@ const claude: StubClaude = {
     return Promise.resolve({
       links: [...claude.links, 'https://job-boards.greenhouse.io/acme', 'https://evil.example/x'],
       results: {
+        ...claude.results,
         // An iCIMS page the server cannot read: the job comes from this search result.
         [ICIMS]: {
           title: 'Senior Product Manager - Remote | Initech Careers',
@@ -169,6 +173,7 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
   });
   beforeEach(async () => {
     claude.links = [101, 102, 103, 104].map(jobLink);
+    claude.results = {};
     claude.searches = [];
     claude.drafts = 0;
     claude.draftsFail = false;
@@ -321,6 +326,56 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
         reason: 'iCIMS needs an account at each company (from the search result only)',
         jobLink: ICIMS,
       });
+    });
+
+    it('drops a job its board says is gone, even when the search still lists it', async () => {
+      const { cookie } = await member();
+      // 199 has no page: the Greenhouse API answers 404, so the job is closed.
+      const closed = jobLink(199);
+      claude.links = [closed];
+      claude.results = {
+        [closed]: { title: 'Senior Product Manager | Acme', pageAge: '1 day ago' },
+      };
+
+      const { hits } = runOf(await run(cookie));
+
+      expect(hits).toEqual([]);
+    });
+
+    it("finds new jobs on the boards of companies it has found, from the board's own list", async () => {
+      const { cookie } = await member();
+      claude.links = [jobLink(103)]; // an old posting: it only tells the search about acme
+      const list = 'https://boards-api.greenhouse.io/v1/boards/acme/jobs';
+      PAGES[list] = JSON.stringify({
+        jobs: [
+          {
+            id: 301,
+            title: 'Product Manager, Payments',
+            first_published: new Date(T0.getTime() - 2 * HOUR).toISOString(),
+            absolute_url: jobLink(301),
+          },
+          {
+            id: 302,
+            title: 'Product Manager, Old',
+            first_published: '2026-01-01T00:00:00Z',
+            absolute_url: jobLink(302),
+          },
+        ],
+      });
+      PAGES[apiUrl(301)] = greenhouseJob('Product Manager, Payments', 2);
+      try {
+        const { hits } = runOf(await run(cookie));
+        expect(byRole(hits, 'Product Manager, Payments')).toMatchObject({
+          kind: 'target',
+          jobLink: jobLink(301),
+          state: 'needs_you',
+        });
+        // The old one on the same list was never even read.
+        expect(hits.some((hit) => hit.role === 'Product Manager, Old')).toBe(false);
+      } finally {
+        delete PAGES[list];
+        delete PAGES[apiUrl(301)];
+      }
     });
 
     it('keeps jobs outside the US when United States only is off', async () => {

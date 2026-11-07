@@ -8,6 +8,7 @@ import {
   uniqueJobRefs,
   type JobRef,
   type JobSearchProfile,
+  type SearchSource,
 } from '@jat/shared';
 import type { Clock } from '../clock';
 import type { Db } from '../db/types';
@@ -21,11 +22,13 @@ import {
   saveDraft,
   seenJobKeys,
   startRun,
+  watchedBoards,
 } from '../repo/jobSearch';
 import { getResumeText } from '../repo/resumes';
 import { AnalyzerUnavailableError } from '../resume/analyze';
 import type { JobSearchClaude } from './claude';
-import { companyFromSlug, readJob, type JobDetails } from './readJob';
+import { companyFromSlug, JobReadError, readJob, type JobDetails } from './readJob';
+import { MAX_BOARDS_PER_SWEEP, sweepBoards } from './sweep';
 
 export interface JobSearchDeps {
   db: Db;
@@ -36,8 +39,21 @@ export interface JobSearchDeps {
   fetchBoard: PageFetcher;
 }
 
+/**
+ * Boards whose job pages often cannot be read even while the job is open: Workable limits how
+ * often its list is read; the account-only sites draw their pages by script. Only these may keep a
+ * job from its search result. Every other board has a public API that answers for an open job.
+ */
+export const SEARCH_RESULT_SOURCES: readonly SearchSource[] = [
+  'workable',
+  'workday',
+  'icims',
+  'taleo',
+  'successfactors',
+];
+
 /** New jobs read per run: a day's postings for a few titles, without running for ever. */
-export const MAX_NEW_JOBS_PER_RUN = 40;
+export const MAX_NEW_JOBS_PER_RUN = 60;
 /** Drafts per call: each is a model call of several seconds. */
 export const MAX_DRAFTS_PER_RUN = 25;
 const READ_CONCURRENCY = 4;
@@ -110,6 +126,39 @@ export async function runJobSearch(
       }
     }
 
+    // Fresh jobs from the boards of every company found so far (this run's first): the search
+    // finds companies, their own lists say what is open and new.
+    const boardKeys = new Set<string>();
+    const boards = [
+      ...refs.map((ref) => ({ source: ref.source, board: ref.board })),
+      ...(await watchedBoards(db, owner.userId, MAX_BOARDS_PER_SWEEP)),
+    ].filter((entry) => {
+      const key = `${entry.source}:${entry.board}`;
+      if (boardKeys.has(key)) return false;
+      boardKeys.add(key);
+      return true;
+    });
+    const swept = await sweepBoards(
+      boards,
+      {
+        wanted: profile.includeTitles.length > 0 ? profile.includeTitles : queryTerms,
+        skipped: profile.skipTitles,
+        timeframeDays: profile.timeframeDays,
+        now,
+      },
+      deps.fetchBoard,
+      () => Date.now() < deadline,
+    );
+    const fresh: JobRef[] = [];
+    for (const ref of swept) {
+      const key = `${ref.source}:${ref.board}:${ref.jobId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      fresh.push(ref);
+    }
+    // Fresh jobs first: they are the point of a run; search hits fill what room is left.
+    refs.unshift(...fresh);
+
     const rules = {
       includeTitles: profile.includeTitles,
       skipTitles: profile.skipTitles,
@@ -128,11 +177,16 @@ export async function runJobSearch(
         let fromResult = false;
         try {
           job = await readJob(ref, deps.fetchPage, deps.fetchBoard);
-        } catch {
-          // The page could not be read (closed, a board that refuses, a page drawn by script):
-          // the search result's title still says what the job is. Without one, it waits.
+        } catch (error) {
+          // A job the board says is gone is closed: never kept. Only where the page cannot be read
+          // for other reasons (Workable's rate limit, account-only sites' pages) does the search
+          // result's title stand in for it.
+          const gone = !(error instanceof JobReadError) || error.gone;
           const result = fromSearch.get(`${ref.source}:${ref.board}:${ref.jobId}`);
-          const fallback = result ? jobFromSearchResult(ref, result, now) : null;
+          const fallback =
+            result && !gone && SEARCH_RESULT_SOURCES.includes(ref.source)
+              ? jobFromSearchResult(ref, result, now)
+              : null;
           if (!fallback) return;
           job = fallback;
           fromResult = true;
