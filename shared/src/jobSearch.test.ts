@@ -10,6 +10,7 @@ import {
   JobSearchProfileSchema,
   jobRefOf,
   locationVerdict,
+  olderMatchKind,
   localClock,
   parseQuery,
   pickOption,
@@ -789,5 +790,34 @@ describe('jobRefOf for the other boards', () => {
   it('searches every board when a query names none', () => {
     expect(parseQuery('"SDET"').sources).toHaveLength(15);
     expect(parseQuery('site:apply.workable.com SDET').sources).toEqual(['workable']);
+  });
+});
+
+describe('olderMatchKind', () => {
+  const NOW = new Date('2026-11-07T12:00:00Z');
+  const hit = (overrides: Partial<Parameters<typeof olderMatchKind>[0]> = {}) => ({
+    kind: 'skipped' as const,
+    reason: 'Posted more than 1 day ago',
+    source: 'ashby' as const,
+    role: 'Sr. Staff SDET, Customer Engineering',
+    location: 'US - Remote',
+    workMode: 'Remote' as const,
+    ...overrides,
+  });
+  const profile = { ...PROFILE, includeTitles: ['SDET'], skipTitles: ['intern'] };
+
+  it('finds a job skipped only for its age', () => {
+    expect(olderMatchKind(hit(), profile, NOW)).toBe('target');
+    expect(olderMatchKind(hit({ source: 'workday' }), profile, NOW)).toBe('finish_yourself');
+  });
+
+  it.each([
+    ['skipped for another reason', { reason: 'Already in your tracker' }],
+    ['outside the US', { location: 'Toronto, Canada' }],
+    ['a skipped title', { role: 'SDET Intern' }],
+    ['a title that does not match', { role: 'Account Executive' }],
+    ['not skipped at all', { kind: 'target' as const }],
+  ])('ignores a job %s', (_label, overrides) => {
+    expect(olderMatchKind(hit(overrides), profile, NOW)).toBeNull();
   });
 });

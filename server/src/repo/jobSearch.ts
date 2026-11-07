@@ -448,3 +448,19 @@ export async function watchedBoards(
   );
   return result.rows;
 }
+
+/** Jobs skipped only for their age, newest posting first: candidates for "older matches". */
+export async function listAgeSkipped(
+  db: Queryable,
+  userId: string,
+  limit: number,
+): Promise<JobHit[]> {
+  const result = await db.query<HitRow>(
+    `select ${HIT_COLUMNS} from job_search_hits
+      where user_id = $1 and kind = 'skipped' and state = 'skipped'
+        and reason like 'Posted more than%'
+      order by posted_at desc nulls last, created_at desc limit $2`,
+    [userId, limit],
+  );
+  return result.rows.map(toHit);
+}

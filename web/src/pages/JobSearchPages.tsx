@@ -1151,7 +1151,7 @@ export function ApplyQueuePage() {
   const { profile } = setup.data;
   if (queue.isPending) return <p className="text-sm text-fg-2">Loading…</p>;
   if (queue.isError) return <p role="alert">Could not load the queue. Try again shortly.</p>;
-  const { ready, needsYou, finishYourself, keywordOnly, notDrafted } = queue.data;
+  const { ready, needsYou, finishYourself, keywordOnly, olderMatches, notDrafted } = queue.data;
 
   return (
     <div className="flex flex-col gap-6">
@@ -1259,6 +1259,52 @@ export function ApplyQueuePage() {
                     Skip
                   </button>
                 </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {olderMatches.length > 0 && (
+        <section aria-labelledby="older-heading" className="flex flex-col gap-3">
+          <h2 id="older-heading" className="text-2xl font-semibold tracking-[-0.03em]">
+            Older matches ({olderMatches.length})
+          </h2>
+          <p className="text-sm text-fg-3">
+            These match your titles and location, but were posted before your time window. They were
+            open when found; add one to the queue to have it drafted.
+          </p>
+          <ul className="flex flex-col gap-2">
+            {olderMatches.map((hit) => (
+              <li
+                key={hit.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-tile bg-s2 p-3"
+              >
+                <div>
+                  <p className="font-medium">
+                    {hit.company} · {hit.role}
+                  </p>
+                  <p className="text-sm text-fg-3">
+                    {posted(hit)}
+                    {hit.location ? ` · ${hit.location}` : ''} ·{' '}
+                    <a
+                      className="link underline"
+                      href={hit.jobLink}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      posting
+                    </a>
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="btn-d"
+                  disabled={action.isPending}
+                  aria-label={`Add to queue: ${hit.company}, ${hit.role}`}
+                  onClick={() => action.mutate({ id: hit.id, action: 'queue' })}
+                >
+                  Add to queue
+                </button>
               </li>
             ))}
           </ul>

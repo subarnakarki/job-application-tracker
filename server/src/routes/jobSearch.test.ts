@@ -463,6 +463,26 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
       expect(queue.ready.map((hit) => hit.id)).toEqual([target.id]);
     });
 
+    it('lists older matches, and adds one to the queue', async () => {
+      const { cookie, hits } = await withRun();
+      // "Product Manager, Growth" was skipped only for its age; the intern for its title too.
+      let queue = queueOf(await send('GET', '/api/job-search/queue', cookie));
+      expect(queue.olderMatches.map((hit) => hit.role)).toEqual(['Product Manager, Growth']);
+
+      const older = byRole(hits, 'Product Manager, Growth');
+      const added = hitOf(await send('POST', `/api/job-search/hits/${older.id}/queue`, cookie));
+      expect(added).toMatchObject({ kind: 'target', state: 'needs_you' });
+      queue = queueOf(await send('GET', '/api/job-search/queue', cookie));
+      expect(queue.olderMatches).toEqual([]);
+      expect(queue.needsYou.map((hit) => hit.role)).toContain('Product Manager, Growth');
+
+      // The intern cannot be added this way.
+      const intern = byRole(hits, 'Product Manager Intern');
+      expect(
+        hitOf(await send('POST', `/api/job-search/hits/${intern.id}/queue`, cookie)).state,
+      ).toBe('skipped');
+    });
+
     it('marks a job applied once, creating the application in the tracker', async () => {
       const { cookie, hits } = await withRun();
       const target = byRole(hits, 'Senior Product Manager');

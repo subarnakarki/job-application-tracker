@@ -11,6 +11,7 @@ import {
   JobSearchRunListSchema,
   JobSearchSetupSchema,
   localDateIn,
+  olderMatchKind,
   SOURCE_LABELS,
   type DraftAnswer,
   type JobHit,
@@ -31,6 +32,7 @@ import {
   getProfile,
   getRun,
   lastScheduledRunDay,
+  listAgeSkipped,
   listOpenHits,
   listRunHits,
   listRuns,
@@ -327,9 +329,18 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
       },
     },
     async (request) => {
+      const db = requireDb();
       const { user } = await memberOf(request);
-      const open = await listOpenHits(requireDb(), user.id);
+      const open = await listOpenHits(db, user.id);
+      const profile = (await getProfile(db, user.id))?.profile;
+      const now = deps.clock.now();
+      const olderMatches = profile
+        ? (await listAgeSkipped(db, user.id, 200))
+            .filter((hit) => olderMatchKind(hit, profile, now) !== null)
+            .slice(0, 50)
+        : [];
       return {
+        olderMatches,
         ready: open.filter((hit) => hit.kind === 'target' && hit.state === 'ready'),
         needsYou: open.filter((hit) => hit.kind === 'target' && hit.state === 'needs_you'),
         finishYourself: open.filter((hit) => hit.kind === 'finish_yourself'),
@@ -454,12 +465,18 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
 
   hitRoute(
     'queue',
-    'Move a keyword-only job into the queue and draft it',
+    'Move a keyword-only job, or an older match, into the queue and draft it',
     undefined,
     { 409: 'Not set up, or no resume', 429: 'Too many drafts today' },
     async ({ db, user, claude, hit, reply }) => {
-      if (hit.kind !== 'keyword_only' || hit.state !== 'new') return;
-      await setHitState(db, user.id, hit.id, { state: 'new', kind: 'target' }, deps.clock.now());
+      let kind: 'target' | 'finish_yourself' | null = null;
+      if (hit.kind === 'keyword_only' && hit.state === 'new') kind = 'target';
+      else if (hit.state === 'skipped') {
+        const profile = await requireProfile(db, user.id);
+        kind = olderMatchKind(hit, profile, deps.clock.now());
+      }
+      if (!kind) return;
+      await setHitState(db, user.id, hit.id, { state: 'new', kind }, deps.clock.now());
       await draftNow(db, user, claude, hit.id, reply);
     },
   );
