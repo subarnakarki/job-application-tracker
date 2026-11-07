@@ -747,7 +747,11 @@ describe.skipIf(!TEST_DATABASE_URL)('schema (real Postgres, real migrations)', (
     });
 
     it.each([
-      ['an unknown board', { source: 'indeed' }, 'job_search_hits_source_check'],
+      [
+        'a board name that is not a plain name',
+        { source: 'Indeed!' },
+        'job_search_hits_source_check',
+      ],
       ['an unknown kind', { kind: 'maybe' }, 'job_search_hits_kind_check'],
       ['an unknown state', { state: 'sent' }, 'job_search_hits_state_check'],
     ])('rejects %s', async (_label, overrides, constraint) => {
