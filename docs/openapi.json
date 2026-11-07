@@ -9221,8 +9221,49 @@
                               "default": true,
                               "type": "boolean"
                             },
-                            "queries": {
+                            "sites": {
+                              "default": [
+                                "greenhouse",
+                                "lever",
+                                "ashby",
+                                "rippling",
+                                "smartrecruiters",
+                                "breezy",
+                                "recruitee",
+                                "teamtailor",
+                                "personio",
+                                "workable",
+                                "jobvite",
+                                "workday",
+                                "icims",
+                                "taleo",
+                                "successfactors"
+                              ],
                               "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "greenhouse",
+                                  "lever",
+                                  "ashby",
+                                  "rippling",
+                                  "smartrecruiters",
+                                  "breezy",
+                                  "recruitee",
+                                  "teamtailor",
+                                  "personio",
+                                  "workable",
+                                  "jobvite",
+                                  "workday",
+                                  "icims",
+                                  "taleo",
+                                  "successfactors"
+                                ]
+                              }
+                            },
+                            "queries": {
+                              "default": [],
                               "maxItems": 3,
                               "type": "array",
                               "items": {
@@ -9363,6 +9404,7 @@
                             "website",
                             "workModes",
                             "usOnly",
+                            "sites",
                             "queries",
                             "includeTitles",
                             "skipTitles",
@@ -9543,8 +9585,49 @@
                     "default": true,
                     "type": "boolean"
                   },
-                  "queries": {
+                  "sites": {
+                    "default": [
+                      "greenhouse",
+                      "lever",
+                      "ashby",
+                      "rippling",
+                      "smartrecruiters",
+                      "breezy",
+                      "recruitee",
+                      "teamtailor",
+                      "personio",
+                      "workable",
+                      "jobvite",
+                      "workday",
+                      "icims",
+                      "taleo",
+                      "successfactors"
+                    ],
                     "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "greenhouse",
+                        "lever",
+                        "ashby",
+                        "rippling",
+                        "smartrecruiters",
+                        "breezy",
+                        "recruitee",
+                        "teamtailor",
+                        "personio",
+                        "workable",
+                        "jobvite",
+                        "workday",
+                        "icims",
+                        "taleo",
+                        "successfactors"
+                      ]
+                    }
+                  },
+                  "queries": {
+                    "default": [],
                     "maxItems": 3,
                     "type": "array",
                     "items": {
@@ -9684,7 +9767,6 @@
                   "portfolio",
                   "website",
                   "workModes",
-                  "queries",
                   "includeTitles",
                   "skipTitles",
                   "timeframeDays",
@@ -9794,8 +9876,49 @@
                               "default": true,
                               "type": "boolean"
                             },
-                            "queries": {
+                            "sites": {
+                              "default": [
+                                "greenhouse",
+                                "lever",
+                                "ashby",
+                                "rippling",
+                                "smartrecruiters",
+                                "breezy",
+                                "recruitee",
+                                "teamtailor",
+                                "personio",
+                                "workable",
+                                "jobvite",
+                                "workday",
+                                "icims",
+                                "taleo",
+                                "successfactors"
+                              ],
                               "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "greenhouse",
+                                  "lever",
+                                  "ashby",
+                                  "rippling",
+                                  "smartrecruiters",
+                                  "breezy",
+                                  "recruitee",
+                                  "teamtailor",
+                                  "personio",
+                                  "workable",
+                                  "jobvite",
+                                  "workday",
+                                  "icims",
+                                  "taleo",
+                                  "successfactors"
+                                ]
+                              }
+                            },
+                            "queries": {
+                              "default": [],
                               "maxItems": 3,
                               "type": "array",
                               "items": {
@@ -9936,6 +10059,7 @@
                             "website",
                             "workModes",
                             "usOnly",
+                            "sites",
                             "queries",
                             "includeTitles",
                             "skipTitles",
@@ -16405,8 +16529,49 @@
                                   "default": true,
                                   "type": "boolean"
                                 },
-                                "queries": {
+                                "sites": {
+                                  "default": [
+                                    "greenhouse",
+                                    "lever",
+                                    "ashby",
+                                    "rippling",
+                                    "smartrecruiters",
+                                    "breezy",
+                                    "recruitee",
+                                    "teamtailor",
+                                    "personio",
+                                    "workable",
+                                    "jobvite",
+                                    "workday",
+                                    "icims",
+                                    "taleo",
+                                    "successfactors"
+                                  ],
                                   "minItems": 1,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "enum": [
+                                      "greenhouse",
+                                      "lever",
+                                      "ashby",
+                                      "rippling",
+                                      "smartrecruiters",
+                                      "breezy",
+                                      "recruitee",
+                                      "teamtailor",
+                                      "personio",
+                                      "workable",
+                                      "jobvite",
+                                      "workday",
+                                      "icims",
+                                      "taleo",
+                                      "successfactors"
+                                    ]
+                                  }
+                                },
+                                "queries": {
+                                  "default": [],
                                   "maxItems": 3,
                                   "type": "array",
                                   "items": {
@@ -16547,6 +16712,7 @@
                                 "website",
                                 "workModes",
                                 "usOnly",
+                                "sites",
                                 "queries",
                                 "includeTitles",
                                 "skipTitles",

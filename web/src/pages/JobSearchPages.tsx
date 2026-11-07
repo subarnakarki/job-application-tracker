@@ -1,5 +1,7 @@
 import {
   chromePrompt,
+  searchQueries,
+  type SearchSource,
   trackedLabel,
   EMPTY_PROGRESS,
   FILLABLE_SOURCES,
@@ -9,7 +11,6 @@ import {
   type RunStep,
   googleSearchUrl,
   SEARCH_SOURCES,
-  SOURCE_HOSTS,
   SOURCE_LABELS,
   type ApplicationQuestion,
   type JobHit,
@@ -43,6 +44,7 @@ import {
   emptySetup,
   fromSetupValues,
   hourLabel,
+  previewSearches,
   scheduleText,
   toSetupValues,
   WEEKDAYS,
@@ -258,8 +260,14 @@ function Summary({ profile }: { profile: JobSearchProfile }) {
     ['Website', profile.website || '—'],
     ['Work mode', profile.workModes.join(', ')],
     ['United States only', profile.usOnly ? 'Yes' : 'No, anywhere'],
-    ['Search queries', profile.queries.join('\n')],
-    ['Titles to include', profile.includeTitles.join(', ') || 'The query words'],
+    [
+      'Job sites',
+      profile.sites.length === SEARCH_SOURCES.length
+        ? `All ${String(SEARCH_SOURCES.length)} sites`
+        : profile.sites.map((source) => SOURCE_LABELS[source]).join(', '),
+    ],
+    ['Searches', searchQueries(profile).join('\n')],
+    ['Job titles', profile.includeTitles.join(', ') || 'From your own searches'],
     ['Titles to skip', profile.skipTitles.join(', ') || '—'],
     [
       'Posted within',
@@ -281,6 +289,80 @@ function Summary({ profile }: { profile: JobSearchProfile }) {
         </div>
       ))}
     </dl>
+  );
+}
+
+/** A checkbox per job site, the fillable ones first, with Select all and Select none. */
+function SiteChoices({
+  sites,
+  error,
+  onChange,
+}: {
+  sites: SearchSource[];
+  error: string | undefined;
+  onChange: (sites: SearchSource[]) => void;
+}) {
+  const toggle = (source: SearchSource, on: boolean) =>
+    onChange(SEARCH_SOURCES.filter((entry) => (entry === source ? on : sites.includes(entry))));
+  const groups: [string, SearchSource[]][] = [
+    ['Filled in by Claude in Chrome', SEARCH_SOURCES.filter((s) => FILLABLE_SOURCES.includes(s))],
+    [
+      'Need an account (listed for you to finish)',
+      SEARCH_SOURCES.filter((s) => !FILLABLE_SOURCES.includes(s)),
+    ],
+  ];
+  return (
+    <fieldset className="flex flex-col gap-2">
+      <legend className={labelClass}>Job sites to search</legend>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className="btn-d" onClick={() => onChange([...SEARCH_SOURCES])}>
+          Select all
+        </button>
+        <button type="button" className="btn-d" onClick={() => onChange([])}>
+          Select none
+        </button>
+      </div>
+      {groups.map(([title, sources]) => (
+        <div key={title} role="group" aria-label={title}>
+          <p className="mt-1 text-xs text-fg-3">{title}</p>
+          <div className="grid grid-cols-2 gap-x-4 sm:grid-cols-3">
+            {sources.map((source) => (
+              <Check
+                key={source}
+                label={SOURCE_LABELS[source]}
+                checked={sites.includes(source)}
+                onChange={(on) => toggle(source, on)}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+      {error && <p className="text-sm text-red">Pick at least one site</p>}
+    </fieldset>
+  );
+}
+
+/** The searches the current answers make, updated as you type. */
+function SearchPreview({ values }: { values: SetupValues }) {
+  const searches = previewSearches(values);
+  return (
+    <div className="flex flex-col gap-1">
+      <p className={labelClass}>Searches that will run</p>
+      {searches.length === 0 ? (
+        <p className="text-sm text-fg-3">Add a job title to make the searches.</p>
+      ) : (
+        <ul aria-label="Searches that will run" className="flex flex-col gap-1">
+          {searches.map((search) => (
+            <li
+              key={search}
+              className="rounded-input bg-s2 px-3 py-2 font-mono text-xs break-words"
+            >
+              {search}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -405,22 +487,31 @@ function SetupForm({ initial, onSaved }: { initial: SetupValues; onSaved: () => 
 
       <Fieldset legend="What to search for">
         <ListField
-          name="queries"
-          label="Search queries"
-          hint={`One per line, at most 3, in Google style: site:job-boards.greenhouse.io "product manager". Without site:, every board is searched. Boards: ${SEARCH_SOURCES.map((source) => `${SOURCE_LABELS[source]} (${SOURCE_HOSTS[source][0] ?? ''})`).join(', ')}. ${SEARCH_SOURCES.filter(
-            (source) => !FILLABLE_SOURCES.includes(source),
-          )
-            .map((source) => SOURCE_LABELS[source])
-            .join(', ')} need an account, so their jobs are listed for you to finish.`}
+          name="includeTitles"
+          label="Job titles to search for"
+          hint="One per line, e.g. SDET or QA automation engineer. Searches are made from these, and a job counts as a match when its title has one."
           {...field}
         />
+        <SiteChoices
+          sites={values.sites}
+          error={errors['sites']}
+          onChange={(sites) => setValues((current) => ({ ...current, sites }))}
+        />
+        <SearchPreview values={values} />
+        <details className="rounded-tile bg-s2 p-3">
+          <summary className="cursor-pointer text-sm font-medium">
+            Advanced: write your own searches
+          </summary>
+          <div className="mt-3">
+            <ListField
+              name="queries"
+              label="Your own searches"
+              hint='Optional, one per line, at most 3, in Google style: "SDET" OR "QA lead" -intern. Used instead of the searches made from your titles. The sites ticked above decide where they search.'
+              {...field}
+            />
+          </div>
+        </details>
         <div className="grid gap-4 sm:grid-cols-2">
-          <ListField
-            name="includeTitles"
-            label="Titles to include"
-            hint="One per line. Empty: the words of your queries."
-            {...field}
-          />
           <ListField
             name="skipTitles"
             label="Titles to skip"
@@ -688,7 +779,7 @@ export function JobSearchPage() {
           Cross-check on Google
         </h2>
         <ul className="flex flex-col gap-1">
-          {profile.queries.map((query) => (
+          {searchQueries(profile).map((query) => (
             <li key={query}>
               <a
                 className="link text-sm break-all underline"

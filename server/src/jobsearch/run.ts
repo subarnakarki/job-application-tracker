@@ -1,5 +1,6 @@
 import {
   assembleDraft,
+  searchQueries,
   trackedMatcher,
   EMPTY_PROGRESS,
   type RunProgress,
@@ -104,7 +105,8 @@ export async function runJobSearch(
 
   let searches = 0;
   // Progress is written in order (one write at a time), so a slow write never overtakes a newer one.
-  const progress: RunProgress = { ...EMPTY_PROGRESS, queriesTotal: profile.queries.length };
+  const queries = searchQueries(profile);
+  const progress: RunProgress = { ...EMPTY_PROGRESS, queriesTotal: queries.length };
   let writing: Promise<void> = Promise.resolve();
   const report = (patch: Partial<RunProgress>) => {
     Object.assign(progress, patch);
@@ -120,7 +122,7 @@ export async function runJobSearch(
     const queryTerms: string[] = [];
     /** The search result's title and age per job, for jobs whose page cannot be read. */
     const fromSearch = new Map<string, { title: string; pageAge: string | null }>();
-    for (const query of profile.queries) {
+    for (const query of queries) {
       const parsed = parseQuery(query);
       queryTerms.push(...parsed.terms);
       const found = await deps.claude.search(

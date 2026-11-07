@@ -1,5 +1,12 @@
+import { SEARCH_SOURCES } from '@jat/shared';
 import { describe, expect, it } from 'vitest';
-import { emptySetup, fromSetupValues, scheduleText, toSetupValues } from './jobSearchForm';
+import {
+  emptySetup,
+  fromSetupValues,
+  previewSearches,
+  scheduleText,
+  toSetupValues,
+} from './jobSearchForm';
 
 const filled = {
   ...emptySetup({ name: 'Pat Example', email: 'pat@example.com' }),
@@ -21,7 +28,8 @@ describe('job search setup form', () => {
       salaryMin: 150000,
       salaryMax: null,
       includeTitles: ['product manager', 'senior product manager'],
-      queries: ['site:job-boards.greenhouse.io "product manager"'],
+      queries: [],
+      sites: [...SEARCH_SOURCES],
       timeframeDays: 30,
       runHour: 8,
     });
@@ -31,10 +39,21 @@ describe('job search setup form', () => {
   });
 
   it('names the field with each problem', () => {
-    const result = fromSetupValues({ ...filled, salaryMin: 'lots', phone: '', queries: ' ' });
+    const result = fromSetupValues({
+      ...filled,
+      salaryMin: 'lots',
+      phone: '',
+      includeTitles: ' ',
+      sites: [],
+    });
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(Object.keys(result.errors).sort()).toEqual(['phone', 'queries', 'salaryMin']);
+    expect(Object.keys(result.errors).sort()).toEqual([
+      'includeTitles',
+      'phone',
+      'salaryMin',
+      'sites',
+    ]);
     expect(result.errors).toMatchObject({ phone: 'Required', salaryMin: 'Enter a number' });
   });
 
@@ -51,5 +70,13 @@ describe('job search setup form', () => {
       'Every weekday at 12:00 AM',
     );
     expect(scheduleText({ ...result.profile, scheduleOn: false })).toBe('Off (run by hand only)');
+  });
+});
+
+describe('search preview', () => {
+  it('shows the searches the current answers make', () => {
+    expect(
+      previewSearches({ queries: '', includeTitles: 'SDET\nQA lead', sites: ['lever'] }),
+    ).toEqual(['site:jobs.lever.co "SDET"', 'site:jobs.lever.co "QA lead"']);
   });
 });

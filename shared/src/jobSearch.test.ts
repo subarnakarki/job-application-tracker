@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   assembleDraft,
+  searchQueries,
+  withoutSites,
   companyKey,
   linkKey,
   roleKey,
@@ -347,6 +349,7 @@ const PROFILE: JobSearchProfile = {
   website: 'https://pat.example.com',
   workModes: ['Remote'],
   usOnly: true,
+  sites: [...SEARCH_SOURCES],
   queries: [DEFAULT_QUERY],
   includeTitles: [],
   skipTitles: [],
@@ -375,7 +378,6 @@ describe('JobSearchProfileSchema', () => {
   it.each([
     ['a maximum below the minimum', { salaryMax: 100 }, 'salaryMax'],
     ['a link that is not http(s)', { linkedin: 'javascript:alert(1)' }, 'linkedin'],
-    ['no queries', { queries: [] }, 'queries'],
     ['four queries', { queries: ['a', 'b', 'c', 'd'] }, 'queries'],
     ['an odd timeframe', { timeframeDays: 2 }, 'timeframeDays'],
     ['a two-line name', { fullName: 'Pat\nExample' }, 'fullName'],
@@ -929,5 +931,64 @@ describe('jobs already in the tracker', () => {
   it('labels the job by where it is in the tracker', () => {
     expect(trackedLabel('Interviewing')).toBe('Already applied · Interviewing');
     expect(trackedLabel('Saved')).toBe('In your tracker · Saved');
+  });
+});
+
+describe('searchQueries', () => {
+  const titles = [
+    'SDET',
+    'software engineer in test',
+    'QA automation engineer',
+    'QA lead',
+    'Playwright',
+  ];
+
+  it('makes up to three searches from the titles, over every site when all are chosen', () => {
+    expect(
+      searchQueries({ queries: [], includeTitles: titles, sites: [...SEARCH_SOURCES] }),
+    ).toEqual([
+      '"SDET" OR "software engineer in test"',
+      '"QA automation engineer" OR "QA lead"',
+      '"Playwright"',
+    ]);
+    expect(
+      searchQueries({ queries: [], includeTitles: ['SDET'], sites: [...SEARCH_SOURCES] }),
+    ).toEqual(['"SDET"']);
+  });
+
+  it('limits each search to the chosen sites, every host of each', () => {
+    const [first] = searchQueries({
+      queries: [],
+      includeTitles: ['SDET'],
+      sites: ['greenhouse', 'ashby'],
+    });
+    expect(first).toBe(
+      'site:job-boards.greenhouse.io OR site:boards.greenhouse.io OR site:jobs.ashbyhq.com "SDET"',
+    );
+    expect(parseQuery(first ?? '').sources).toEqual(['greenhouse', 'ashby']);
+  });
+
+  it('uses searches written by hand instead, with their own site: replaced by the chosen sites', () => {
+    expect(
+      searchQueries({
+        queries: ['site:jobs.lever.co OR site:jobs.ashbyhq.com "SDET" OR "QA lead"'],
+        includeTitles: titles,
+        sites: ['workable'],
+      }),
+    ).toEqual(['site:apply.workable.com "SDET" OR "QA lead"']);
+  });
+
+  it('strips site: operators, wherever they are', () => {
+    expect(withoutSites('site:a.com "x" OR site:b.com OR "y" -site:c.com')).toBe('"x" OR "y"');
+  });
+
+  it('needs titles or a written search', () => {
+    const result = JobSearchProfileSchema.safeParse({ ...PROFILE, queries: [], includeTitles: [] });
+    expect(result.error?.issues[0]?.path).toEqual(['includeTitles']);
+  });
+
+  it('loads an older setup as searching every site', () => {
+    const old = Object.fromEntries(Object.entries(PROFILE).filter(([key]) => key !== 'sites'));
+    expect(JobSearchProfileSchema.parse(old).sites).toEqual([...SEARCH_SOURCES]);
   });
 });

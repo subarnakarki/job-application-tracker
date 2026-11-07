@@ -773,8 +773,16 @@ export const JobSearchProfileSchema = z
     workModes: z.array(z.enum(WORK_MODES)).min(1).max(3),
     /** Skip jobs clearly outside the United States (on unless turned off). */
     usOnly: z.boolean().default(true),
-    /** Google-style queries, e.g. site:job-boards.greenhouse.io "product manager". */
-    queries: z.array(required(300)).min(1).max(3),
+    /** The job sites to search (all of them unless narrowed). */
+    sites: z
+      .array(z.enum(SEARCH_SOURCES))
+      .min(1)
+      .default([...SEARCH_SOURCES]),
+    /**
+     * Searches written by hand (advanced). Empty: searches are made from the titles to include. Any
+     * site: in them is ignored; the sites above decide.
+     */
+    queries: z.array(required(300)).max(3).default([]),
     includeTitles: termList,
     skipTitles: termList,
     timeframeDays: z.union([
@@ -809,6 +817,10 @@ export const JobSearchProfileSchema = z
   .refine((profile) => profile.salaryMax === null || profile.salaryMax >= profile.salaryMin, {
     path: ['salaryMax'],
     message: 'Must be at least the minimum',
+  })
+  .refine((profile) => profile.includeTitles.length > 0 || profile.queries.length > 0, {
+    path: ['includeTitles'],
+    message: 'Add at least one title to search for',
   });
 export type JobSearchProfile = z.infer<typeof JobSearchProfileSchema>;
 
@@ -816,7 +828,8 @@ export type JobSearchProfile = z.infer<typeof JobSearchProfileSchema>;
 export const PROFILE_DEFAULTS = {
   workModes: ['Remote', 'Hybrid'] as WorkMode[],
   usOnly: true,
-  queries: [DEFAULT_QUERY],
+  queries: [] as string[],
+  sites: [...SEARCH_SOURCES],
   timeframeDays: 30 as const,
   cadence: 'weekdays' as const,
   runHour: 8,
@@ -1393,7 +1406,7 @@ export function olderMatchKind(
     {
       includeTitles: profile.includeTitles,
       skipTitles: profile.skipTitles,
-      queryTerms: profile.queries.flatMap((query) => parseQuery(query).terms),
+      queryTerms: searchQueries(profile).flatMap((query) => parseQuery(query).terms),
       workModes: profile.workModes,
       timeframeDays: profile.timeframeDays,
       usOnly: profile.usOnly,
@@ -1486,4 +1499,55 @@ export function trackedMatcher(applications: TrackedApplication[]) {
 /** The label for a job already in the tracker. */
 export function trackedLabel(status: Status): string {
   return status === 'Saved' ? 'In your tracker · Saved' : `Already applied · ${status}`;
+}
+
+// ---------------------------------------------------------------------------------------------
+// The searches a run makes
+
+/** Searches per run, at most. */
+export const MAX_SEARCHES = 3;
+
+/** A query without its site: operators (the chosen sites decide where it searches). */
+export function withoutSites(query: string): string {
+  return query
+    .replace(/(^|\s)-?site:\S+/gi, ' ')
+    .replace(/^(\s*OR\b)+|(\bOR\s*)+$/gi, '')
+    .replace(/\bOR\s+OR\b/gi, 'OR')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^OR\s+|\s+OR$/gi, '');
+}
+
+/** The site: part for the chosen sites; empty when all are chosen (every site is searched then). */
+export function sitePart(sites: readonly SearchSource[]): string {
+  if (sites.length === 0 || SEARCH_SOURCES.every((source) => sites.includes(source))) return '';
+  return SEARCH_SOURCES.filter((source) => sites.includes(source))
+    .flatMap((source) => SOURCE_HOSTS[source])
+    .map((host) => `site:${host}`)
+    .join(' OR ');
+}
+
+/**
+ * The searches a run makes: the hand-written ones if any, else the titles to include, spread over
+ * at most three searches ("SDET" OR "QA lead" ...); each limited to the chosen sites.
+ */
+export function searchQueries(
+  profile: Pick<JobSearchProfile, 'queries' | 'includeTitles' | 'sites'>,
+): string[] {
+  const written = profile.queries.map(withoutSites).filter(Boolean);
+  let bodies = written;
+  if (bodies.length === 0) {
+    const titles = [...new Set(profile.includeTitles.map((title) => title.trim()).filter(Boolean))];
+    const per = Math.max(1, Math.ceil(titles.length / MAX_SEARCHES));
+    bodies = [];
+    for (let at = 0; at < titles.length && bodies.length < MAX_SEARCHES; at += per)
+      bodies.push(
+        titles
+          .slice(at, at + per)
+          .map((title) => `"${title.replace(/"/g, '')}"`)
+          .join(' OR '),
+      );
+  }
+  const sites = sitePart(profile.sites);
+  return bodies.map((body) => (sites ? `${sites} ${body}` : body));
 }

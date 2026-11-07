@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import {
   ApplyQueueSchema,
+  SEARCH_SOURCES,
   DEFAULT_QUERY,
   JobHitSchema,
   JobSearchRunDetailSchema,
@@ -124,6 +125,7 @@ const PROFILE: JobSearchProfile = {
   website: '',
   workModes: ['Remote', 'Hybrid'],
   usOnly: true,
+  sites: [...SEARCH_SOURCES],
   queries: [DEFAULT_QUERY],
   includeTitles: ['product manager'],
   skipTitles: ['intern'],
@@ -265,7 +267,10 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
 
       expect(response.statusCode).toBe(201);
       const { run: summary, hits } = runOf(response);
-      expect(claude.searches).toEqual([{ query: DEFAULT_QUERY, sources: ['greenhouse'] }]);
+      // The written search's own site: gives way to the chosen sites (all of them here).
+      expect(claude.searches).toEqual([
+        { query: '"product manager"', sources: [...SEARCH_SOURCES] },
+      ]);
       expect(summary).toMatchObject({
         trigger: 'manual',
         status: 'done',
@@ -396,6 +401,30 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
       claude.links = [jobLink(105)];
       const { hits } = runOf(await run(cookie));
       expect(byRole(hits, 'Product Manager, EMEA').kind).toBe('target');
+    });
+
+    it('searches only the ticked sites, with searches made from the titles', async () => {
+      const { cookie } = await member();
+      await send('PUT', '/api/job-search/profile', cookie, {
+        ...PROFILE,
+        queries: [],
+        includeTitles: ['product manager', 'QA lead'],
+        sites: ['greenhouse', 'ashby'],
+      });
+      claude.links = [jobLink(101)];
+      await run(cookie);
+      expect(claude.searches).toEqual([
+        {
+          query:
+            'site:job-boards.greenhouse.io OR site:boards.greenhouse.io OR site:jobs.ashbyhq.com "product manager"',
+          sources: ['greenhouse', 'ashby'],
+        },
+        {
+          query:
+            'site:job-boards.greenhouse.io OR site:boards.greenhouse.io OR site:jobs.ashbyhq.com "QA lead"',
+          sources: ['greenhouse', 'ashby'],
+        },
+      ]);
     });
 
     it('never shows a job twice, and refuses a second run while one is going', async () => {

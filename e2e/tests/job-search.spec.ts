@@ -1,4 +1,4 @@
-import type { JobSearchProfile } from '@jat/shared';
+import { SEARCH_SOURCES, type JobSearchProfile } from '@jat/shared';
 import { expect, test } from '../fixtures';
 import { ApplyQueuePage } from '../pages/ApplyQueuePage';
 
@@ -17,6 +17,7 @@ const PROFILE: JobSearchProfile = {
   website: '',
   workModes: ['Remote', 'Hybrid'],
   usOnly: true,
+  sites: [...SEARCH_SOURCES],
   queries: ['site:job-boards.greenhouse.io "product manager"'],
   includeTitles: [],
   skipTitles: ['intern'],
@@ -182,6 +183,17 @@ test('first run: the setup asks once, confirms everything, then opens the overvi
   await page.getByLabel('On', { exact: true }).selectOption('Friday');
   await page.getByLabel('Gender', { exact: true }).fill('Female');
   await page.getByLabel('Veteran status').selectOption('I am not a protected veteran');
+
+  // Titles and ticked sites make the searches, shown as they change.
+  await page.getByLabel('Job titles to search for').fill('SDET\nQA automation engineer');
+  const preview = page.getByRole('list', { name: 'Searches that will run' });
+  await expect(preview.getByRole('listitem')).toHaveText(['"SDET"', '"QA automation engineer"']);
+  await page.getByRole('button', { name: 'Select none' }).click();
+  await page.getByRole('checkbox', { name: 'Greenhouse' }).check();
+  await page.getByRole('checkbox', { name: 'Ashby' }).check();
+  await expect(preview.getByRole('listitem').first()).toHaveText(
+    'site:job-boards.greenhouse.io OR site:boards.greenhouse.io OR site:jobs.ashbyhq.com "SDET"',
+  );
   await page.getByRole('button', { name: 'Review' }).click();
 
   const confirm = page.getByRole('region', { name: 'Check everything before it is saved' });
@@ -191,7 +203,8 @@ test('first run: the setup asks once, confirms everything, then opens the overvi
   await expect(confirm).toContainText('I am not a protected veteran');
   await expect(confirm).toContainText('Disability');
   await expect(confirm).toContainText('United States onlyYes');
-  await expect(confirm).toContainText('site:job-boards.greenhouse.io "product manager"');
+  await expect(confirm).toContainText('Job sitesGreenhouse, Ashby');
+  await expect(confirm).toContainText('site:jobs.ashbyhq.com "QA automation engineer"');
   await page.getByRole('button', { name: 'Confirm and save' }).click();
 
   await expect(page).toHaveURL('/job-search');

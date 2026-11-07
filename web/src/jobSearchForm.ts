@@ -3,8 +3,10 @@ import {
   DEFAULT_EEO_ANSWER,
   JobSearchProfileSchema,
   PROFILE_DEFAULTS,
+  searchQueries,
   WORK_MODES,
   type Cadence,
+  type SearchSource,
   type JobSearchProfile,
   type WorkMode,
 } from '@jat/shared';
@@ -27,6 +29,7 @@ export interface SetupValues {
   usOnly: boolean;
   queries: string;
   includeTitles: string;
+  sites: SearchSource[];
   skipTitles: string;
   timeframeDays: '1' | '3' | '7' | '14' | '30';
   cadence: Cadence;
@@ -85,6 +88,7 @@ export function emptySetup(prefill: { name?: string | null; email?: string }): S
     usOnly: PROFILE_DEFAULTS.usOnly,
     queries: PROFILE_DEFAULTS.queries.join('\n'),
     includeTitles: '',
+    sites: PROFILE_DEFAULTS.sites,
     skipTitles: '',
     timeframeDays: String(PROFILE_DEFAULTS.timeframeDays) as SetupValues['timeframeDays'],
     cadence: PROFILE_DEFAULTS.cadence,
@@ -147,6 +151,9 @@ export function fromSetupValues(
     errors[field] ??=
       field === 'salaryMin' || field === 'salaryMax' ? 'Enter a number' : issue.message;
   }
+  // The schema checks this only once every field is valid; the form says it at once.
+  if (lines(values.includeTitles).length === 0 && lines(values.queries).length === 0)
+    errors['includeTitles'] ??= 'Add at least one title to search for';
   return { ok: false, errors };
 }
 
@@ -179,3 +186,12 @@ export const DISABILITY_LABELS: Record<JobSearchProfile['disabilityStatus'], str
   no: 'No disability',
   yes: 'Yes, I have (or had) a disability',
 };
+
+/** The searches the form's current values would make (for the live preview). */
+export function previewSearches(values: Pick<SetupValues, 'queries' | 'includeTitles' | 'sites'>) {
+  return searchQueries({
+    queries: lines(values.queries),
+    includeTitles: lines(values.includeTitles),
+    sites: values.sites,
+  });
+}
