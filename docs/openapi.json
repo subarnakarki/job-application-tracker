@@ -11438,6 +11438,80 @@
                               "notDrafted"
                             ],
                             "additionalProperties": false
+                          },
+                          "progress": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "step": {
+                                    "type": "string",
+                                    "enum": [
+                                      "searching",
+                                      "sweeping",
+                                      "reading",
+                                      "drafting",
+                                      "done"
+                                    ]
+                                  },
+                                  "queriesDone": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "queriesTotal": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "boardsDone": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "boardsTotal": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "jobsRead": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "jobsTotal": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "drafted": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "draftsTotal": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  }
+                                },
+                                "required": [
+                                  "step",
+                                  "queriesDone",
+                                  "queriesTotal",
+                                  "boardsDone",
+                                  "boardsTotal",
+                                  "jobsRead",
+                                  "jobsTotal",
+                                  "drafted",
+                                  "draftsTotal"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           }
                         },
                         "required": [
@@ -11448,7 +11522,8 @@
                           "error",
                           "startedAt",
                           "finishedAt",
-                          "counts"
+                          "counts",
+                          "progress"
                         ],
                         "additionalProperties": false
                       }
@@ -11643,6 +11718,80 @@
                             "notDrafted"
                           ],
                           "additionalProperties": false
+                        },
+                        "progress": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "step": {
+                                  "type": "string",
+                                  "enum": [
+                                    "searching",
+                                    "sweeping",
+                                    "reading",
+                                    "drafting",
+                                    "done"
+                                  ]
+                                },
+                                "queriesDone": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "queriesTotal": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "boardsDone": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "boardsTotal": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "jobsRead": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "jobsTotal": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "drafted": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "draftsTotal": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "step",
+                                "queriesDone",
+                                "queriesTotal",
+                                "boardsDone",
+                                "boardsTotal",
+                                "jobsRead",
+                                "jobsTotal",
+                                "drafted",
+                                "draftsTotal"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -11653,7 +11802,8 @@
                         "error",
                         "startedAt",
                         "finishedAt",
-                        "counts"
+                        "counts",
+                        "progress"
                       ],
                       "additionalProperties": false
                     },
@@ -12183,6 +12333,80 @@
                             "notDrafted"
                           ],
                           "additionalProperties": false
+                        },
+                        "progress": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "step": {
+                                  "type": "string",
+                                  "enum": [
+                                    "searching",
+                                    "sweeping",
+                                    "reading",
+                                    "drafting",
+                                    "done"
+                                  ]
+                                },
+                                "queriesDone": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "queriesTotal": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "boardsDone": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "boardsTotal": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "jobsRead": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "jobsTotal": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "drafted": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "draftsTotal": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "step",
+                                "queriesDone",
+                                "queriesTotal",
+                                "boardsDone",
+                                "boardsTotal",
+                                "jobsRead",
+                                "jobsTotal",
+                                "drafted",
+                                "draftsTotal"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -12193,7 +12417,8 @@
                         "error",
                         "startedAt",
                         "finishedAt",
-                        "counts"
+                        "counts",
+                        "progress"
                       ],
                       "additionalProperties": false
                     },
@@ -16013,6 +16238,80 @@
                                   "notDrafted"
                                 ],
                                 "additionalProperties": false
+                              },
+                              "progress": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "step": {
+                                        "type": "string",
+                                        "enum": [
+                                          "searching",
+                                          "sweeping",
+                                          "reading",
+                                          "drafting",
+                                          "done"
+                                        ]
+                                      },
+                                      "queriesDone": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "queriesTotal": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "boardsDone": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "boardsTotal": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "jobsRead": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "jobsTotal": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "drafted": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "draftsTotal": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 9007199254740991
+                                      }
+                                    },
+                                    "required": [
+                                      "step",
+                                      "queriesDone",
+                                      "queriesTotal",
+                                      "boardsDone",
+                                      "boardsTotal",
+                                      "jobsRead",
+                                      "jobsTotal",
+                                      "drafted",
+                                      "draftsTotal"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -16023,7 +16322,8 @@
                               "error",
                               "startedAt",
                               "finishedAt",
-                              "counts"
+                              "counts",
+                              "progress"
                             ],
                             "additionalProperties": false
                           }

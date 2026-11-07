@@ -1200,6 +1200,69 @@ export const RunCountsSchema = z.strictObject({
 });
 export type RunCounts = z.infer<typeof RunCountsSchema>;
 
+/** The steps of a run, in order. */
+export const RUN_STEPS = ['searching', 'sweeping', 'reading', 'drafting', 'done'] as const;
+export type RunStep = (typeof RUN_STEPS)[number];
+
+const count = z.number().int().min(0);
+
+/** How far a run has got: its step, and done/total counts for each step. */
+export const RunProgressSchema = z.strictObject({
+  step: z.enum(RUN_STEPS),
+  queriesDone: count,
+  queriesTotal: count,
+  boardsDone: count,
+  boardsTotal: count,
+  jobsRead: count,
+  jobsTotal: count,
+  drafted: count,
+  draftsTotal: count,
+});
+export type RunProgress = z.infer<typeof RunProgressSchema>;
+
+export const EMPTY_PROGRESS: RunProgress = {
+  step: 'searching',
+  queriesDone: 0,
+  queriesTotal: 0,
+  boardsDone: 0,
+  boardsTotal: 0,
+  jobsRead: 0,
+  jobsTotal: 0,
+  drafted: 0,
+  draftsTotal: 0,
+};
+
+/** Each step's share of a run's time, roughly as measured: searching and drafting are slowest. */
+const STEP_WEIGHTS: Record<Exclude<RunStep, 'done'>, number> = {
+  searching: 35,
+  sweeping: 15,
+  reading: 25,
+  drafting: 25,
+};
+
+/**
+ * Overall progress, 0 to 100: finished steps count in full, the current one by its done/total
+ * (half when its total is not known yet). Never 100 until the run is done.
+ */
+export function progressPercent(progress: RunProgress): number {
+  if (progress.step === 'done') return 100;
+  const steps = Object.keys(STEP_WEIGHTS) as (keyof typeof STEP_WEIGHTS)[];
+  const current = steps.indexOf(progress.step);
+  const fraction = (done: number, total: number) => (total > 0 ? Math.min(done / total, 1) : 0.5);
+  const within: Record<keyof typeof STEP_WEIGHTS, number> = {
+    searching: fraction(progress.queriesDone, progress.queriesTotal),
+    sweeping: fraction(progress.boardsDone, progress.boardsTotal),
+    reading: fraction(progress.jobsRead, progress.jobsTotal),
+    drafting: fraction(progress.drafted, progress.draftsTotal),
+  };
+  const total = steps.reduce((sum, step, index) => {
+    if (index < current) return sum + STEP_WEIGHTS[step];
+    if (index === current) return sum + STEP_WEIGHTS[step] * within[step];
+    return sum;
+  }, 0);
+  return Math.min(99, Math.round(total));
+}
+
 export const JobSearchRunSchema = z.strictObject({
   id: z.uuid(),
   trigger: z.enum(['schedule', 'manual']),
@@ -1209,6 +1272,8 @@ export const JobSearchRunSchema = z.strictObject({
   startedAt: instantSchema,
   finishedAt: instantSchema.nullable(),
   counts: RunCountsSchema,
+  /** Null for runs from before progress was recorded. */
+  progress: RunProgressSchema.nullable(),
 });
 export type JobSearchRun = z.infer<typeof JobSearchRunSchema>;
 

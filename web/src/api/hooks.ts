@@ -582,11 +582,14 @@ export function useSaveJobSearchProfile() {
   });
 }
 
-export function useJobSearchRuns(enabled: boolean) {
+/** The latest runs. While one is going (or `watching`), checked every 2 seconds for progress. */
+export function useJobSearchRuns(enabled: boolean, watching = false) {
   return useQuery({
     queryKey: ['job-search-runs'],
     queryFn: () => apiRequest('/api/job-search/runs', JobSearchRunListSchema),
     enabled,
+    refetchInterval: (query) =>
+      watching || query.state.data?.items.some((run) => run.status === 'running') ? 2000 : false,
   });
 }
 

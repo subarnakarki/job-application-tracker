@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   assembleDraft,
+  EMPTY_PROGRESS,
+  progressPercent,
+  type RunProgress,
   eeoOption,
   chromePrompt,
   DEFAULT_QUERY,
@@ -827,5 +830,26 @@ describe('olderMatchKind', () => {
     ['not skipped at all', { kind: 'target' as const }],
   ])('ignores a job %s', (_label, overrides) => {
     expect(olderMatchKind(hit(overrides), profile, NOW)).toBeNull();
+  });
+});
+
+describe('progressPercent', () => {
+  const at = (overrides: Partial<RunProgress>): RunProgress => ({
+    ...EMPTY_PROGRESS,
+    ...overrides,
+  });
+
+  it('counts finished steps in full and the current one by its share', () => {
+    expect(progressPercent(at({ step: 'searching', queriesTotal: 3, queriesDone: 0 }))).toBe(0);
+    expect(progressPercent(at({ step: 'searching', queriesTotal: 2, queriesDone: 1 }))).toBe(18);
+    expect(progressPercent(at({ step: 'sweeping', boardsTotal: 10, boardsDone: 10 }))).toBe(50);
+    expect(progressPercent(at({ step: 'reading', jobsTotal: 4, jobsRead: 2 }))).toBe(63);
+    expect(progressPercent(at({ step: 'drafting', draftsTotal: 4, drafted: 4 }))).toBe(99);
+    expect(progressPercent(at({ step: 'done' }))).toBe(100);
+  });
+
+  it('takes half a step when its total is not known yet, and never goes past 99 early', () => {
+    expect(progressPercent(at({ step: 'searching' }))).toBe(18);
+    expect(progressPercent(at({ step: 'reading', jobsTotal: 2, jobsRead: 5 }))).toBe(75);
   });
 });

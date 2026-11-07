@@ -1,6 +1,11 @@
 import {
   chromePrompt,
+  EMPTY_PROGRESS,
   FILLABLE_SOURCES,
+  progressPercent,
+  RUN_STEPS,
+  type RunProgress,
+  type RunStep,
   googleSearchUrl,
   SEARCH_SOURCES,
   SOURCE_HOSTS,
@@ -591,9 +596,10 @@ function counts(run: JobSearchRun): string {
 export function JobSearchPage() {
   const setup = useJobSearchSetup();
   const available = setup.data?.available === true;
-  const runs = useJobSearchRuns(available && setup.data?.profile !== null);
-  const queue = useApplyQueue(available && setup.data?.profile !== null);
   const runNow = useRunJobSearch();
+  const runs = useJobSearchRuns(available && setup.data?.profile !== null, runNow.isPending);
+  const queue = useApplyQueue(available && setup.data?.profile !== null);
+  const active = runs.data?.items.find((run) => run.status === 'running') ?? null;
   const navigate = useNavigate();
   const toast = useToast();
 
@@ -643,12 +649,7 @@ export function JobSearchPage() {
           </>
         }
       />
-      {runNow.isPending && (
-        <p role="status" className="text-sm text-fg-2">
-          Searching the job boards and drafting answers. This can take a few minutes; keep this page
-          open.
-        </p>
-      )}
+      {(active || runNow.isPending) && <RunProgressPanel run={active} />}
       {runNow.isError && (
         <p role="alert" className="text-sm text-red">
           {errorText(runNow.error)}
@@ -721,6 +722,87 @@ export function JobSearchPage() {
         </ul>
       </section>
     </div>
+  );
+}
+
+const STEP_LABELS: Record<Exclude<RunStep, 'done'>, string> = {
+  searching: 'Searching the job boards',
+  sweeping: "Checking companies' own job lists",
+  reading: 'Reading new jobs',
+  drafting: 'Drafting answers',
+};
+
+function stepCount(step: Exclude<RunStep, 'done'>, progress: RunProgress): string | null {
+  const of = (done: number, total: number, noun: string) =>
+    total > 0 ? `${String(Math.min(done, total))} of ${String(total)} ${noun}` : null;
+  switch (step) {
+    case 'searching':
+      return of(progress.queriesDone, progress.queriesTotal, 'queries');
+    case 'sweeping':
+      return of(progress.boardsDone, progress.boardsTotal, 'companies');
+    case 'reading':
+      return of(progress.jobsRead, progress.jobsTotal, 'jobs');
+    case 'drafting':
+      return of(progress.drafted, progress.draftsTotal, 'jobs');
+  }
+}
+
+/** A running search: the overall bar, then each step with its counts. */
+function RunProgressPanel({ run }: { run: JobSearchRun | null }) {
+  const progress = run?.progress ?? EMPTY_PROGRESS;
+  const percent = progressPercent(progress);
+  const steps = Object.keys(STEP_LABELS) as Exclude<RunStep, 'done'>[];
+  const current = RUN_STEPS.indexOf(progress.step);
+  const label = progress.step === 'done' ? 'Finishing' : STEP_LABELS[progress.step];
+  return (
+    <Glow as="section" aria-labelledby="progress-heading" className="flex flex-col gap-4 p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="progress-heading" className="text-lg font-semibold tracking-[-0.02em]">
+          {run?.trigger === 'schedule' ? 'Scheduled search running' : 'Search running'}
+        </h2>
+        <span className="text-sm text-fg-3 tabular-nums">{percent}%</span>
+      </div>
+      <div
+        role="progressbar"
+        aria-label="Job search progress"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent}
+        aria-valuetext={`${String(percent)}%, ${label}`}
+        className="h-2 overflow-hidden rounded-full bg-s3"
+      >
+        <div
+          className="h-full rounded-full bg-blue motion-safe:transition-[width] motion-safe:duration-700"
+          style={{ width: `${String(percent)}%` }}
+        />
+      </div>
+      <p role="status" className="text-sm text-fg-2">
+        {run ? `${label}…` : 'Starting…'} This takes a few minutes; you can leave this page.
+      </p>
+      <ol className="flex flex-col gap-1.5" aria-label="Steps">
+        {steps.map((step, index) => {
+          const state = !run || index > current ? 'waiting' : index < current ? 'done' : 'now';
+          const counts = run ? stepCount(step, progress) : null;
+          return (
+            <li key={step} className="flex flex-wrap items-baseline gap-x-2 text-sm">
+              <span
+                aria-hidden="true"
+                className={`inline-block w-4 text-center ${state === 'done' ? 'text-green' : state === 'now' ? 'text-blue' : 'text-fg-4'}`}
+              >
+                {state === 'done' ? '✓' : state === 'now' ? '●' : '○'}
+              </span>
+              <span className={state === 'waiting' ? 'text-fg-3' : 'text-fg'}>
+                {STEP_LABELS[step]}
+              </span>
+              <span className="sr-only">
+                {state === 'done' ? '(done)' : state === 'now' ? '(in progress)' : '(waiting)'}
+              </span>
+              {counts && state !== 'waiting' && <span className="text-fg-3">· {counts}</span>}
+            </li>
+          );
+        })}
+      </ol>
+    </Glow>
   );
 }
 

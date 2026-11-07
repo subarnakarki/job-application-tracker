@@ -279,6 +279,18 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
         ['Product Manager, Growth', 'skipped', 'skipped'],
       ]);
       expect(byRole(hits, 'Product Manager, Growth').reason).toBe('Posted more than 1 day ago');
+      // Progress ends at done, with every step's counts.
+      expect(summary.progress).toEqual({
+        step: 'done',
+        queriesDone: 1,
+        queriesTotal: 1,
+        boardsDone: 1,
+        boardsTotal: 1,
+        jobsRead: 4,
+        jobsTotal: 4,
+        drafted: 1,
+        draftsTotal: 1,
+      });
       expect(claude.drafts).toBe(1);
 
       const target = byRole(hits, 'Senior Product Manager');

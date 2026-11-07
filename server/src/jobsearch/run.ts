@@ -1,5 +1,7 @@
 import {
   assembleDraft,
+  EMPTY_PROGRESS,
+  type RunProgress,
   jobRefOf,
   localDateIn,
   parseQuery,
@@ -21,6 +23,7 @@ import {
   listUndrafted,
   saveDraft,
   seenJobKeys,
+  setRunProgress,
   startRun,
   watchedBoards,
 } from '../repo/jobSearch';
@@ -96,9 +99,20 @@ export async function runJobSearch(
   const now = clock.now();
   const runId = await startRun(db, owner.userId, trigger, localDateIn(now, owner.timeZone), now);
   if (!runId) return { kind: 'already_running' };
+  const currentRun: string = runId;
 
   let searches = 0;
+  // Progress is written in order (one write at a time), so a slow write never overtakes a newer one.
+  const progress: RunProgress = { ...EMPTY_PROGRESS, queriesTotal: profile.queries.length };
+  let writing: Promise<void> = Promise.resolve();
+  const report = (patch: Partial<RunProgress>) => {
+    Object.assign(progress, patch);
+    const snapshot = { ...progress };
+    writing = writing.then(() => setRunProgress(db, runId, snapshot)).catch(() => {});
+    return writing;
+  };
   try {
+    await report({});
     const seen = await seenJobKeys(db, owner.userId);
     const refs: JobRef[] = [];
     const queryTerms: string[] = [];
@@ -124,6 +138,7 @@ export async function runJobSearch(
         seen.add(key);
         refs.push(ref);
       }
+      await report({ queriesDone: progress.queriesDone + 1 });
     }
 
     // Fresh jobs from the boards of every company found so far (this run's first): the search
@@ -148,6 +163,7 @@ export async function runJobSearch(
       },
       deps.fetchBoard,
       () => Date.now() < deadline,
+      (done, total) => void report({ step: 'sweeping', boardsDone: done, boardsTotal: total }),
     );
     const fresh: JobRef[] = [];
     for (const ref of swept) {
@@ -168,76 +184,94 @@ export async function runJobSearch(
       usOnly: profile.usOnly,
       now,
     };
+    const toRead = refs.slice(0, MAX_NEW_JOBS_PER_RUN);
+    await report({ step: 'reading', jobsRead: 0, jobsTotal: toRead.length });
+    let read = 0;
     await pool(
-      refs.slice(0, MAX_NEW_JOBS_PER_RUN),
+      toRead,
       READ_CONCURRENCY,
       () => Date.now() < deadline,
       async (ref) => {
-        let job: JobDetails;
-        let fromResult = false;
         try {
-          job = await readJob(ref, deps.fetchPage, deps.fetchBoard);
-        } catch (error) {
-          // A job the board says is gone is closed: never kept. Only where the page cannot be read
-          // for other reasons (Workable's rate limit, account-only sites' pages) does the search
-          // result's title stand in for it.
-          const gone = !(error instanceof JobReadError) || error.gone;
-          const result = fromSearch.get(`${ref.source}:${ref.board}:${ref.jobId}`);
-          const fallback =
-            result && !gone && SEARCH_RESULT_SOURCES.includes(ref.source)
-              ? jobFromSearchResult(ref, result, now)
-              : null;
-          if (!fallback) return;
-          job = fallback;
-          fromResult = true;
+          await readAndSave(ref);
+        } finally {
+          read += 1;
+          void report({ jobsRead: read });
         }
-        const alreadyTracked = await isTracked(db, owner.userId, {
-          links: [ref.link, job.applyLink],
-          company: job.company,
-          role: job.role,
-        });
-        const sorted = sortJob(
-          {
-            source: ref.source,
-            title: job.role,
-            text: job.text,
-            workMode: job.workMode,
-            postedAt: job.postedAt,
-            postedDayOnly: job.postedDayOnly ?? false,
-            alreadyTracked,
-            location: job.location,
-            country: job.country,
-          },
-          rules,
-        );
-        const reason = fromResult
-          ? `${sorted.reason} (from the search result only)`
-          : sorted.reason;
-        await insertHit(
-          db,
-          owner.userId,
-          {
-            runId,
-            source: ref.source,
-            board: ref.board,
-            jobId: ref.jobId,
-            jobLink: ref.link,
-            applyLink: job.applyLink,
-            company: job.company,
-            role: job.role,
-            location: job.location,
-            workMode: job.workMode,
-            postedAt: job.postedAt,
-            kind: sorted.kind,
-            reason,
-            questions: job.questions,
-          },
-          clock.now(),
-        );
       },
     );
 
-    await draftPending(deps, owner.userId, profile, deadline);
+    async function readAndSave(ref: JobRef): Promise<void> {
+      let job: JobDetails;
+      let fromResult = false;
+      try {
+        job = await readJob(ref, deps.fetchPage, deps.fetchBoard);
+      } catch (error) {
+        // A job the board says is gone is closed: never kept. Only where the page cannot be read
+        // for other reasons (Workable's rate limit, account-only sites' pages) does the search
+        // result's title stand in for it.
+        const gone = !(error instanceof JobReadError) || error.gone;
+        const result = fromSearch.get(`${ref.source}:${ref.board}:${ref.jobId}`);
+        const fallback =
+          result && !gone && SEARCH_RESULT_SOURCES.includes(ref.source)
+            ? jobFromSearchResult(ref, result, now)
+            : null;
+        if (!fallback) return;
+        job = fallback;
+        fromResult = true;
+      }
+      const alreadyTracked = await isTracked(db, owner.userId, {
+        links: [ref.link, job.applyLink],
+        company: job.company,
+        role: job.role,
+      });
+      const sorted = sortJob(
+        {
+          source: ref.source,
+          title: job.role,
+          text: job.text,
+          workMode: job.workMode,
+          postedAt: job.postedAt,
+          postedDayOnly: job.postedDayOnly ?? false,
+          alreadyTracked,
+          location: job.location,
+          country: job.country,
+        },
+        rules,
+      );
+      const reason = fromResult ? `${sorted.reason} (from the search result only)` : sorted.reason;
+      await insertHit(
+        db,
+        owner.userId,
+        {
+          runId: currentRun,
+          source: ref.source,
+          board: ref.board,
+          jobId: ref.jobId,
+          jobLink: ref.link,
+          applyLink: job.applyLink,
+          company: job.company,
+          role: job.role,
+          location: job.location,
+          workMode: job.workMode,
+          postedAt: job.postedAt,
+          kind: sorted.kind,
+          reason,
+          questions: job.questions,
+        },
+        clock.now(),
+      );
+    }
+
+    await report({ step: 'drafting' });
+    await draftPending(
+      deps,
+      owner.userId,
+      profile,
+      deadline,
+      (done, total) => void report({ drafted: done, draftsTotal: total }),
+    );
+    await report({ step: 'done' });
     await finishRun(db, runId, { status: 'done', searches, error: null }, clock.now());
     return { kind: 'done', runId };
   } catch (error) {
@@ -311,17 +345,26 @@ export async function draftPending(
   userId: string,
   profile: JobSearchProfile,
   deadline: number,
+  /** Told how many jobs wait, then after each draft (done or failed). */
+  onProgress: (done: number, total: number) => void = () => {},
 ): Promise<number> {
   const resume = await getResumeText(deps.db, userId);
-  if (!resume) return 0;
+  if (!resume) {
+    onProgress(0, 0);
+    return 0;
+  }
   const waiting = await listUndrafted(deps.db, userId, MAX_DRAFTS_PER_RUN);
   let drafted = 0;
+  let tried = 0;
+  onProgress(0, waiting.length);
   await pool(
     waiting,
     DRAFT_CONCURRENCY,
     () => Date.now() < deadline,
     async (hit) => {
       if (await draftHit(deps, userId, profile, hit.id, resume.text)) drafted += 1;
+      tried += 1;
+      onProgress(tried, waiting.length);
     },
   );
   return drafted;

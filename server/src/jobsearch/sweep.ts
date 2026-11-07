@@ -66,12 +66,16 @@ export async function sweepBoards(
   rules: SweepRules,
   fetchBoard: PageFetcher,
   keepGoing: () => boolean,
+  /** Told how many boards there are, then after each one is read. */
+  onProgress: (done: number, total: number) => void = () => {},
 ): Promise<JobRef[]> {
   const listable = boards
     .filter((entry) => isListable(entry.source))
     .slice(0, MAX_BOARDS_PER_SWEEP);
   const found: JobRef[] = [];
   let next = 0;
+  let done = 0;
+  onProgress(0, listable.length);
   const worker = async () => {
     while (next < listable.length && keepGoing()) {
       const board = listable[next];
@@ -84,6 +88,8 @@ export async function sweepBoards(
       try {
         jobs = spec.parseList((await fetchBoard(url)).text, board.board);
       } catch {
+        done += 1;
+        onProgress(done, listable.length);
         continue;
       }
       for (const job of jobs) {
@@ -91,6 +97,8 @@ export async function sweepBoards(
         const ref = refOf(job, board);
         if (ref) found.push(ref);
       }
+      done += 1;
+      onProgress(done, listable.length);
     }
   };
   await Promise.all(Array.from({ length: Math.min(SWEEP_CONCURRENCY, listable.length) }, worker));

@@ -2,6 +2,8 @@ import {
   ApplicationDraftSchema,
   ApplicationQuestionSchema,
   JobSearchProfileSchema,
+  RunProgressSchema,
+  type RunProgress,
   type ApplicationDraft,
   type ApplicationQuestion,
   type HitKind,
@@ -58,6 +60,7 @@ export async function saveProfile(
 
 interface RunRow {
   id: string;
+  progress: unknown;
   trigger: 'schedule' | 'manual';
   status: 'running' | 'done' | 'failed';
   searches: number;
@@ -76,7 +79,7 @@ interface RunRow {
   not_drafted: number;
 }
 
-const RUN_SELECT = `r.id, r.trigger, r.status, r.searches, r.error, r.started_at, r.finished_at,
+const RUN_SELECT = `r.id, r.progress, r.trigger, r.status, r.searches, r.error, r.started_at, r.finished_at,
   count(h.id)::int as found,
   count(h.id) filter (where h.kind = 'target')::int as target,
   count(h.id) filter (where h.kind = 'keyword_only')::int as keyword_only,
@@ -112,6 +115,9 @@ function toRun(row: RunRow): JobSearchRun {
     startedAt: row.started_at.toISOString(),
     finishedAt: row.finished_at?.toISOString() ?? null,
     counts,
+    progress: RunProgressSchema.nullable()
+      .catch(null)
+      .parse(row.progress ?? null),
   };
 }
 
@@ -463,4 +469,16 @@ export async function listAgeSkipped(
     [userId, limit],
   );
   return result.rows.map(toHit);
+}
+
+/** Records how far a run has got. */
+export async function setRunProgress(
+  db: Queryable,
+  runId: string,
+  progress: RunProgress,
+): Promise<void> {
+  await db.query('update job_search_runs set progress = $2 where id = $1', [
+    runId,
+    JSON.stringify(progress),
+  ]);
 }

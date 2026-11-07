@@ -193,3 +193,65 @@ test('first run: the setup asks once, confirms everything, then opens the overvi
     page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Job search' }),
   ).toBeVisible();
 });
+
+test('a running search shows its progress, step by step', async ({ page, api }) => {
+  await api.seedJobSearch({ profile: PROFILE, jobs: [], answers: {} });
+  // The run itself is covered by API tests; here the browser sees one half way through.
+  await page.route('**/api/job-search/runs', (route) =>
+    route.request().method() === 'GET'
+      ? route.fulfill({
+          json: {
+            items: [
+              {
+                id: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
+                trigger: 'schedule',
+                status: 'running',
+                searches: 6,
+                error: null,
+                startedAt: new Date().toISOString(),
+                finishedAt: null,
+                counts: {
+                  found: 3,
+                  target: 1,
+                  keywordOnly: 0,
+                  finishYourself: 0,
+                  skipped: 2,
+                  ready: 0,
+                  needsYou: 0,
+                  applied: 0,
+                  blocked: 0,
+                  notDrafted: 1,
+                },
+                progress: {
+                  step: 'reading',
+                  queriesDone: 3,
+                  queriesTotal: 3,
+                  boardsDone: 12,
+                  boardsTotal: 12,
+                  jobsRead: 5,
+                  jobsTotal: 20,
+                  drafted: 0,
+                  draftsTotal: 0,
+                },
+              },
+            ],
+          },
+        })
+      : route.fallback(),
+  );
+  await page.goto('/job-search');
+
+  const panel = page.getByRole('region', { name: 'Scheduled search running' });
+  await expect(panel.getByRole('progressbar', { name: 'Job search progress' })).toHaveAttribute(
+    'aria-valuenow',
+    '56',
+  );
+  const steps = panel.getByRole('list', { name: 'Steps' }).getByRole('listitem');
+  await expect(steps).toHaveText([
+    /Searching the job boards\s*\(done\)\s*· 3 of 3 queries/,
+    /Checking companies' own job lists\s*\(done\)\s*· 12 of 12 companies/,
+    /Reading new jobs\s*\(in progress\)\s*· 5 of 20 jobs/,
+    /Drafting answers\s*\(waiting\)/,
+  ]);
+  await expect(panel.getByRole('status')).toContainText('Reading new jobs…');
+});
