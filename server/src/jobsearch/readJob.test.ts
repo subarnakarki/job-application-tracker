@@ -65,6 +65,31 @@ describe('readJob', () => {
     );
   });
 
+  it("reads Greenhouse's newer demographic block, required flags and options included", async () => {
+    const api =
+      'https://boards-api.greenhouse.io/v1/boards/discord/jobs/8917177002?questions=true&pay_transparency=true';
+    const { fetchPage } = fetcher({ [api]: fixture('greenhouse-job-demographic.json') });
+
+    const job = await readJob(
+      ref('https://job-boards.greenhouse.io/discord/jobs/8917177002'),
+      fetchPage,
+    );
+
+    const byLabel = new Map((job.questions ?? []).map((question) => [question.label, question]));
+    expect(byLabel.get('Gender')).toEqual({
+      label: 'Gender',
+      required: true,
+      kind: 'single_select',
+      options: ['Male', 'Female', "I don't wish to answer"],
+    });
+    expect(byLabel.get('Disability Status')?.options).toContain(
+      'No, I do not have a disability and have not had one in the past',
+    );
+    expect(byLabel.has('I consider myself a member of the LGBTQ+ community. (optional)')).toBe(
+      true,
+    );
+  });
+
   it('reads a Lever posting (no questions published) and its apply link', async () => {
     const { fetchPage } = fetcher({
       'https://api.lever.co/v0/postings/palantir/6ed76ce8-4156-4b60-b120-403538bd66cd':

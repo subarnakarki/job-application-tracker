@@ -307,6 +307,9 @@ export function isRunDue(
 // ---------------------------------------------------------------------------------------------
 // The profile
 
+const DECLINE = 'Decline to self-identify';
+export const DEFAULT_EEO_ANSWER = DECLINE;
+
 const line = (max: number) =>
   z
     .string()
@@ -353,7 +356,16 @@ export const JobSearchProfileSchema = z
     startDate: required(200),
     howHeard: required(200),
     over18: z.boolean(),
-    /** Used for every demographic or EEO question. */
+    /**
+     * Voluntary self-identification (EEO) questions, each answered from here and never by the
+     * model. Every one defaults to declining; setups saved before these existed load as declined.
+     */
+    gender: required(100).default(DECLINE),
+    hispanicLatino: z.enum(['decline', 'yes', 'no']).default('decline'),
+    raceEthnicity: required(200).default(DECLINE),
+    veteranStatus: z.enum(['decline', 'not_veteran', 'protected_veteran']).default('decline'),
+    disabilityStatus: z.enum(['decline', 'no', 'yes']).default('decline'),
+    /** Any other demographic question (sexual orientation, LGBTQ+, pronouns...). */
     eeoAnswer: required(200),
   })
   .refine((profile) => profile.salaryMax === null || profile.salaryMax >= profile.salaryMin, {
@@ -361,8 +373,6 @@ export const JobSearchProfileSchema = z
     message: 'Must be at least the minimum',
   });
 export type JobSearchProfile = z.infer<typeof JobSearchProfileSchema>;
-
-export const DEFAULT_EEO_ANSWER = 'Decline to self-identify';
 
 /** What the setup form starts with. */
 export const PROFILE_DEFAULTS = {
@@ -377,7 +387,12 @@ export const PROFILE_DEFAULTS = {
   startDate: 'Two weeks after an offer',
   howHeard: 'Company careers page',
   over18: true,
-  eeoAnswer: DEFAULT_EEO_ANSWER,
+  gender: DECLINE,
+  hispanicLatino: 'decline' as const,
+  raceEthnicity: DECLINE,
+  veteranStatus: 'decline' as const,
+  disabilityStatus: 'decline' as const,
+  eeoAnswer: DECLINE,
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -400,16 +415,25 @@ export type ProfileAnswerKind =
   | 'start_date'
   | 'how_heard'
   | 'over_18'
-  | 'eeo'
+  | 'eeo_gender'
+  | 'eeo_hispanic'
+  | 'eeo_race'
+  | 'eeo_veteran'
+  | 'eeo_disability'
+  | 'eeo_other'
   | 'resume'
   | 'cover_letter';
 
 /** Most specific first: "sponsorship" questions also mention authorization. */
 const PROFILE_QUESTIONS: [RegExp, ProfileAnswerKind][] = [
-  [
-    /\b(gender|race|ethnic|hispanic|latin[oa]|veteran|disabilit|sexual orientation|transgender|pronoun|demographic|eeo)/i,
-    'eeo',
-  ],
+  // Self-identification first. Race before Hispanic/Latino: "Race and Ethnicity" lists Hispanic as
+  // an option, while the separate question is "Are you Hispanic/Latino?".
+  [/veteran/i, 'eeo_veteran'],
+  [/disabilit/i, 'eeo_disability'],
+  [/\brace\b|ethnicit/i, 'eeo_race'],
+  [/hispanic|latin[aoxe]/i, 'eeo_hispanic'],
+  [/sexual orientation|transgender|pronoun|lgbt|demographic|\beeo\b/i, 'eeo_other'],
+  [/gender|\bsex\b/i, 'eeo_gender'],
   [/\b(resume|cv)\b/i, 'resume'],
   [/\bcover letter\b/i, 'cover_letter'],
   [/\b(sponsor|visa|h-?1b)/i, 'sponsorship'],
@@ -490,7 +514,26 @@ export function profileAnswer(kind: ProfileAnswerKind, profile: JobSearchProfile
       return profile.howHeard;
     case 'over_18':
       return profile.over18 ? 'Yes' : 'No';
-    case 'eeo':
+    case 'eeo_gender':
+      return profile.gender;
+    case 'eeo_race':
+      return profile.raceEthnicity;
+    case 'eeo_hispanic':
+      return { decline: DECLINE, yes: 'Yes', no: 'No' }[profile.hispanicLatino];
+    case 'eeo_veteran':
+      return {
+        decline: DECLINE,
+        not_veteran: 'I am not a protected veteran',
+        protected_veteran:
+          'I identify as one or more of the classifications of a protected veteran',
+      }[profile.veteranStatus];
+    case 'eeo_disability':
+      return {
+        decline: DECLINE,
+        no: 'No, I do not have a disability',
+        yes: 'Yes, I have a disability (or had one in the past)',
+      }[profile.disabilityStatus];
+    case 'eeo_other':
       return profile.eeoAnswer;
     case 'resume':
     case 'cover_letter':
@@ -499,16 +542,72 @@ export function profileAnswer(kind: ProfileAnswerKind, profile: JobSearchProfile
 }
 
 /** For a yes/no question with fixed options: the option matching a Yes or No answer, if any. */
+const DECLINE_OPTION =
+  /decline|don'?t wish|do not wish|don'?t want|do not want|prefer not|not to (answer|say|disclose)/i;
+
+/** For a question with fixed options: the option matching the answer, if any. */
 export function pickOption(answer: string, options: string[]): string | null {
   if (options.length === 0) return answer;
-  const exact = options.find((option) => option.toLowerCase() === answer.toLowerCase());
+  const exact = options.find(
+    (option) => option.trim().toLowerCase() === answer.trim().toLowerCase(),
+  );
   if (exact) return exact;
+  if (DECLINE_OPTION.test(answer))
+    return options.find((option) => DECLINE_OPTION.test(option)) ?? null;
   const yes = /^yes\b/i.test(answer);
   const no = /^no\b/i.test(answer);
   if (yes || no)
     return options.find((option) => (yes ? /^yes\b/i : /^no\b/i).test(option.trim())) ?? null;
-  const decline = /decline|don'?t wish|prefer not/i;
-  if (decline.test(answer)) return options.find((option) => decline.test(option)) ?? null;
+  return null;
+}
+
+/** Words forms use for the same gender answer. */
+const GENDER_WORDS: Record<string, string[]> = {
+  male: ['male', 'man'],
+  man: ['male', 'man'],
+  female: ['female', 'woman'],
+  woman: ['female', 'woman'],
+};
+
+/**
+ * The option for a self-identification question. Forms word these differently ("Male" or "Man",
+ * "Asian" or "East Asian"), so beyond an exact match: veteran and disability answers by meaning,
+ * gender by its usual synonyms, and race by the one option that contains the answer. Null when no
+ * option clearly matches: the question then waits for the candidate rather than guessing.
+ */
+export function eeoOption(
+  kind: ProfileAnswerKind,
+  profile: JobSearchProfile,
+  options: string[],
+): string | null {
+  const answer = profileAnswer(kind, profile) ?? '';
+  const direct = pickOption(answer, options);
+  if (direct !== null || DECLINE_OPTION.test(answer)) return direct;
+  const unique = (matches: string[]) => (matches.length === 1 ? (matches[0] ?? null) : null);
+  if (kind === 'eeo_veteran')
+    return unique(
+      options.filter((option) =>
+        profile.veteranStatus === 'not_veteran'
+          ? /\bnot\b.*veteran/i.test(option)
+          : /veteran/i.test(option) && !/\bnot\b/i.test(option) && !DECLINE_OPTION.test(option),
+      ),
+    );
+  if (kind === 'eeo_gender') {
+    const words = GENDER_WORDS[answer.trim().toLowerCase()];
+    if (words)
+      return unique(options.filter((option) => words.includes(option.trim().toLowerCase())));
+  }
+  if (kind === 'eeo_race' || kind === 'eeo_gender') {
+    const wanted = answer.trim().toLowerCase();
+    return unique(
+      options.filter((option) =>
+        new RegExp(
+          `(^|[^a-z])${wanted.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z]|$)`,
+          'i',
+        ).test(option),
+      ),
+    );
+  }
   return null;
 }
 
@@ -610,7 +709,12 @@ export function assembleDraft(
       answer = drafted && !drafted.needsCandidate ? clip(drafted.answer, 4000) || null : null;
       source = 'draft';
     }
-    const option = answer !== null && choices.length > 0 ? pickOption(answer, choices) : null;
+    const option =
+      answer === null || choices.length === 0
+        ? null
+        : kind?.startsWith('eeo_')
+          ? eeoOption(kind, profile, choices)
+          : pickOption(answer, choices);
     const usable = answer !== null && (choices.length === 0 || option !== null);
     if (!usable) {
       // An optional question can stay empty; a required one waits for the candidate.

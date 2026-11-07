@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   assembleDraft,
+  eeoOption,
   chromePrompt,
   DEFAULT_QUERY,
   googleSearchUrl,
@@ -292,6 +293,11 @@ const PROFILE: JobSearchProfile = {
   startDate: 'Two weeks after an offer',
   howHeard: 'Company careers page',
   over18: true,
+  gender: 'Decline to self-identify',
+  hispanicLatino: 'decline',
+  raceEthnicity: 'Decline to self-identify',
+  veteranStatus: 'decline',
+  disabilityStatus: 'decline',
   eeoAnswer: 'Decline to self-identify',
 };
 
@@ -343,9 +349,18 @@ describe('screening questions answered from the profile', () => {
     ['When can you start?', 'start_date', 'Two weeks after an offer'],
     ['How did you hear about this job?', 'how_heard', 'Company careers page'],
     ['Are you at least 18 years of age?', 'over_18', 'Yes'],
-    ['VeteranStatus', 'eeo', 'Decline to self-identify'],
-    ['Please identify your race or ethnicity', 'eeo', 'Decline to self-identify'],
-    ['Do you have a disability?', 'eeo', 'Decline to self-identify'],
+    ['VeteranStatus', 'eeo_veteran', 'Decline to self-identify'],
+    ['Please identify your race or ethnicity', 'eeo_race', 'Decline to self-identify'],
+    ['Race and Ethnicity', 'eeo_race', 'Decline to self-identify'],
+    ['Are you Hispanic/Latino?', 'eeo_hispanic', 'Decline to self-identify'],
+    ['Do you have a disability?', 'eeo_disability', 'Decline to self-identify'],
+    ['Gender Identity (optional)', 'eeo_gender', 'Decline to self-identify'],
+    [
+      'I consider myself a member of the LGBTQ+ community. (optional)',
+      'eeo_other',
+      'Decline to self-identify',
+    ],
+    ['What is your sexual orientation?', 'eeo_other', 'Decline to self-identify'],
     ['Resume/CV', 'resume', null],
     ['Cover Letter', 'cover_letter', null],
   ])('"%s" is %s', (label, kind, answer) => {
@@ -497,5 +512,141 @@ describe('chromePrompt', () => {
     ])
       expect(prompt).toContain(rule);
     expect(prompt).not.toMatch(/@|\d{3}[ -]\d{3}/);
+  });
+});
+
+describe('self-identification answers against real form options', () => {
+  // Option lists as Greenhouse forms show them (saved 2026-11-07).
+  const VETERAN = [
+    "I don't wish to answer",
+    'I identify as one or more of the classifications of a protected veteran',
+    'I am not a protected veteran',
+  ];
+  const DISABILITY = [
+    'Yes, I have a disability, or have had one in the past',
+    'No, I do not have a disability and have not had one in the past',
+    "I don't wish to answer",
+  ];
+  const RACE = [
+    'Decline To Self Identify',
+    'Two or More Races',
+    'White',
+    'Hispanic or Latino',
+    'Black or African American',
+    'Asian',
+    'American Indian or Alaskan Native',
+  ];
+  const RACE_DETAILED = [
+    'Black or of African descent',
+    'East Asian',
+    'South Asian',
+    'White or European',
+    "I don't wish to answer",
+  ];
+  const GENDER = ['Decline To Self Identify', 'Female', 'Male'];
+  const GENDER_IDENTITY = ['Man', 'Woman', 'Non-binary or third gender', "I don't wish to answer"];
+  const HISPANIC = ['Yes', 'No', 'Decline To Self Identify'];
+  const as = (overrides: Partial<JobSearchProfile>) => ({ ...PROFILE, ...overrides });
+
+  it.each<
+    [string, Partial<JobSearchProfile>, Parameters<typeof eeoOption>[0], string[], string | null]
+  >([
+    ['declining, worded either way', {}, 'eeo_veteran', VETERAN, "I don't wish to answer"],
+    ['declining race', {}, 'eeo_race', RACE, 'Decline To Self Identify'],
+    [
+      'not a veteran',
+      { veteranStatus: 'not_veteran' },
+      'eeo_veteran',
+      VETERAN,
+      'I am not a protected veteran',
+    ],
+    [
+      'a protected veteran',
+      { veteranStatus: 'protected_veteran' },
+      'eeo_veteran',
+      VETERAN,
+      'I identify as one or more of the classifications of a protected veteran',
+    ],
+    [
+      'no disability',
+      { disabilityStatus: 'no' },
+      'eeo_disability',
+      DISABILITY,
+      'No, I do not have a disability and have not had one in the past',
+    ],
+    [
+      'a disability',
+      { disabilityStatus: 'yes' },
+      'eeo_disability',
+      DISABILITY,
+      'Yes, I have a disability, or have had one in the past',
+    ],
+    ['Male on a Male/Female form', { gender: 'Male' }, 'eeo_gender', GENDER, 'Male'],
+    ['Male on a Man/Woman form', { gender: 'Male' }, 'eeo_gender', GENDER_IDENTITY, 'Man'],
+    ['Woman on a Male/Female form', { gender: 'woman' }, 'eeo_gender', GENDER, 'Female'],
+    [
+      'Non-binary',
+      { gender: 'Non-binary' },
+      'eeo_gender',
+      GENDER_IDENTITY,
+      'Non-binary or third gender',
+    ],
+    ['Asian, exactly', { raceEthnicity: 'Asian' }, 'eeo_race', RACE, 'Asian'],
+    [
+      'White inside a longer option',
+      { raceEthnicity: 'White' },
+      'eeo_race',
+      RACE_DETAILED,
+      'White or European',
+    ],
+    // "Asian" is in two detailed options: no guess, the candidate picks.
+    ['an ambiguous answer', { raceEthnicity: 'Asian' }, 'eeo_race', RACE_DETAILED, null],
+    ['Hispanic yes', { hispanicLatino: 'yes' }, 'eeo_hispanic', HISPANIC, 'Yes'],
+    ['Hispanic no', { hispanicLatino: 'no' }, 'eeo_hispanic', HISPANIC, 'No'],
+    ['no matching option', { gender: 'Agender' }, 'eeo_gender', GENDER, null],
+  ])('%s', (_label, overrides, kind, options, expected) => {
+    expect(eeoOption(kind, as(overrides), options)).toBe(expected);
+  });
+
+  it('loads a setup saved before these fields existed, as declined', () => {
+    const added = [
+      'gender',
+      'hispanicLatino',
+      'raceEthnicity',
+      'veteranStatus',
+      'disabilityStatus',
+    ];
+    const old = Object.fromEntries(Object.entries(PROFILE).filter(([key]) => !added.includes(key)));
+    expect(JobSearchProfileSchema.parse(old)).toMatchObject({
+      gender: 'Decline to self-identify',
+      hispanicLatino: 'decline',
+      raceEthnicity: 'Decline to self-identify',
+      veteranStatus: 'decline',
+      disabilityStatus: 'decline',
+    });
+  });
+
+  it('drafts each self-identification question from its own answer, never the model', () => {
+    const q = (label: string, options: string[]): ApplicationQuestion => ({
+      label,
+      required: true,
+      kind: 'single_select',
+      options,
+    });
+    const { draft, needsYou } = assembleDraft(
+      [q('Gender', GENDER), q('Veteran Status', VETERAN), q('Race', RACE)],
+      as({ gender: 'Female', veteranStatus: 'not_veteran', raceEthnicity: 'Asian' }),
+      {
+        answers: [{ question: 'Gender', answer: 'Male', needsCandidate: false }],
+        coverLetter: '',
+        whyInterested: '',
+      },
+    );
+    expect(needsYou).toBe(false);
+    expect(draft.answers.map((answer) => [answer.option, answer.source])).toEqual([
+      ['Female', 'profile'],
+      ['I am not a protected veteran', 'profile'],
+      ['Asian', 'profile'],
+    ]);
   });
 });

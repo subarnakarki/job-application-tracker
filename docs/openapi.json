@@ -9018,6 +9018,43 @@
                             "over18": {
                               "type": "boolean"
                             },
+                            "gender": {
+                              "default": "Decline to self-identify",
+                              "type": "string",
+                              "maxLength": 100
+                            },
+                            "hispanicLatino": {
+                              "default": "decline",
+                              "type": "string",
+                              "enum": [
+                                "decline",
+                                "yes",
+                                "no"
+                              ]
+                            },
+                            "raceEthnicity": {
+                              "default": "Decline to self-identify",
+                              "type": "string",
+                              "maxLength": 200
+                            },
+                            "veteranStatus": {
+                              "default": "decline",
+                              "type": "string",
+                              "enum": [
+                                "decline",
+                                "not_veteran",
+                                "protected_veteran"
+                              ]
+                            },
+                            "disabilityStatus": {
+                              "default": "decline",
+                              "type": "string",
+                              "enum": [
+                                "decline",
+                                "no",
+                                "yes"
+                              ]
+                            },
                             "eeoAnswer": {
                               "type": "string",
                               "maxLength": 200
@@ -9049,6 +9086,11 @@
                             "startDate",
                             "howHeard",
                             "over18",
+                            "gender",
+                            "hispanicLatino",
+                            "raceEthnicity",
+                            "veteranStatus",
+                            "disabilityStatus",
                             "eeoAnswer"
                           ],
                           "additionalProperties": false
@@ -9285,6 +9327,43 @@
                   "over18": {
                     "type": "boolean"
                   },
+                  "gender": {
+                    "default": "Decline to self-identify",
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "hispanicLatino": {
+                    "default": "decline",
+                    "type": "string",
+                    "enum": [
+                      "decline",
+                      "yes",
+                      "no"
+                    ]
+                  },
+                  "raceEthnicity": {
+                    "default": "Decline to self-identify",
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "veteranStatus": {
+                    "default": "decline",
+                    "type": "string",
+                    "enum": [
+                      "decline",
+                      "not_veteran",
+                      "protected_veteran"
+                    ]
+                  },
+                  "disabilityStatus": {
+                    "default": "decline",
+                    "type": "string",
+                    "enum": [
+                      "decline",
+                      "no",
+                      "yes"
+                    ]
+                  },
                   "eeoAnswer": {
                     "type": "string",
                     "maxLength": 200
@@ -9487,6 +9566,43 @@
                             "over18": {
                               "type": "boolean"
                             },
+                            "gender": {
+                              "default": "Decline to self-identify",
+                              "type": "string",
+                              "maxLength": 100
+                            },
+                            "hispanicLatino": {
+                              "default": "decline",
+                              "type": "string",
+                              "enum": [
+                                "decline",
+                                "yes",
+                                "no"
+                              ]
+                            },
+                            "raceEthnicity": {
+                              "default": "Decline to self-identify",
+                              "type": "string",
+                              "maxLength": 200
+                            },
+                            "veteranStatus": {
+                              "default": "decline",
+                              "type": "string",
+                              "enum": [
+                                "decline",
+                                "not_veteran",
+                                "protected_veteran"
+                              ]
+                            },
+                            "disabilityStatus": {
+                              "default": "decline",
+                              "type": "string",
+                              "enum": [
+                                "decline",
+                                "no",
+                                "yes"
+                              ]
+                            },
                             "eeoAnswer": {
                               "type": "string",
                               "maxLength": 200
@@ -9518,6 +9634,11 @@
                             "startDate",
                             "howHeard",
                             "over18",
+                            "gender",
+                            "hispanicLatino",
+                            "raceEthnicity",
+                            "veteranStatus",
+                            "disabilityStatus",
                             "eeoAnswer"
                           ],
                           "additionalProperties": false
@@ -15232,6 +15353,43 @@
                                 "over18": {
                                   "type": "boolean"
                                 },
+                                "gender": {
+                                  "default": "Decline to self-identify",
+                                  "type": "string",
+                                  "maxLength": 100
+                                },
+                                "hispanicLatino": {
+                                  "default": "decline",
+                                  "type": "string",
+                                  "enum": [
+                                    "decline",
+                                    "yes",
+                                    "no"
+                                  ]
+                                },
+                                "raceEthnicity": {
+                                  "default": "Decline to self-identify",
+                                  "type": "string",
+                                  "maxLength": 200
+                                },
+                                "veteranStatus": {
+                                  "default": "decline",
+                                  "type": "string",
+                                  "enum": [
+                                    "decline",
+                                    "not_veteran",
+                                    "protected_veteran"
+                                  ]
+                                },
+                                "disabilityStatus": {
+                                  "default": "decline",
+                                  "type": "string",
+                                  "enum": [
+                                    "decline",
+                                    "no",
+                                    "yes"
+                                  ]
+                                },
                                 "eeoAnswer": {
                                   "type": "string",
                                   "maxLength": 200
@@ -15263,6 +15421,11 @@
                                 "startDate",
                                 "howHeard",
                                 "over18",
+                                "gender",
+                                "hispanicLatino",
+                                "raceEthnicity",
+                                "veteranStatus",
+                                "disabilityStatus",
                                 "eeoAnswer"
                               ],
                               "additionalProperties": false

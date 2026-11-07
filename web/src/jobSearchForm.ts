@@ -36,6 +36,11 @@ export interface SetupValues {
   startDate: string;
   howHeard: string;
   over18: boolean;
+  gender: string;
+  hispanicLatino: JobSearchProfile['hispanicLatino'];
+  raceEthnicity: string;
+  veteranStatus: JobSearchProfile['veteranStatus'];
+  disabilityStatus: JobSearchProfile['disabilityStatus'];
   eeoAnswer: string;
 }
 
@@ -88,6 +93,11 @@ export function emptySetup(prefill: { name?: string | null; email?: string }): S
     startDate: PROFILE_DEFAULTS.startDate,
     howHeard: PROFILE_DEFAULTS.howHeard,
     over18: PROFILE_DEFAULTS.over18,
+    gender: PROFILE_DEFAULTS.gender,
+    hispanicLatino: PROFILE_DEFAULTS.hispanicLatino,
+    raceEthnicity: PROFILE_DEFAULTS.raceEthnicity,
+    veteranStatus: PROFILE_DEFAULTS.veteranStatus,
+    disabilityStatus: PROFILE_DEFAULTS.disabilityStatus,
     eeoAnswer: DEFAULT_EEO_ANSWER,
   };
 }
@@ -151,3 +161,19 @@ export function scheduleText(profile: JobSearchProfile): string {
     ? `Every ${WEEKDAYS[profile.runWeekday] ?? ''} at ${when}`
     : `${CADENCE_LABELS[profile.cadence]} at ${when}`;
 }
+
+export const HISPANIC_LABELS: Record<JobSearchProfile['hispanicLatino'], string> = {
+  decline: 'Decline to self-identify',
+  yes: 'Yes',
+  no: 'No',
+};
+export const VETERAN_LABELS: Record<JobSearchProfile['veteranStatus'], string> = {
+  decline: 'Decline to self-identify',
+  not_veteran: 'I am not a protected veteran',
+  protected_veteran: 'I am a protected veteran',
+};
+export const DISABILITY_LABELS: Record<JobSearchProfile['disabilityStatus'], string> = {
+  decline: 'Decline to self-identify',
+  no: 'No disability',
+  yes: 'Yes, I have (or had) a disability',
+};

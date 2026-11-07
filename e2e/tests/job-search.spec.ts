@@ -28,6 +28,11 @@ const PROFILE: JobSearchProfile = {
   startDate: 'Two weeks after an offer',
   howHeard: 'Company careers page',
   over18: true,
+  gender: 'Decline to self-identify',
+  hispanicLatino: 'decline',
+  raceEthnicity: 'Decline to self-identify',
+  veteranStatus: 'decline',
+  disabilityStatus: 'decline',
   eeoAnswer: 'Decline to self-identify',
 };
 
@@ -158,18 +163,24 @@ test('first run: the setup asks once, confirms everything, then opens the overvi
   await page.getByRole('link', { name: 'Set up the job search' }).click();
 
   await page.getByLabel('Phone').fill('+1 555 010 0199');
-  await page.getByLabel('City').fill('Boston');
-  await page.getByLabel('State').fill('MA');
+  await page.getByLabel('City', { exact: true }).fill('Boston');
+  await page.getByLabel('State', { exact: true }).fill('MA');
   await page.getByLabel('Work authorization').fill('US citizen');
   await page.getByLabel('Salary (minimum)').fill('150000');
   await page.getByLabel('Full name').fill('Pat Example');
   await page.getByLabel('Email').fill('pat@example.com');
   await page.getByLabel('How often').selectOption('weekly');
   await page.getByLabel('On', { exact: true }).selectOption('Friday');
+  await page.getByLabel('Gender', { exact: true }).fill('Female');
+  await page.getByLabel('Veteran status').selectOption('I am not a protected veteran');
   await page.getByRole('button', { name: 'Review' }).click();
 
   const confirm = page.getByRole('region', { name: 'Check everything before it is saved' });
   await expect(confirm).toContainText('Every Friday at 8:00 AM');
+  await expect(confirm).toContainText('Gender');
+  await expect(confirm).toContainText('Female');
+  await expect(confirm).toContainText('I am not a protected veteran');
+  await expect(confirm).toContainText('Disability');
   await expect(confirm).toContainText('site:job-boards.greenhouse.io "product manager"');
   await page.getByRole('button', { name: 'Confirm and save' }).click();
 

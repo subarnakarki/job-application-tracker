@@ -119,6 +119,11 @@ const PROFILE: JobSearchProfile = {
   startDate: 'Two weeks after an offer',
   howHeard: 'Company careers page',
   over18: true,
+  gender: 'Decline to self-identify',
+  hispanicLatino: 'decline',
+  raceEthnicity: 'Decline to self-identify',
+  veteranStatus: 'decline',
+  disabilityStatus: 'decline',
   eeoAnswer: 'Decline to self-identify',
 };
 

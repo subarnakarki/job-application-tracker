@@ -37,8 +37,23 @@ import {
   toSetupValues,
   WEEKDAYS,
   WORK_MODES,
+  DISABILITY_LABELS,
+  HISPANIC_LABELS,
+  VETERAN_LABELS,
   type SetupValues,
 } from '../jobSearchForm';
+
+/** The self-identification answers, for the confirm step and the queue. */
+function selfIdentification(profile: JobSearchProfile): [string, string][] {
+  return [
+    ['Gender', profile.gender],
+    ['Hispanic or Latino', HISPANIC_LABELS[profile.hispanicLatino]],
+    ['Race or ethnicity', profile.raceEthnicity],
+    ['Veteran status', VETERAN_LABELS[profile.veteranStatus]],
+    ['Disability', DISABILITY_LABELS[profile.disabilityStatus]],
+    ['Other demographic questions', profile.eeoAnswer],
+  ];
+}
 
 function errorText(error: unknown): string | null {
   if (!error) return null;
@@ -244,7 +259,7 @@ function Summary({ profile }: { profile: JobSearchProfile }) {
     ['Start date', profile.startDate],
     ['How you heard', profile.howHeard],
     ['18 or older', profile.over18 ? 'Yes' : 'No'],
-    ['Demographic questions', profile.eeoAnswer],
+    ...selfIdentification(profile),
   ];
   return (
     <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-[12rem_1fr]">
@@ -447,21 +462,63 @@ function SetupForm({ initial, onSaved }: { initial: SetupValues; onSaved: () => 
       </Fieldset>
 
       <Fieldset legend="Standard answers">
-        <p className="text-sm text-fg-3">
-          Used for the questions most forms ask. Demographic and EEO questions always get the answer
-          below, never a guess.
-        </p>
+        <p className="text-sm text-fg-3">Used for the questions most forms ask.</p>
         <div className="grid gap-4 sm:grid-cols-2">
           <TextField name="willingToRelocate" label="Willing to relocate?" {...field} />
           <TextField name="startDate" label="When can you start?" {...field} />
           <TextField name="howHeard" label="How did you hear about the job?" {...field} />
-          <TextField name="eeoAnswer" label="Demographic and EEO questions" {...field} />
         </div>
         <Check
           label="I am 18 or older"
           checked={values.over18}
           onChange={(checked) => setValues((current) => ({ ...current, over18: checked }))}
         />
+      </Fieldset>
+
+      <Fieldset legend="Voluntary self-identification (EEO)">
+        <p className="text-sm text-fg-3">
+          US forms often ask these. They are optional and employers must keep them out of hiring
+          decisions. Each one is filled from here, never guessed; if a form&apos;s options
+          don&apos;t clearly match your answer, the job asks you instead.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <TextField
+            name="gender"
+            label="Gender"
+            hint="As forms list it, e.g. Male, Female, Non-binary. Or decline."
+            {...field}
+          />
+          <Select
+            label="Hispanic or Latino?"
+            value={values.hispanicLatino}
+            options={Object.entries(HISPANIC_LABELS).map(([value, label]) => ({ value, label }))}
+            onChange={(value) => set('hispanicLatino', value)}
+          />
+          <TextField
+            name="raceEthnicity"
+            label="Race or ethnicity"
+            hint="As forms list it, e.g. Asian, White, Two or More Races. Or decline."
+            {...field}
+          />
+          <Select
+            label="Veteran status"
+            value={values.veteranStatus}
+            options={Object.entries(VETERAN_LABELS).map(([value, label]) => ({ value, label }))}
+            onChange={(value) => set('veteranStatus', value)}
+          />
+          <Select
+            label="Disability"
+            value={values.disabilityStatus}
+            options={Object.entries(DISABILITY_LABELS).map(([value, label]) => ({ value, label }))}
+            onChange={(value) => set('disabilityStatus', value)}
+          />
+          <TextField
+            name="eeoAnswer"
+            label="Other demographic questions"
+            hint="Sexual orientation, LGBTQ+, pronouns and the like."
+            {...field}
+          />
+        </div>
       </Fieldset>
 
       {Object.keys(errors).length > 0 && (
@@ -808,6 +865,15 @@ function HitActions({ hit }: { hit: JobHit }) {
         >
           Skip
         </button>
+        <button
+          type="button"
+          className="btn-d"
+          disabled={action.isPending}
+          aria-label={`Redraft with my current setup: ${job}`}
+          onClick={() => act('redraft', `Redrafted ${hit.company}`)}
+        >
+          Redraft
+        </button>
       </div>
       {blocking && (
         <form
@@ -1010,7 +1076,7 @@ function StandardAnswers({ profile }: { profile: JobSearchProfile }) {
     ['Start date', profile.startDate],
     ['How did you hear about us', profile.howHeard],
     ['18 or older', profile.over18 ? 'Yes' : 'No'],
-    ['Demographic and EEO questions', profile.eeoAnswer],
+    ...selfIdentification(profile),
   ];
   return (
     <Glow as="section" aria-labelledby="standard-heading" className="flex flex-col gap-3 p-5">

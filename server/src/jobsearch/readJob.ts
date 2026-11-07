@@ -76,15 +76,41 @@ function greenhouseQuestion(question: unknown): ApplicationQuestion | null {
   };
 }
 
+/**
+ * A question from Greenhouse's newer demographic block, which has its own shape: a `type` and
+ * `answer_options` on the question itself, instead of `fields`.
+ */
+function demographicQuestion(question: unknown): ApplicationQuestion | null {
+  const label = cleanText(fieldOf(question, 'label'), 1000);
+  if (!label) return null;
+  const type = fieldOf(question, 'type');
+  const options = asArray(fieldOf(question, 'answer_options'))
+    .map((option) => cleanText(fieldOf(option, 'label'), 300))
+    .filter((option): option is string => option !== null)
+    .slice(0, MAX_OPTIONS);
+  return {
+    label,
+    required: fieldOf(question, 'required') === true,
+    kind:
+      type === 'multi_value_multi_select'
+        ? 'multi_select'
+        : options.length > 0
+          ? 'single_select'
+          : 'text',
+    options,
+  };
+}
+
 /** The questions, then any EEO and demographic questions (answered from the profile). */
 export function greenhouseQuestions(job: unknown): ApplicationQuestion[] {
   const compliance = asArray(fieldOf(job, 'compliance')).flatMap((block) =>
     asArray(fieldOf(block, 'questions')),
   );
   const demographic = asArray(fieldOf(fieldOf(job, 'demographic_questions'), 'questions'));
-  return [...asArray(fieldOf(job, 'questions')), ...compliance, ...demographic]
-    .map(greenhouseQuestion)
-    .filter((question): question is ApplicationQuestion => question !== null);
+  return [
+    ...[...asArray(fieldOf(job, 'questions')), ...compliance].map(greenhouseQuestion),
+    ...demographic.map(demographicQuestion),
+  ].filter((question): question is ApplicationQuestion => question !== null);
 }
 
 const textOf = (body: unknown) => proseInJson(body).join('\n').slice(0, POSTING_TEXT_MAX);
