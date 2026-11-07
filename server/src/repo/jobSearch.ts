@@ -2,6 +2,9 @@ import {
   ApplicationDraftSchema,
   ApplicationQuestionSchema,
   JobSearchProfileSchema,
+  trackedMatcher,
+  type Status,
+  type TrackedApplication,
   RunProgressSchema,
   type RunProgress,
   type ApplicationDraft,
@@ -262,7 +265,48 @@ function toHit(row: HitRow): JobHit {
     blockReason: row.block_reason,
     applicationId: row.application_id,
     createdAt: row.created_at.toISOString(),
+    tracked: null,
   };
+}
+
+/** The user's applications, for spotting found jobs that are already in the tracker. */
+export async function listTrackedApplications(
+  db: Queryable,
+  userId: string,
+): Promise<TrackedApplication[]> {
+  const result = await db.query<{
+    id: string;
+    company: string;
+    role: string;
+    status: Status;
+    job_link: string | null;
+  }>('select id, company, role, status, job_link from applications where user_id = $1', [userId]);
+  return result.rows.map((row) => ({
+    id: row.id,
+    company: row.company,
+    role: row.role,
+    status: row.status,
+    jobLink: row.job_link,
+  }));
+}
+
+/**
+ * Marks each hit that is already in the tracker, checked now (not when found): the application
+ * a hit created, else the same posting by link, else the same company and role.
+ */
+async function withTracked(db: Queryable, userId: string, hits: JobHit[]): Promise<JobHit[]> {
+  if (hits.length === 0) return hits;
+  const applications = await listTrackedApplications(db, userId);
+  const byId = new Map(applications.map((application) => [application.id, application]));
+  const find = trackedMatcher(applications);
+  return hits.map((hit) => {
+    const application =
+      (hit.applicationId ? byId.get(hit.applicationId) : undefined) ??
+      find({ links: [hit.jobLink, hit.applyLink], company: hit.company, role: hit.role });
+    return application
+      ? { ...hit, tracked: { applicationId: application.id, status: application.status } }
+      : hit;
+  });
 }
 
 /** The (source, board, job id) keys of jobs this user has already seen, to skip them early. */
@@ -272,21 +316,6 @@ export async function seenJobKeys(db: Queryable, userId: string): Promise<Set<st
     [userId],
   );
   return new Set(result.rows.map((row) => row.key));
-}
-
-/** Whether the tracker already has this job: the same link, or the same company and role. */
-export async function isTracked(
-  db: Queryable,
-  userId: string,
-  job: { links: string[]; company: string; role: string },
-): Promise<boolean> {
-  const result = await db.query(
-    `select 1 from applications where user_id = $1 and (
-        job_link = any($2) or (lower(company) = lower($3) and lower(role) = lower($4))
-      ) limit 1`,
-    [userId, job.links, job.company, job.role],
-  );
-  return result.rowCount > 0;
 }
 
 /** Saves a found job; returns null when the user already has it (another run got there first). */
@@ -331,7 +360,7 @@ export async function getHit(db: Queryable, userId: string, id: string): Promise
     [userId, id],
   );
   const row = result.rows[0];
-  return row ? toHit(row) : null;
+  return row ? ((await withTracked(db, userId, [toHit(row)]))[0] ?? null) : null;
 }
 
 export async function listRunHits(db: Queryable, userId: string, runId: string): Promise<JobHit[]> {
@@ -341,7 +370,7 @@ export async function listRunHits(db: Queryable, userId: string, runId: string):
         when 'keyword_only' then 2 else 3 end, posted_at desc nulls last, created_at`,
     [userId, runId],
   );
-  return result.rows.map(toHit);
+  return withTracked(db, userId, result.rows.map(toHit));
 }
 
 /** Every hit still waiting on something, newest first (at most 200). */
@@ -352,7 +381,7 @@ export async function listOpenHits(db: Queryable, userId: string): Promise<JobHi
       order by posted_at desc nulls last, created_at desc limit 200`,
     [userId],
   );
-  return result.rows.map(toHit);
+  return withTracked(db, userId, result.rows.map(toHit));
 }
 
 /** Targets (and finish-yourself jobs) still waiting for a draft, oldest first. */
@@ -367,7 +396,7 @@ export async function listUndrafted(
       order by created_at, id limit $2`,
     [userId, limit],
   );
-  return result.rows.map(toHit);
+  return withTracked(db, userId, result.rows.map(toHit));
 }
 
 export async function saveDraft(
@@ -435,7 +464,11 @@ export async function exportJobSearch(
     `select ${HIT_COLUMNS} from job_search_hits where user_id = $1 order by created_at`,
     [userId],
   );
-  return { profile: profile?.profile ?? null, runs, hits: hits.rows.map(toHit) };
+  return {
+    profile: profile?.profile ?? null,
+    runs,
+    hits: await withTracked(db, userId, hits.rows.map(toHit)),
+  };
 }
 
 /**
@@ -468,7 +501,7 @@ export async function listAgeSkipped(
       order by posted_at desc nulls last, created_at desc limit $2`,
     [userId, limit],
   );
-  return result.rows.map(toHit);
+  return withTracked(db, userId, result.rows.map(toHit));
 }
 
 /** Records how far a run has got. */

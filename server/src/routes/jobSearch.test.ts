@@ -413,17 +413,36 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
       expect(busy.json()).toMatchObject({ error: 'run_in_progress' });
     });
 
-    it('skips a job already in the tracker', async () => {
+    it('skips a job already applied to, matched however the names are written', async () => {
       const { cookie } = await member();
-      await send('POST', '/api/applications', cookie, {
-        company: 'GitLab',
-        role: 'Senior Product Manager',
+      const created = await send('POST', '/api/applications', cookie, {
+        company: 'Gitlab, Inc.',
+        role: 'Sr. Product Manager',
+        status: 'Interviewing',
       });
       const { hits } = runOf(await run(cookie));
       expect(byRole(hits, 'Senior Product Manager')).toMatchObject({
         kind: 'skipped',
-        reason: 'Already in your tracker',
+        reason: 'Already applied · Interviewing',
+        tracked: { applicationId: created.json<{ id: string }>().id, status: 'Interviewing' },
       });
+    });
+
+    it('labels a found job applied to later, when the lists are read', async () => {
+      const { cookie } = await member();
+      const { hits } = runOf(await run(cookie));
+      const target = byRole(hits, 'Senior Product Manager');
+      expect(target.tracked).toBeNull();
+
+      // Applied outside the job search, by the posting's link.
+      await send('POST', '/api/applications', cookie, {
+        company: 'Somewhere',
+        role: 'Something',
+        status: 'Applied',
+        jobLink: `${jobLink(101)}?gh_src=linkedin`,
+      });
+      const queue = queueOf(await send('GET', '/api/job-search/queue', cookie));
+      expect(queue.needsYou.find((hit) => hit.id === target.id)?.tracked?.status).toBe('Applied');
     });
 
     it('allows ten runs by hand a day', async () => {
@@ -477,8 +496,12 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
 
     it('lists older matches, and adds one to the queue', async () => {
       const { cookie, hits } = await withRun();
-      // "Product Manager, Growth" was skipped only for its age; the intern for its title too.
+      // "Product Manager, Growth" (3 days old) was skipped only for its age under the 1-day
+      // window; widening the window makes it an older match. The intern stays out (its title).
       let queue = queueOf(await send('GET', '/api/job-search/queue', cookie));
+      expect(queue.olderMatches).toEqual([]);
+      await send('PUT', '/api/job-search/profile', cookie, { ...PROFILE, timeframeDays: 7 });
+      queue = queueOf(await send('GET', '/api/job-search/queue', cookie));
       expect(queue.olderMatches.map((hit) => hit.role)).toEqual(['Product Manager, Growth']);
 
       const older = byRole(hits, 'Product Manager, Growth');

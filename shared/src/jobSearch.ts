@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { LIMITS, WORK_MODES, type WorkMode } from './constants';
+import { LIMITS, STATUSES, WORK_MODES, type Status, type WorkMode } from './constants';
 import { localDateIn } from './dates';
 import { indexText } from './resume';
 import { isHttpUrl } from './schemas';
@@ -608,6 +608,8 @@ export interface JobFacts {
   postedDayOnly?: boolean;
   /** Already an application in the tracker (same link, or same company and role). */
   alreadyTracked: boolean;
+  /** Where the tracked application is, for the reason shown. */
+  trackedStatus?: Status | null;
   location: string | null;
   /** The country the board gives, when it does (a name or a code). */
   country: string | null;
@@ -642,7 +644,11 @@ const anyIn = (terms: string[], text: string): string | undefined => {
  * the title), or finish-yourself (a target on a board that needs an account).
  */
 export function sortJob(job: JobFacts, rules: SortRules): Sorted {
-  if (job.alreadyTracked) return { kind: 'skipped', reason: 'Already in your tracker' };
+  if (job.alreadyTracked)
+    return {
+      kind: 'skipped',
+      reason: job.trackedStatus ? trackedLabel(job.trackedStatus) : 'Already in your tracker',
+    };
   if (job.postedAt) {
     const DAY = 24 * 60 * 60 * 1000;
     const cutoff = rules.now.getTime() - rules.timeframeDays * DAY;
@@ -1297,6 +1303,8 @@ export const JobHitSchema = z.strictObject({
   blockReason: z.string().nullable(),
   applicationId: z.uuid().nullable(),
   createdAt: instantSchema,
+  /** The application in the tracker for this same job, when there is one (checked on each read). */
+  tracked: z.strictObject({ applicationId: z.uuid(), status: z.enum(STATUSES) }).nullable(),
 });
 export type JobHit = z.infer<typeof JobHitSchema>;
 
@@ -1362,18 +1370,22 @@ export function chromePrompt(origin: string): string {
  * any other job, or one that would still be skipped.
  */
 export function olderMatchKind(
-  hit: Pick<JobHit, 'kind' | 'reason' | 'source' | 'role' | 'location' | 'workMode'>,
+  hit: Pick<JobHit, 'kind' | 'reason' | 'source' | 'role' | 'location' | 'workMode' | 'postedAt'>,
   profile: JobSearchProfile,
   now: Date,
 ): 'target' | 'finish_yourself' | null {
   if (hit.kind !== 'skipped' || !hit.reason.startsWith('Posted more than')) return null;
+  // Only jobs read from the board itself (a search result alone may be a closed job), with a
+  // posting date inside the current window.
+  if (hit.reason.endsWith('(from the search result only)') || !hit.postedAt) return null;
   const sorted = sortJob(
     {
       source: hit.source,
       title: hit.role,
       text: '',
       workMode: hit.workMode,
-      postedAt: null,
+      postedAt: new Date(hit.postedAt),
+      postedDayOnly: true,
       alreadyTracked: false,
       location: hit.location,
       country: null,
@@ -1389,4 +1401,89 @@ export function olderMatchKind(
     },
   );
   return sorted.kind === 'target' || sorted.kind === 'finish_yourself' ? sorted.kind : null;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Jobs already in the tracker
+
+/** A company name as compared: "Hims & Hers", "Hims And Hers" and "hims-and-hers" are one company. */
+export function companyKey(name: string): string {
+  return name
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(
+      /\b(the|inc|incorporated|llc|ltd|limited|corp|corporation|co|company|gmbh|plc)\b/g,
+      ' ',
+    )
+    .replace(/\s+/g, '');
+}
+
+const ROLE_WORDS: Record<string, string> = {
+  sr: 'senior',
+  jr: 'junior',
+  mgr: 'manager',
+  eng: 'engineer',
+};
+
+/** A role as compared: case, punctuation and common abbreviations ("Sr.") do not matter. */
+export function roleKey(role: string): string {
+  return role
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .split(' ')
+    .map((word) => ROLE_WORDS[word] ?? word)
+    .join(' ');
+}
+
+/** A job link as compared: one key per job on the boards the search knows, else the bare URL. */
+export function linkKey(link: string): string | null {
+  const ref = jobRefOf(link);
+  if (ref) return `${ref.source}:${ref.board}:${ref.jobId}`;
+  try {
+    const url = new URL(link);
+    return `${url.hostname.toLowerCase()}${url.pathname.replace(/\/+$/, '')}`;
+  } catch {
+    return null;
+  }
+}
+
+export interface TrackedApplication {
+  id: string;
+  company: string;
+  role: string;
+  status: Status;
+  jobLink: string | null;
+}
+
+/**
+ * Finds a found job in the tracker: the same posting (by link), or the same company and role.
+ * Statuses past Saved mean it was applied to.
+ */
+export function trackedMatcher(applications: TrackedApplication[]) {
+  const byLink = new Map<string, TrackedApplication>();
+  const byName = new Map<string, TrackedApplication>();
+  for (const application of applications) {
+    const link = application.jobLink ? linkKey(application.jobLink) : null;
+    if (link) byLink.set(link, application);
+    byName.set(`${companyKey(application.company)}|${roleKey(application.role)}`, application);
+  }
+  return (job: { links: (string | null)[]; company: string; role: string }) => {
+    for (const link of job.links) {
+      const key = link ? linkKey(link) : null;
+      const found = key ? byLink.get(key) : undefined;
+      if (found) return found;
+    }
+    return byName.get(`${companyKey(job.company)}|${roleKey(job.role)}`) ?? null;
+  };
+}
+
+/** The label for a job already in the tracker. */
+export function trackedLabel(status: Status): string {
+  return status === 'Saved' ? 'In your tracker · Saved' : `Already applied · ${status}`;
 }

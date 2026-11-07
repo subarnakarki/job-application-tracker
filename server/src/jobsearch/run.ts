@@ -1,5 +1,6 @@
 import {
   assembleDraft,
+  trackedMatcher,
   EMPTY_PROGRESS,
   type RunProgress,
   jobRefOf,
@@ -19,7 +20,7 @@ import {
   finishRun,
   getHit,
   insertHit,
-  isTracked,
+  listTrackedApplications,
   listUndrafted,
   saveDraft,
   seenJobKeys,
@@ -114,6 +115,7 @@ export async function runJobSearch(
   try {
     await report({});
     const seen = await seenJobKeys(db, owner.userId);
+    const findTracked = trackedMatcher(await listTrackedApplications(db, owner.userId));
     const refs: JobRef[] = [];
     const queryTerms: string[] = [];
     /** The search result's title and age per job, for jobs whose page cannot be read. */
@@ -220,7 +222,7 @@ export async function runJobSearch(
         job = fallback;
         fromResult = true;
       }
-      const alreadyTracked = await isTracked(db, owner.userId, {
+      const tracked = findTracked({
         links: [ref.link, job.applyLink],
         company: job.company,
         role: job.role,
@@ -233,7 +235,8 @@ export async function runJobSearch(
           workMode: job.workMode,
           postedAt: job.postedAt,
           postedDayOnly: job.postedDayOnly ?? false,
-          alreadyTracked,
+          alreadyTracked: tracked !== null,
+          trackedStatus: tracked?.status ?? null,
           location: job.location,
           country: job.country,
         },

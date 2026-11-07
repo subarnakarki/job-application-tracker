@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   assembleDraft,
+  companyKey,
+  linkKey,
+  roleKey,
+  trackedLabel,
+  trackedMatcher,
+  type TrackedApplication,
   EMPTY_PROGRESS,
   progressPercent,
   type RunProgress,
@@ -813,9 +819,15 @@ describe('olderMatchKind', () => {
     role: 'Sr. Staff SDET, Customer Engineering',
     location: 'US - Remote',
     workMode: 'Remote' as const,
+    postedAt: '2026-10-27T05:19:39.005Z' as string | null,
     ...overrides,
   });
-  const profile = { ...PROFILE, includeTitles: ['SDET'], skipTitles: ['intern'] };
+  const profile = {
+    ...PROFILE,
+    includeTitles: ['SDET'],
+    skipTitles: ['intern'],
+    timeframeDays: 30 as const,
+  };
 
   it('finds a job skipped only for its age', () => {
     expect(olderMatchKind(hit(), profile, NOW)).toBe('target');
@@ -828,6 +840,13 @@ describe('olderMatchKind', () => {
     ['a skipped title', { role: 'SDET Intern' }],
     ['a title that does not match', { role: 'Account Executive' }],
     ['not skipped at all', { kind: 'target' as const }],
+    [
+      'known only from a search result',
+      { reason: 'Posted more than 1 day ago (from the search result only)' },
+    ],
+    ['posted before the window', { postedAt: '2026-09-01T00:00:00Z' }],
+    ['with no posting date', { postedAt: null }],
+    ['a work mode not wanted', { workMode: 'Hybrid' as const }],
   ])('ignores a job %s', (_label, overrides) => {
     expect(olderMatchKind(hit(overrides), profile, NOW)).toBeNull();
   });
@@ -851,5 +870,64 @@ describe('progressPercent', () => {
   it('takes half a step when its total is not known yet, and never goes past 99 early', () => {
     expect(progressPercent(at({ step: 'searching' }))).toBe(18);
     expect(progressPercent(at({ step: 'reading', jobsTotal: 2, jobsRead: 5 }))).toBe(75);
+  });
+});
+
+describe('jobs already in the tracker', () => {
+  const applications: TrackedApplication[] = [
+    {
+      id: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
+      company: 'Hims & Hers',
+      role: 'Sr. Staff SDET, Customer Engineering',
+      status: 'Interviewing',
+      jobLink: null,
+    },
+    {
+      id: '00000000-0000-4000-8000-000000000002',
+      company: 'Acme, Inc.',
+      role: 'QA Lead',
+      status: 'Saved',
+      jobLink: 'https://boards.greenhouse.io/acme/jobs/42?gh_src=x',
+    },
+  ];
+  const find = trackedMatcher(applications);
+
+  it('finds the same company and role however they are written', () => {
+    expect(
+      find({
+        links: [],
+        company: 'Hims And Hers',
+        role: 'Senior Staff SDET – Customer Engineering',
+      })?.status,
+    ).toBe('Interviewing');
+  });
+
+  it('finds the same posting by its link, whatever the link looks like', () => {
+    expect(
+      find({
+        links: ['https://job-boards.greenhouse.io/acme/jobs/42'],
+        company: 'Someone Else',
+        role: 'Different',
+      })?.status,
+    ).toBe('Saved');
+  });
+
+  it('does not match a different role at the same company', () => {
+    expect(find({ links: [], company: 'Hims and Hers', role: 'Staff SDET, Payments' })).toBeNull();
+  });
+
+  it('normalises names and roles', () => {
+    expect(companyKey('Hims & Hers')).toBe(companyKey('hims-and-hers'));
+    expect(companyKey('Acme, Inc.')).toBe(companyKey('ACME'));
+    expect(companyKey('ŌURA')).toBe('oura');
+    expect(roleKey('Sr. QA Engineer (Remote)')).toBe('senior qa engineer remote');
+    expect(linkKey('https://jobs.lever.co/acme/7c9e6679-7425-40de-944b-e07fc1f90ae7/apply')).toBe(
+      'lever:acme:7c9e6679-7425-40de-944b-e07fc1f90ae7',
+    );
+  });
+
+  it('labels the job by where it is in the tracker', () => {
+    expect(trackedLabel('Interviewing')).toBe('Already applied · Interviewing');
+    expect(trackedLabel('Saved')).toBe('In your tracker · Saved');
   });
 });

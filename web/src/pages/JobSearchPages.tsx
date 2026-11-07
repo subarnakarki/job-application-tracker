@@ -1,5 +1,6 @@
 import {
   chromePrompt,
+  trackedLabel,
   EMPTY_PROGRESS,
   FILLABLE_SOURCES,
   progressPercent,
@@ -34,6 +35,7 @@ import {
 import { useToast } from '../components/Toast';
 import { Glow } from '../components/ui/Glow';
 import { PageHeader } from '../components/ui/PageHeader';
+import { Pill } from '../components/ui/Pill';
 import { formatDateTime } from '../format';
 import {
   CADENCE_LABELS,
@@ -806,6 +808,21 @@ function RunProgressPanel({ run }: { run: JobSearchRun | null }) {
   );
 }
 
+/** "Already applied · Interviewing" (or "In your tracker · Saved"), linking to the application. */
+function TrackedLabel({ hit }: { hit: JobHit }) {
+  if (!hit.tracked) return null;
+  return (
+    <Link
+      to={`/applications/${hit.tracked.applicationId}`}
+      className="ml-1 inline-block align-middle"
+    >
+      <Pill tone={hit.tracked.status === 'Saved' ? 'neutral' : 'iv'} dot>
+        {trackedLabel(hit.tracked.status)}
+      </Pill>
+    </Link>
+  );
+}
+
 function CopyPromptButton() {
   const toast = useToast();
   return (
@@ -876,7 +893,7 @@ export function JobSearchRunPage() {
               {group.map((hit) => (
                 <li key={hit.id} className="rounded-tile bg-s2 p-3">
                   <p className="font-medium">
-                    {hit.company} · {hit.role}
+                    {hit.company} · {hit.role} <TrackedLabel hit={hit} />
                   </p>
                   <p className="text-sm text-fg-3">
                     {posted(hit)} · {SOURCE_LABELS[hit.source]}
@@ -1106,6 +1123,7 @@ function QueueJob({ hit, profile }: { hit: JobHit; profile: JobSearchProfile }) 
         <h3 id={headingId} className="text-lg font-semibold tracking-[-0.02em]">
           {hit.company}: {hit.role}
         </h3>
+        <TrackedLabel hit={hit} />
         <p className="text-sm text-fg-3">
           {posted(hit)} · {SOURCE_LABELS[hit.source]}
           {hit.location ? ` · ${hit.location}` : ''}
@@ -1309,7 +1327,7 @@ export function ApplyQueuePage() {
               >
                 <div>
                   <p className="font-medium">
-                    {hit.company} · {hit.role}
+                    {hit.company} · {hit.role} <TrackedLabel hit={hit} />
                   </p>
                   <p className="text-sm text-fg-3">
                     {posted(hit)} ·{' '}
@@ -1365,7 +1383,7 @@ export function ApplyQueuePage() {
               >
                 <div>
                   <p className="font-medium">
-                    {hit.company} · {hit.role}
+                    {hit.company} · {hit.role} <TrackedLabel hit={hit} />
                   </p>
                   <p className="text-sm text-fg-3">
                     {posted(hit)}

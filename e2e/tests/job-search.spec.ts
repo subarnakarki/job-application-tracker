@@ -148,6 +148,14 @@ test('a search run lists jobs in groups; the queue holds every answer; apply and
   await page.goto('/');
   await expect(page.getByRole('link', { name: /Initech/ }).first()).toBeVisible();
 
+  // The run's list now labels the job applied to, linking to its application.
+  await page.goto(`/job-search/runs/${runId}`);
+  await expect(
+    page
+      .getByRole('region', { name: 'Target roles' })
+      .getByRole('link', { name: 'Already applied · Applied' }),
+  ).toBeVisible();
+
   // The run's summary counts what happened.
   await page.goto('/job-search');
   await expect(page.getByRole('list', { name: 'Runs' })).toContainText(
