@@ -22,7 +22,7 @@ describe('job search setup form', () => {
       salaryMax: null,
       includeTitles: ['product manager', 'senior product manager'],
       queries: ['site:job-boards.greenhouse.io "product manager"'],
-      timeframeDays: 1,
+      timeframeDays: 30,
       runHour: 8,
     });
     expect(toSetupValues(result.profile).includeTitles).toBe(

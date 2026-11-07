@@ -138,7 +138,7 @@ export function parseQuery(query: string): ParsedQuery {
 
 /** The same query as a Google search link, with the time filter, for a manual cross-check. */
 export function googleSearchUrl(query: string, timeframeDays: number): string {
-  const tbs = timeframeDays <= 1 ? 'qdr:d' : timeframeDays <= 7 ? `qdr:d${timeframeDays}` : 'qdr:w';
+  const tbs = timeframeDays <= 1 ? 'qdr:d' : `qdr:d${String(Math.min(timeframeDays, 30))}`;
   return `https://www.google.com/search?q=${encodeURIComponent(query)}&tbs=${tbs}`;
 }
 
@@ -771,7 +771,13 @@ export const JobSearchProfileSchema = z
     queries: z.array(required(300)).min(1).max(3),
     includeTitles: termList,
     skipTitles: termList,
-    timeframeDays: z.union([z.literal(1), z.literal(3), z.literal(7)]),
+    timeframeDays: z.union([
+      z.literal(1),
+      z.literal(3),
+      z.literal(7),
+      z.literal(14),
+      z.literal(30),
+    ]),
     cadence: z.enum(CADENCES),
     runHour: z.number().int().min(0).max(23),
     runWeekday: z.number().int().min(0).max(6),
@@ -805,7 +811,7 @@ export const PROFILE_DEFAULTS = {
   workModes: ['Remote', 'Hybrid'] as WorkMode[],
   usOnly: true,
   queries: [DEFAULT_QUERY],
-  timeframeDays: 1 as const,
+  timeframeDays: 30 as const,
   cadence: 'weekdays' as const,
   runHour: 8,
   runWeekday: 1,

@@ -61,6 +61,7 @@ describe('parseQuery', () => {
       'https://www.google.com/search?q=site%3Ajob-boards.greenhouse.io%20%22product%20manager%22&tbs=qdr:d',
     );
     expect(googleSearchUrl('x', 3)).toMatch(/&tbs=qdr:d3$/);
+    expect(googleSearchUrl('x', 30)).toMatch(/&tbs=qdr:d30$/);
   });
 });
 
@@ -207,6 +208,13 @@ describe('sortJob', () => {
       {},
       'finish_yourself',
       'Workday needs an account at each company',
+    ],
+    [
+      'an 11-day-old posting with a 30-day window',
+      { postedAt: new Date('2026-10-27T05:00:00Z') },
+      { timeframeDays: 30 },
+      'target',
+      'Matches your titles',
     ],
     [
       'a day-only date from yesterday, within 24 hours',

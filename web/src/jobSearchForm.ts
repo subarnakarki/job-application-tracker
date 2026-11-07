@@ -28,7 +28,7 @@ export interface SetupValues {
   queries: string;
   includeTitles: string;
   skipTitles: string;
-  timeframeDays: '1' | '3' | '7';
+  timeframeDays: '1' | '3' | '7' | '14' | '30';
   cadence: Cadence;
   runHour: string;
   runWeekday: string;
@@ -86,7 +86,7 @@ export function emptySetup(prefill: { name?: string | null; email?: string }): S
     queries: PROFILE_DEFAULTS.queries.join('\n'),
     includeTitles: '',
     skipTitles: '',
-    timeframeDays: '1',
+    timeframeDays: String(PROFILE_DEFAULTS.timeframeDays) as SetupValues['timeframeDays'],
     cadence: PROFILE_DEFAULTS.cadence,
     runHour: String(PROFILE_DEFAULTS.runHour),
     runWeekday: String(PROFILE_DEFAULTS.runWeekday),

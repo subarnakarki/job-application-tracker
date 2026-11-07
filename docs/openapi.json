@@ -9049,6 +9049,14 @@
                                 {
                                   "type": "number",
                                   "const": 7
+                                },
+                                {
+                                  "type": "number",
+                                  "const": 14
+                                },
+                                {
+                                  "type": "number",
+                                  "const": 30
                                 }
                               ]
                             },
@@ -9363,6 +9371,14 @@
                       {
                         "type": "number",
                         "const": 7
+                      },
+                      {
+                        "type": "number",
+                        "const": 14
+                      },
+                      {
+                        "type": "number",
+                        "const": 30
                       }
                     ]
                   },
@@ -9606,6 +9622,14 @@
                                 {
                                   "type": "number",
                                   "const": 7
+                                },
+                                {
+                                  "type": "number",
+                                  "const": 14
+                                },
+                                {
+                                  "type": "number",
+                                  "const": 30
                                 }
                               ]
                             },
@@ -15739,6 +15763,14 @@
                                     {
                                       "type": "number",
                                       "const": 7
+                                    },
+                                    {
+                                      "type": "number",
+                                      "const": 14
+                                    },
+                                    {
+                                      "type": "number",
+                                      "const": 30
                                     }
                                   ]
                                 },

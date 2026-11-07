@@ -428,6 +428,8 @@ function SetupForm({ initial, onSaved }: { initial: SetupValues; onSaved: () => 
             { value: '1', label: 'The past 24 hours' },
             { value: '3', label: 'The past 3 days' },
             { value: '7', label: 'The past week' },
+            { value: '14', label: 'The past 2 weeks' },
+            { value: '30', label: 'The past 30 days' },
           ]}
           onChange={(value) => set('timeframeDays', value)}
         />
