@@ -6,11 +6,13 @@ const LINKS = [
   { to: '/', label: 'Applications' },
   { to: '/leads', label: 'Leads' },
   { to: '/stats', label: 'Stats' },
+  { to: '/resume', label: 'Resume' },
   { to: '/account', label: 'Account' },
 ] as const;
 
 /**
- * The header for pages a signed-out visitor can see (sign-in, privacy). The app links lead to
+ * The header for pages a signed-out visitor can see (sign-in, privacy). Job search is left out: it
+ * is open only to the owner, so the signed-in header shows it only where it is available. The app links lead to
  * sign-in first and then to the page they asked for. Signed in, it offers to open the app instead.
  */
 export function PublicHeader() {

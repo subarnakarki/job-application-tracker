@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router';
 import { ApiRequestError } from '../api/client';
 import { useDemoSignIn, useMe } from '../api/hooks';
@@ -15,7 +16,15 @@ const GOOGLE_ERRORS: Record<string, string> = {
   rate_limited: 'Too many sign-ins from your network. Try again later.',
 };
 
-const FEATURES = [
+interface Feature {
+  title: string;
+  text: string;
+  icon: ReactNode;
+  /** Open only to the owner for now (it spends on Claude's API); said on the card. */
+  ownerOnly?: boolean;
+}
+
+const FEATURES: Feature[] = [
   {
     title: 'Follow-ups, flagged',
     text: 'Quiet for 7 days with no next step? It rises to the top.',
@@ -32,8 +41,41 @@ const FEATURES = [
     ),
   },
   {
+    title: 'Resume match',
+    text: 'Claude reads your resume like a senior recruiter: the 20 titles you fit best, with the ATS keywords you have and the ones you are missing.',
+    icon: (
+      <>
+        <path d="M7 3h7l5 5v13H7z" />
+        <path d="M14 3v5h5M10 13h6M10 17h4" />
+      </>
+    ),
+  },
+  {
+    title: 'A job search that runs itself',
+    text: 'Searches 15 job boards on your schedule, checks each job is still open, and drafts every answer for Claude in Chrome to fill in.',
+    ownerOnly: true,
+    icon: (
+      <>
+        <circle cx="11" cy="11" r="6" />
+        <path d="m20 20-4.2-4.2" />
+      </>
+    ),
+  },
+  {
+    title: 'Tailored to each job',
+    text: 'A fit score for every posting, best first, and honest rewording of your own resume lines to add the missing keywords. Nothing invented.',
+    ownerOnly: true,
+    icon: (
+      <>
+        <path d="M4 20h4L19 9l-4-4L4 16z" />
+        <path d="m13 7 4 4" />
+      </>
+    ),
+  },
+  {
     title: 'Gmail import',
     text: 'Rejections and interview invites update your list, and you can undo each change.',
+    ownerOnly: true,
     icon: (
       <>
         <rect x="3" y="5" width="18" height="14" rx="2" />
@@ -41,6 +83,16 @@ const FEATURES = [
       </>
     ),
   },
+];
+
+/** The rest, in one line under the cards. */
+const ALSO = [
+  'fill an application from a job link',
+  'networking leads with notes',
+  'interviews on the timeline',
+  'stats by source',
+  'CSV and JSON export',
+  'installable on your phone',
 ];
 
 export function LoginPage() {
@@ -73,15 +125,15 @@ export function LoginPage() {
             <b className="rounded-full bg-gradient-to-r from-blue to-violet px-2 py-0.5 text-xs font-medium text-white">
               New
             </b>
-            Fill an application from a job link
+            Tailor your resume to each job
           </span>
           <RevealHeading
             text="Every application. One calm place."
             className="relative mx-auto mt-5 max-w-[12ch] text-[clamp(2.75rem,8.4vw,6.5rem)] leading-[0.95] font-[650] tracking-[-0.055em]"
           />
           <p className="rise rise-4 relative mx-auto mt-5 max-w-[40ch] text-[clamp(1.0625rem,2vw,1.25rem)] leading-snug tracking-[-0.015em] text-fg-2">
-            Track your job applications through the hiring pipeline, and see which ones need a
-            follow-up.
+            Track every application through the hiring pipeline, see which ones need a follow-up,
+            and match your resume to the roles you fit best.
           </p>
           {error && (
             <p
@@ -152,8 +204,12 @@ export function LoginPage() {
               </span>
               <h2 className="mt-8 text-xl font-semibold tracking-[-0.03em]">{feature.title}</h2>
               <p className="mt-1.5 text-[0.9375rem] leading-snug text-fg-2">{feature.text}</p>
+              {feature.ownerOnly && (
+                <p className="mt-3 text-[0.8125rem] text-fg-3">Owner only for now</p>
+              )}
             </div>
           ))}
+          <p className="text-[0.9375rem] text-fg-2 md:col-span-3">Also: {ALSO.join(' · ')}.</p>
         </section>
       </main>
     </>

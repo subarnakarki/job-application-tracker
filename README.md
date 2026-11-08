@@ -1,7 +1,9 @@
 # Job Application Tracker
 
 Track job applications through a hiring pipeline: counts per stage, status history, a "needs follow-up"
-flag, search, filters and CSV export. Sign in with Google, or try the shared demo account.
+flag, search, filters and CSV export. Match your resume to the roles you fit best, and (owner only for now)
+let a scheduled job search find, check and draft applications, with a fit score and a tailored resume for
+each job. Sign in with Google, or try the shared demo account.
 
 **Live:** https://job-application-tracker-eta-one.vercel.app
 
@@ -29,11 +31,25 @@ Built by an SDET as a portfolio project, so the tests matter as much as the feat
 - Resume match: upload a resume (PDF, Word or pasted text) and Claude reads it as a senior recruiter would,
   listing the 20 job titles it fits best with the keywords applicant tracking systems match for each, marked found
   or missing in the resume by plain code. "Check my resume" scores the resume against one application's posting.
-- Job search (owner only): a one-time setup, then on your schedule it runs your Google-style queries
-  (`site:job-boards.greenhouse.io "product manager"`) through Claude's web search, reads each new job from
-  Greenhouse, Lever, Ashby or Workday, keeps the past day's postings, sorts target roles from keyword-only
-  ones, and drafts every application. The apply queue lists every answer per job for Claude in Chrome (or you)
-  to fill in and submit, with go / go all, and Mark applied adds each one to the tracker.
+- Networking leads (people who help you, with conversation notes, linked to applications), interviews on an
+  application's timeline, and an installable app for phones.
+- Job search (owner only): a one-time setup (contact details, standard answers, salary, work authorization,
+  self-identification answers), then on your schedule it searches 15 job boards (Greenhouse, Lever, Ashby,
+  Workable, Rippling, SmartRecruiters and more; tick which ones) for your titles, US-only by default, within a
+  time window you choose. New jobs are also found on the boards of companies already seen. Each new job is read
+  from its board, sorted into target roles, keyword-only matches and finish-yourself (account-only sites), and
+  drafted. A progress bar shows each step of a run, and jobs you already applied to are labelled.
+- Apply queue: tabs with counts (Ready to apply, Needs you, Finish yourself, Older matches, Keyword only), each
+  job with every answer for its form, for Claude in Chrome (or you) to fill in with go / go all. Mark applied
+  adds it to the tracker.
+  - **Still open?** Each waiting job is read again on its board about once a day (or with "Check they're still
+    open"); a board that says it is gone closes it, so nobody applies to a dead posting.
+  - **Fit score:** the posting's ATS keywords are checked against your current resume by code ("Fit 82%",
+    with what is missing), and the queue lists the best fit first.
+  - **Tailor my resume:** Claude suggests rewording lines you already have so the missing keywords appear
+    where your resume supports them. Code drops edits of lines you do not have and flags any number or name
+    your resume never mentions; you tick what to use and copy the result.
+- Breadcrumbs and section navigation on every page.
 - Mobile-first, keyboard and screen-reader friendly, with a dark design (Inter, self-hosted) and
   respect for reduced-motion settings. Colours are tokens, so a light theme can be added later.
 
@@ -51,7 +67,7 @@ Built by an SDET as a portfolio project, so the tests matter as much as the feat
 
 ## How it is tested
 
-About 890 unit and API tests and 25 end-to-end runs (desktop and phone viewports), all on every push.
+About 1,470 unit and API tests and 70 end-to-end runs (desktop and phone viewports), all on every push.
 
 - **API tests against real Postgres.** Every test gets a fresh, migrated schema; no mocks of the database.
 - **Contract checks on every response.** Each route declares its inputs and responses; in tests every response
