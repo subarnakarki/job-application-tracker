@@ -65,7 +65,7 @@ const READ_CONCURRENCY = 4;
 const DRAFT_CONCURRENCY = 3;
 
 /** Runs `work` over `items`, `limit` at a time, until the items or the time run out. */
-async function pool<T>(
+export async function pool<T>(
   items: T[],
   limit: number,
   keepGoing: () => boolean,

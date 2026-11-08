@@ -17,7 +17,7 @@ import type { JobSearchClaude } from '../jobsearch/claude';
 import { FetchError, type PageFetcher } from '../postings/fetchPage';
 import { createTestApp, SAME_ORIGIN, T0, type TestApp } from '../test/app';
 import { TEST_DATABASE_URL } from '../test/testDb';
-import { MANUAL_RUN_RULE } from './jobSearch';
+import { CHECK_RULE, MANUAL_RUN_RULE } from './jobSearch';
 
 const MISSING_ID = '00000000-0000-4000-8000-000000000000';
 const CRON_SECRET = 'cron-secret-for-tests-0123456789abcdef';
@@ -57,7 +57,12 @@ const PAGES: Record<string, string> = {
   [apiUrl(104)]: greenhouseJob('Product Manager Intern', 2),
   [apiUrl(105)]: greenhouseJob('Product Manager, EMEA', 2, undefined, 'London, UK'),
 };
+/** Pages the board now answers 404 for (taken down), and pages that time out, per test. */
+const GONE = new Set<string>();
+const TIMING_OUT = new Set<string>();
 const fetchPage: PageFetcher = (url) => {
+  if (GONE.has(url)) return Promise.reject(new FetchError('http_status', '404'));
+  if (TIMING_OUT.has(url)) return Promise.reject(new FetchError('timeout', 'slow board'));
   const text = PAGES[url];
   return text === undefined
     ? Promise.reject(new FetchError('network', 'tests never reach the network'))
@@ -179,6 +184,8 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
     claude.searches = [];
     claude.drafts = 0;
     claude.draftsFail = false;
+    GONE.clear();
+    TIMING_OUT.clear();
     t.clock.set(T0);
     await t.db.query("delete from rate_limits where key like 'job-search%'");
   });
@@ -605,6 +612,79 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
     });
   });
 
+  describe('the still-open check', () => {
+    const check = (cookie: string) => send('POST', '/api/job-search/queue/check', cookie);
+
+    it('closes a job its board says is gone, and leaves one it could not read', async () => {
+      const login = await member();
+      const { hits } = runOf(await run(login.cookie));
+      const target = byRole(hits, 'Senior Product Manager');
+      const keywordOnly = byRole(hits, 'Engineering Manager');
+      GONE.add(apiUrl(101));
+      TIMING_OUT.add(apiUrl(102));
+      t.clock.set(new Date(T0.getTime() + HOUR));
+
+      const result = await check(login.cookie);
+      expect(result.statusCode).toBe(200);
+      expect(result.json()).toEqual({ checked: 1, closed: 1, unknown: 1 });
+
+      const queue = queueOf(await send('GET', '/api/job-search/queue', login.cookie));
+      expect(queue.needsYou).toEqual([]);
+      expect(queue.keywordOnly.map((hit) => hit.id)).toEqual([keywordOnly.id]);
+      expect(queue.keywordOnly[0]?.checkedAt).toBeNull();
+      expect(queue.checks).toEqual({
+        lastCheckedAt: new Date(T0.getTime() + HOUR).toISOString(),
+        closedThisWeek: 1,
+      });
+      const detail = runOf(
+        await send('GET', `/api/job-search/runs/${hits[0]?.runId ?? ''}`, login.cookie),
+      );
+      expect(byRole(detail.hits, 'Senior Product Manager')).toMatchObject({
+        id: target.id,
+        state: 'closed',
+        checkedAt: new Date(T0.getTime() + HOUR).toISOString(),
+      });
+
+      // Once the board answers again, the job it could not read is checked and stays open.
+      TIMING_OUT.clear();
+      expect((await check(login.cookie)).json()).toEqual({ checked: 1, closed: 0, unknown: 0 });
+      const after = queueOf(await send('GET', '/api/job-search/queue', login.cookie));
+      expect(after.keywordOnly[0]).toMatchObject({ state: 'new' });
+      expect(after.checks.lastCheckedAt).toBe(new Date(T0.getTime() + HOUR).toISOString());
+    });
+
+    it('never closes a job that is already applied to', async () => {
+      const login = await member();
+      const { hits } = runOf(await run(login.cookie));
+      const target = byRole(hits, 'Senior Product Manager');
+      await send('POST', `/api/job-search/hits/${target.id}/applied`, login.cookie);
+      GONE.add(apiUrl(101));
+      await check(login.cookie);
+      expect(
+        hitOf(await send('POST', `/api/job-search/hits/${target.id}/closed`, login.cookie)).state,
+      ).toBe('applied');
+    });
+
+    it(`allows ${String(CHECK_RULE.limit)} checks by hand a day`, async () => {
+      const { cookie } = await member();
+      for (let index = 0; index < CHECK_RULE.limit; index += 1)
+        expect((await check(cookie)).statusCode).toBe(200);
+      expect((await check(cookie)).statusCode).toBe(429);
+    });
+
+    it('marks a job closed by hand', async () => {
+      const login = await member();
+      const { hits } = runOf(await run(login.cookie));
+      const target = byRole(hits, 'Senior Product Manager');
+      const closed = hitOf(
+        await send('POST', `/api/job-search/hits/${target.id}/closed`, login.cookie),
+      );
+      expect(closed.state).toBe('closed');
+      const queue = queueOf(await send('GET', '/api/job-search/queue', login.cookie));
+      expect(queue.needsYou).toEqual([]);
+    });
+  });
+
   describe('the data export', () => {
     it('includes the setup, the runs and the jobs found', async () => {
       const { cookie } = await member();
@@ -632,6 +712,7 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
         ['POST', `/api/job-search/hits/{id}/applied`, undefined],
         ['POST', `/api/job-search/hits/{id}/blocked`, { reason: 'x' }],
         ['POST', `/api/job-search/hits/{id}/skip`, undefined],
+        ['POST', `/api/job-search/hits/{id}/closed`, undefined],
         ['POST', `/api/job-search/hits/{id}/queue`, undefined],
         ['POST', `/api/job-search/hits/{id}/redraft`, undefined],
         ['PUT', `/api/job-search/hits/{id}/draft`, { answers: [], coverLetter: '' }],
@@ -686,6 +767,19 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
       expect(
         runs.json<{ items: { trigger: string }[] }>().items.map((item) => item.trigger),
       ).toEqual(['schedule']);
+    });
+
+    it('checks waiting jobs about once a day, closing the gone ones', async () => {
+      env['JOB_SEARCH_USER_IDS'] = '';
+      const { cookie } = await member();
+      const { hits } = runOf(await run(cookie));
+      const target = byRole(hits, 'Senior Product Manager');
+      GONE.add(apiUrl(101));
+      t.clock.set(new Date('2026-11-05T12:30:00Z')); // 07:30 in New York: no run is due
+      await cron(CRON_SECRET);
+      const detail = runOf(await send('GET', `/api/job-search/runs/${target.runId}`, cookie));
+      expect(byRole(detail.hits, 'Senior Product Manager').state).toBe('closed');
+      expect(byRole(detail.hits, 'Engineering Manager').checkedAt).toBe('2026-11-05T12:30:00.000Z');
     });
 
     it('does not start a run before the run hour, or with the schedule off', async () => {

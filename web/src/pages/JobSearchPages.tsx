@@ -14,6 +14,7 @@ import {
   SEARCH_SOURCES,
   SOURCE_LABELS,
   type ApplicationQuestion,
+  type ApplyQueue,
   type JobHit,
   type JobSearchProfile,
   type JobSearchRun,
@@ -23,6 +24,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { ApiRequestError } from '../api/client';
 import {
   useApplyQueue,
+  useCheckQueue,
   useEditDraft,
   useHitAction,
   useJobSearchRun,
@@ -1075,6 +1077,7 @@ const STATE_LABELS: Record<JobHit['state'], string> = {
   applied: 'Applied',
   blocked: 'Blocked',
   skipped: 'Skipped',
+  closed: 'Closed',
 };
 
 function posted(hit: JobHit): string {
@@ -1201,6 +1204,15 @@ function HitActions({ hit }: { hit: JobHit }) {
           onClick={() => act('skip', `Skipped ${hit.company}`)}
         >
           Skip
+        </button>
+        <button
+          type="button"
+          className="btn-d"
+          disabled={action.isPending}
+          aria-label={`Mark closed: ${job}`}
+          onClick={() => act('closed', `Marked ${hit.company} closed`)}
+        >
+          Mark closed
         </button>
         <button
           type="button"
@@ -1556,6 +1568,58 @@ function JobRows({ hits, addLabel }: { hits: JobHit[]; addLabel: string | null }
   );
 }
 
+function agoText(iso: string, now: number): string {
+  const minutes = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60_000));
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${String(minutes)} minute${minutes === 1 ? '' : 's'} ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${String(hours)} hour${hours === 1 ? '' : 's'} ago`;
+  const days = Math.round(hours / 24);
+  return `${String(days)} day${days === 1 ? '' : 's'} ago`;
+}
+
+/** "Check they're still open": the last check, and a button to read every waiting job again. */
+function StillOpenCheck({ checks }: { checks: ApplyQueue['checks'] }) {
+  const check = useCheckQueue();
+  const toast = useToast();
+  // The time the page was opened: "ago" is coarse (minutes), so it need not tick.
+  const [openedAt] = useState(() => Date.now());
+  const last = checks.lastCheckedAt
+    ? `Checked ${agoText(checks.lastCheckedAt, openedAt)}`
+    : 'Not checked yet';
+  const closed =
+    checks.closedThisWeek > 0 ? ` · ${String(checks.closedThisWeek)} closed this week` : '';
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <button
+        type="button"
+        className="btn-d"
+        disabled={check.isPending}
+        onClick={() =>
+          check.mutate(undefined, {
+            onSuccess: (result) =>
+              toast(
+                `Checked ${String(result.checked)} job${result.checked === 1 ? '' : 's'}: ${String(
+                  result.closed,
+                )} closed${result.unknown > 0 ? `, ${String(result.unknown)} could not be read (left as they were)` : ''}`,
+              ),
+          })
+        }
+      >
+        {check.isPending ? 'Checking…' : "Check they're still open"}
+      </button>
+      <p className="text-sm text-fg-3" role="status">
+        {check.isPending ? 'Reading each job on its board…' : `${last}${closed}`}
+      </p>
+      {check.isError && (
+        <p role="alert" className="text-sm text-red">
+          {errorText(check.error)}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function ApplyQueuePage() {
   const setup = useJobSearchSetup();
   const available = setup.data?.available === true;
@@ -1598,6 +1662,7 @@ export function ApplyQueuePage() {
             Download resume
           </a>
         </div>
+        <StillOpenCheck checks={queue.data.checks} />
         <details className="rounded-tile bg-s2 p-3">
           <summary className="cursor-pointer text-sm font-medium">
             Your standard answers and resume text

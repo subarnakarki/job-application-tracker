@@ -10,6 +10,7 @@ import {
   JobSearchRunDetailSchema,
   JobSearchRunListSchema,
   JobSearchSetupSchema,
+  QueueCheckResultSchema,
   localDateIn,
   olderMatchKind,
   SOURCE_LABELS,
@@ -24,10 +25,12 @@ import type { Clock } from '../clock';
 import type { Db } from '../db/types';
 import { ApiError, parseInput } from '../http/errors';
 import type { JobSearchClaude } from '../jobsearch/claude';
+import { checkOpenJobs, MANUAL_CHECK_AGE_MS, SCHEDULED_CHECK_AGE_MS } from '../jobsearch/check';
 import { draftHit, draftPending, runJobSearch } from '../jobsearch/run';
 import type { PageFetcher } from '../postings/fetchPage';
 import { createApplication } from '../repo/applications';
 import {
+  checkSummary,
   getHit,
   getProfile,
   getRun,
@@ -54,6 +57,10 @@ export const MANUAL_RUN_RULE: RateLimitRule = {
 export const ALL_RUNS_RULE: RateLimitRule = { name: 'job-search-all', limit: 50, windowMs: DAY_MS };
 /** Single drafts (re-draft, move to queue). */
 export const DRAFT_RULE: RateLimitRule = { name: 'job-search-draft', limit: 30, windowMs: DAY_MS };
+/** "Check they're still open" by hand: each reads up to 60 boards. */
+export const CHECK_RULE: RateLimitRule = { name: 'job-search-check', limit: 6, windowMs: DAY_MS };
+/** A check by hand answers within the request: well under the function limit. */
+export const CHECK_BUDGET_MS = 50_000;
 
 /** Stop starting new work this long after a request began (the function limit is 300 s). */
 export const RUN_BUDGET_MS = 240_000;
@@ -346,7 +353,31 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
         finishYourself: open.filter((hit) => hit.kind === 'finish_yourself'),
         keywordOnly: open.filter((hit) => hit.kind === 'keyword_only'),
         notDrafted: open.filter((hit) => hit.kind === 'target' && hit.state === 'new').length,
+        checks: await checkSummary(db, user.id, now),
       };
+    },
+  );
+
+  app.post(
+    '/api/job-search/queue/check',
+    {
+      config: {
+        auth: 'user',
+        contract: {
+          summary: "Check they're still open: read each waiting job again and close the gone ones",
+          errors: { 404: 'Not available to this account', 429: 'Too many checks today' },
+          responses: { 200: QueueCheckResultSchema },
+        },
+      },
+    },
+    async (request, reply) => {
+      const db = requireDb();
+      const { user } = await memberOf(request);
+      await spend(db, CHECK_RULE, user.id, reply);
+      return checkOpenJobs(searchDeps(db, NO_CLAUDE), user.id, {
+        maxAgeMs: MANUAL_CHECK_AGE_MS,
+        deadline: Date.now() + CHECK_BUDGET_MS,
+      });
     },
   );
 
@@ -441,6 +472,17 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
         { state: 'blocked', blockReason: reason },
         deps.clock.now(),
       );
+    },
+  );
+
+  hitRoute(
+    'closed',
+    'Mark a job closed (its page says it no longer takes applications)',
+    undefined,
+    {},
+    async ({ db, user, hit }) => {
+      if (!['new', 'ready', 'needs_you'].includes(hit.state)) return;
+      await setHitState(db, user.id, hit.id, { state: 'closed' }, deps.clock.now());
     },
   );
 
@@ -570,6 +612,11 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
         const saved = row && !row.is_demo ? await getProfile(db, userId) : null;
         if (!row || !saved || !(await getResumeText(db, userId))) continue;
         const { profile } = saved;
+        // About once a day per job, before anything is drafted: closed jobs leave the queue.
+        await checkOpenJobs(searchDeps(db, claude), userId, {
+          maxAgeMs: SCHEDULED_CHECK_AGE_MS,
+          deadline: Math.min(deadline, Date.now() + CHECK_BUDGET_MS),
+        });
         const due =
           profile.scheduleOn &&
           isRunDue(profile, row.time_zone, deps.clock.now(), await lastScheduledRunDay(db, userId));

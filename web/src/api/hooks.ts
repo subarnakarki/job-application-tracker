@@ -5,6 +5,7 @@ import {
   JobSearchRunDetailSchema,
   JobSearchRunListSchema,
   JobSearchSetupSchema,
+  QueueCheckResultSchema,
   ResumeTextSchema,
   type DraftEdit,
   type JobSearchProfile,
@@ -628,7 +629,20 @@ export function useApplyQueue(enabled = true) {
   });
 }
 
-export type HitAction = 'applied' | 'blocked' | 'skip' | 'queue' | 'redraft';
+export type HitAction = 'applied' | 'blocked' | 'skip' | 'queue' | 'redraft' | 'closed';
+
+/** "Check they're still open": reads each waiting job again; closed ones leave the queue. */
+export function useCheckQueue() {
+  const refresh = useRefreshJobSearch();
+  return useMutation({
+    mutationFn: () =>
+      apiRequest('/api/job-search/queue/check', QueueCheckResultSchema, {
+        method: 'POST',
+        body: {},
+      }),
+    onSuccess: refresh,
+  });
+}
 
 export function useHitAction() {
   const refresh = useRefreshJobSearch();

@@ -346,3 +346,40 @@ test('adds titles from the Resume match to the job titles', async ({ page, api }
     '"Developer Productivity Engineer"',
   );
 });
+
+test('a job found closed on its form is marked closed and leaves the queue', async ({
+  page,
+  api,
+}) => {
+  await api.uploadResumeText(
+    'Pat Example. Senior product manager with eight years of launches. '.repeat(4),
+  );
+  await api.seedJobSearch({
+    profile: PROFILE,
+    jobs: [
+      {
+        board: 'initech',
+        company: 'Initech',
+        title: 'Senior Product Manager',
+        location: 'Remote, US',
+        hoursAgo: 3,
+        content: 'Own the roadmap. '.repeat(20),
+        questions: QUESTIONS.filter((question) => !/clearance/.test(question.label)),
+      },
+    ],
+    answers: { 'Why do you want to work here?': 'Your roadmap work matches my launches.' },
+  });
+  const queue = new ApplyQueuePage(page);
+  await queue.goto();
+  await expect(page.getByRole('button', { name: "Check they're still open" })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Not checked yet' })).toBeVisible();
+
+  await queue
+    .job('Initech: Senior Product Manager')
+    .getByRole('button', { name: 'Mark closed: Initech, Senior Product Manager' })
+    .click();
+  await expect(queue.section(/^Ready to apply/)).toContainText('Ready to apply (0)');
+  await expect(page.getByRole('status').filter({ hasText: 'closed this week' })).toContainText(
+    '1 closed this week',
+  );
+});

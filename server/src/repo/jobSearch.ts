@@ -234,11 +234,12 @@ interface HitRow {
   block_reason: string | null;
   application_id: string | null;
   created_at: Date;
+  checked_at: Date | null;
 }
 
 const HIT_COLUMNS = `id, run_id, source, job_link, apply_link, company, role, location, work_mode,
   posted_at, kind, reason, state, questions, draft, draft_error, block_reason, application_id,
-  created_at`;
+  created_at, checked_at`;
 
 const QuestionsSchema = z.array(ApplicationQuestionSchema).nullable();
 
@@ -265,6 +266,7 @@ function toHit(row: HitRow): JobHit {
     blockReason: row.block_reason,
     applicationId: row.application_id,
     createdAt: row.created_at.toISOString(),
+    checkedAt: row.checked_at?.toISOString() ?? null,
     tracked: null,
   };
 }
@@ -514,4 +516,64 @@ export async function setRunProgress(
     runId,
     JSON.stringify(progress),
   ]);
+}
+
+/** States in which a job is still waiting in the queue (and can be checked or closed). */
+const WAITING = "('new', 'ready', 'needs_you')";
+
+/**
+ * Waiting jobs to check again on their board: on a board that can be read, not checked since
+ * `checkedBefore`, never-checked and longest-unchecked first.
+ */
+export async function listToCheck(
+  db: Queryable,
+  userId: string,
+  sources: readonly string[],
+  checkedBefore: Date,
+  limit: number,
+): Promise<JobHit[]> {
+  const result = await db.query<HitRow>(
+    `select ${HIT_COLUMNS} from job_search_hits
+      where user_id = $1 and kind <> 'skipped' and state in ${WAITING}
+        and source = any($2::text[]) and (checked_at is null or checked_at < $3)
+      order by checked_at nulls first, created_at, id limit $4`,
+    [userId, [...sources], checkedBefore, limit],
+  );
+  return result.rows.map(toHit);
+}
+
+/** Records a check; a job its board says is gone is closed (only while it is still waiting). */
+export async function markChecked(
+  db: Queryable,
+  userId: string,
+  id: string,
+  closed: boolean,
+  now: Date,
+): Promise<boolean> {
+  const result = await db.query(
+    `update job_search_hits set checked_at = $3,
+        state = case when $4::boolean then 'closed' else state end, updated_at = $3
+      where user_id = $1 and id = $2 and state in ${WAITING}`,
+    [userId, id, now, closed],
+  );
+  return result.rowCount > 0;
+}
+
+/** For the queue: the latest check of any job, and jobs closed in the past week. */
+export async function checkSummary(
+  db: Queryable,
+  userId: string,
+  now: Date,
+): Promise<{ lastCheckedAt: string | null; closedThisWeek: number }> {
+  const result = await db.query<{ last_checked: Date | null; closed: number }>(
+    `select max(checked_at) as last_checked,
+        count(*) filter (where state = 'closed' and updated_at >= $2)::int as closed
+      from job_search_hits where user_id = $1`,
+    [userId, new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)],
+  );
+  const row = result.rows[0];
+  return {
+    lastCheckedAt: row?.last_checked?.toISOString() ?? null,
+    closedThisWeek: row?.closed ?? 0,
+  };
 }

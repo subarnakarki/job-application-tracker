@@ -136,10 +136,15 @@ Open to the users in `JOB_SEARCH_USER_IDS` when `ANTHROPIC_API_KEY` is set; ever
 |        |                                    |        | 10 a day by hand; 50 runs a day in total                              |
 | GET    | `/api/job-search/runs`             | user   | The latest 10 runs with counts                                        |
 | GET    | `/api/job-search/runs/:id`         | user   | One run and every job it found                                        |
-| GET    | `/api/job-search/queue`            | user   | `{ ready, needsYou, finishYourself, keywordOnly, notDrafted }`        |
+| GET    | `/api/job-search/queue`            | user   | `{ ready, needsYou, finishYourself, keywordOnly, olderMatches,`       |
+|        |                                    |        | `notDrafted, checks: { lastCheckedAt, closedThisWeek } }`             |
+| POST   | `/api/job-search/queue/check`      | user   | Reads each waiting job again (up to 60); a board that says it is gone |
+|        |                                    |        | closes it. `{ checked, closed, unknown }`. 6 a day; the hourly        |
+|        |                                    |        | schedule also checks each job about once a day                        |
 | POST   | `/api/job-search/hits/:id/applied` | user   | Creates the application (Applied, Company site, job link) once        |
 | POST   | `/api/job-search/hits/:id/blocked` | user   | `{ reason }`                                                          |
 | POST   | `/api/job-search/hits/:id/skip`    | user   |                                                                       |
+| POST   | `/api/job-search/hits/:id/closed`  | user   | The job's page says it is closed (only while it is waiting)           |
 | POST   | `/api/job-search/hits/:id/queue`   | user   | A keyword-only job becomes a target and is drafted (30 drafts a day)  |
 | POST   | `/api/job-search/hits/:id/redraft` | user   | Drafts again                                                          |
 | PUT    | `/api/job-search/hits/:id/draft`   | user   | `{ answers: [{ question, answer }], coverLetter }`; answers sent back |
