@@ -99,6 +99,9 @@ test('a search run lists jobs in groups; the queue holds every answer; apply and
 
   // The run's list, before applying: grouped, with company, role, time posted and link.
   await page.goto(`/job-search/runs/${runId}`);
+  await expect(
+    page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('link', { name: 'Job search' }),
+  ).toHaveAttribute('href', '/job-search');
   await expect(page.getByRole('heading', { name: 'Search results', level: 1 })).toBeVisible();
   const targets = page.getByRole('region', { name: 'Target roles' });
   await expect(targets.getByRole('listitem')).toHaveCount(2);
@@ -114,9 +117,13 @@ test('a search run lists jobs in groups; the queue holds every answer; apply and
   // The queue, read the way Claude in Chrome reads it.
   const queue = new ApplyQueuePage(page);
   await queue.goto();
+  await expect(
+    page.getByRole('navigation', { name: 'Job search' }).getByRole('link', { name: 'Apply queue' }),
+  ).toHaveAttribute('aria-current', 'page');
   const ready = queue.section(/^Ready to apply/);
   const initech = queue.job('Initech: Senior Product Manager');
   await expect(ready).toContainText('Ready to apply (1)');
+  await queue.showAnswers(initech);
   await expect(queue.answer(initech, 'Email')).toHaveText('pat@example.com');
   await expect(queue.answer(initech, 'Will you require visa sponsorship?')).toHaveText('No');
   await expect(queue.answer(initech, 'Why do you want to work here?')).toHaveText(
@@ -130,9 +137,12 @@ test('a search run lists jobs in groups; the queue holds every answer; apply and
 
   // Hooli asks something only the candidate knows: answer it, and it becomes ready.
   const hooli = queue.job('Hooli: Product Manager, Platform');
+  await queue.openTab('Needs you');
   await expect(queue.section(/^Needs you/)).toContainText('Needs you (1)');
   await hooli.getByLabel('Do you hold an active security clearance? (required)').selectOption('No');
   await hooli.getByRole('button', { name: 'Save answers' }).click();
+  await expect(queue.section(/^Needs you/)).toContainText('Needs you (0)');
+  await queue.openTab('Ready to apply');
   await expect(ready).toContainText('Ready to apply (2)');
 
   // Claude in Chrome presses Mark applied after submitting: the application is tracked.
@@ -151,6 +161,9 @@ test('a search run lists jobs in groups; the queue holds every answer; apply and
 
   // The run's list now labels the job applied to, linking to its application.
   await page.goto(`/job-search/runs/${runId}`);
+  await expect(
+    page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('link', { name: 'Job search' }),
+  ).toHaveAttribute('href', '/job-search');
   await expect(
     page
       .getByRole('region', { name: 'Target roles' })

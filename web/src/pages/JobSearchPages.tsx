@@ -19,7 +19,7 @@ import {
   type JobSearchRun,
 } from '@jat/shared';
 import { useId, useState, type ReactNode } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { ApiRequestError } from '../api/client';
 import {
   useApplyQueue,
@@ -36,6 +36,7 @@ import {
   useSaveJobSearchProfile,
   type HitAction,
 } from '../api/hooks';
+import { Breadcrumbs } from '../components/Breadcrumbs';
 import { useToast } from '../components/Toast';
 import { Glow } from '../components/ui/Glow';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -293,6 +294,34 @@ function Summary({ profile }: { profile: JobSearchProfile }) {
         </div>
       ))}
     </dl>
+  );
+}
+
+/** Moves between the job search's pages: Overview, Apply queue, Setup. */
+function JobSearchNav({ current }: { current: 'overview' | 'queue' | 'setup' }) {
+  const links = [
+    { id: 'overview', to: '/job-search', label: 'Overview' },
+    { id: 'queue', to: '/apply-queue', label: 'Apply queue' },
+    { id: 'setup', to: '/job-search/setup', label: 'Setup' },
+  ] as const;
+  return (
+    <nav aria-label="Job search" className="-mb-2 flex flex-wrap items-center gap-x-1 text-sm">
+      {links.map((link) => {
+        const active = link.id === current;
+        return (
+          <Link
+            key={link.id}
+            to={link.to}
+            aria-current={active ? 'page' : undefined}
+            className={`flex min-h-11 items-center rounded-full px-3 transition-colors ${
+              active ? 'bg-s3 text-fg' : 'text-fg-2 hover:text-fg'
+            }`}
+          >
+            {link.label}
+          </Link>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -755,6 +784,7 @@ export function JobSearchSetupPage() {
     : emptySetup({ name: me.data?.name, email: me.data?.email });
   return (
     <div className="flex flex-col gap-6">
+      <JobSearchNav current="setup" />
       <PageHeader
         title="Job search setup"
         subtitle="Asked once. It fills your applications and decides what to search for and when."
@@ -798,6 +828,7 @@ export function JobSearchPage() {
   if (!profile)
     return (
       <div className="flex flex-col gap-6">
+        <JobSearchNav current="overview" />
         <PageHeader
           title="Job search"
           subtitle="Searches the job boards on your schedule, drafts every application, and queues them for Claude in Chrome to fill in."
@@ -811,6 +842,7 @@ export function JobSearchPage() {
   const waiting = queue.data ? queue.data.ready.length + queue.data.needsYou.length : 0;
   return (
     <div className="flex flex-col gap-6">
+      <JobSearchNav current="overview" />
       <PageHeader
         title="Job search"
         subtitle={`${scheduleText(profile)}. Postings from the past ${profile.timeframeDays === 1 ? '24 hours' : `${String(profile.timeframeDays)} days`}.`}
@@ -1057,6 +1089,9 @@ export function JobSearchRunPage() {
   const { run: summary, hits } = run.data;
   return (
     <div className="flex flex-col gap-6">
+      <Breadcrumbs
+        items={[{ label: 'Job search', to: '/job-search' }, { label: 'Search results' }]}
+      />
       <PageHeader
         title="Search results"
         subtitle={`${formatDateTime(summary.startedAt)} · ${counts(summary)}`}
@@ -1293,7 +1328,16 @@ function NeedsYouForm({ hit }: { hit: JobHit }) {
   );
 }
 
-function QueueJob({ hit, profile }: { hit: JobHit; profile: JobSearchProfile }) {
+function QueueJob({
+  hit,
+  profile,
+  open = false,
+}: {
+  hit: JobHit;
+  profile: JobSearchProfile;
+  /** Answers shown at first (they are folded away otherwise). */
+  open?: boolean;
+}) {
   const headingId = useId();
   const draft = hit.draft;
   const contact = profileFields(profile);
@@ -1315,39 +1359,63 @@ function QueueJob({ hit, profile }: { hit: JobHit; profile: JobSearchProfile }) 
           {hit.location ? ` · ${hit.location}` : ''}
         </p>
       </div>
-      <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[14rem_1fr]">
-        <dt className="text-fg-3">Application link</dt>
-        <dd>
-          <a
-            className="link break-all underline"
-            href={hit.applyLink}
-            target="_blank"
-            rel="noreferrer"
-          >
-            {hit.applyLink}
-          </a>
-        </dd>
-        {contact.map(([label, value]) => (
-          <div key={label} className="contents">
-            <dt className="text-fg-3">{label}</dt>
-            <dd className="break-words">{value}</dd>
-          </div>
-        ))}
-        {answered.map((answer) => (
-          <div key={answer.question} className="contents">
-            <dt className="text-fg-3">{answer.question}</dt>
-            <dd className="break-words whitespace-pre-line">{answer.option ?? answer.answer}</dd>
-          </div>
-        ))}
-        {draft && (
-          <>
-            <dt className="text-fg-3">Cover letter</dt>
-            <dd className="whitespace-pre-line">{draft.coverLetter}</dd>
-            <dt className="text-fg-3">Why this job</dt>
-            <dd className="whitespace-pre-line">{draft.whyInterested}</dd>
-          </>
-        )}
-      </dl>
+      <p className="text-sm">
+        <a
+          className="link break-all underline"
+          href={hit.applyLink}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Open the application
+          <span className="sr-only">
+            {' '}
+            for {hit.company}, {hit.role}
+          </span>
+        </a>
+      </p>
+      <details open={open} className="group">
+        <summary className="cursor-pointer text-sm font-medium text-fg-2 hover:text-fg">
+          <span className="group-open:hidden">Show answers</span>
+          <span className="hidden group-open:inline">Hide answers</span>
+          <span className="sr-only">
+            {' '}
+            for {hit.company}, {hit.role}
+          </span>
+        </summary>
+        <dl className="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[14rem_1fr]">
+          <dt className="text-fg-3">Application link</dt>
+          <dd>
+            <a
+              className="link break-all underline"
+              href={hit.applyLink}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {hit.applyLink}
+            </a>
+          </dd>
+          {contact.map(([label, value]) => (
+            <div key={label} className="contents">
+              <dt className="text-fg-3">{label}</dt>
+              <dd className="break-words">{value}</dd>
+            </div>
+          ))}
+          {answered.map((answer) => (
+            <div key={answer.question} className="contents">
+              <dt className="text-fg-3">{answer.question}</dt>
+              <dd className="break-words whitespace-pre-line">{answer.option ?? answer.answer}</dd>
+            </div>
+          ))}
+          {draft && (
+            <>
+              <dt className="text-fg-3">Cover letter</dt>
+              <dd className="whitespace-pre-line">{draft.coverLetter}</dd>
+              <dt className="text-fg-3">Why this job</dt>
+              <dd className="whitespace-pre-line">{draft.whyInterested}</dd>
+            </>
+          )}
+        </dl>
+      </details>
       {hit.state === 'needs_you' && (
         <section aria-label="Answers only you can give" className="flex flex-col gap-2">
           <h4 className="text-sm font-semibold text-amber">Only you can answer these</h4>
@@ -1428,11 +1496,71 @@ function ResumeTextBlock() {
   );
 }
 
+type QueueTab = 'ready' | 'needs' | 'finish' | 'older' | 'keyword';
+
+const QUEUE_TABS: { id: QueueTab; label: string }[] = [
+  { id: 'ready', label: 'Ready to apply' },
+  { id: 'needs', label: 'Needs you' },
+  { id: 'finish', label: 'Finish yourself' },
+  { id: 'older', label: 'Older matches' },
+  { id: 'keyword', label: 'Keyword only' },
+];
+
+/** A short list of jobs that are not drafted for the form: the posting, and a way into the queue. */
+function JobRows({ hits, addLabel }: { hits: JobHit[]; addLabel: string | null }) {
+  const action = useHitAction();
+  return (
+    <ul className="flex flex-col gap-2">
+      {hits.map((hit) => (
+        <li
+          key={hit.id}
+          className="flex flex-wrap items-center justify-between gap-3 rounded-tile bg-s2 p-3"
+        >
+          <div className="min-w-0">
+            <p className="font-medium">
+              {hit.company} · {hit.role} <TrackedLabel hit={hit} />
+            </p>
+            <p className="text-sm text-fg-3">
+              {posted(hit)}
+              {hit.location ? ` · ${hit.location}` : ''} ·{' '}
+              <a className="link underline" href={hit.jobLink} target="_blank" rel="noreferrer">
+                posting
+              </a>
+            </p>
+          </div>
+          <div className="flex gap-2">
+            {addLabel && (
+              <button
+                type="button"
+                className="btn-d"
+                disabled={action.isPending}
+                aria-label={`Add to queue: ${hit.company}, ${hit.role}`}
+                onClick={() => action.mutate({ id: hit.id, action: 'queue' })}
+              >
+                {addLabel}
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn-d"
+              disabled={action.isPending}
+              aria-label={`Skip: ${hit.company}, ${hit.role}`}
+              onClick={() => action.mutate({ id: hit.id, action: 'skip' })}
+            >
+              Skip
+            </button>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function ApplyQueuePage() {
   const setup = useJobSearchSetup();
   const available = setup.data?.available === true;
   const queue = useApplyQueue(available);
-  const action = useHitAction();
+  const [params, setParams] = useSearchParams();
 
   if (setup.isPending) return <p className="text-sm text-fg-2">Loading…</p>;
   if (!available || !setup.data?.profile) return <Unavailable />;
@@ -1440,164 +1568,102 @@ export function ApplyQueuePage() {
   if (queue.isPending) return <p className="text-sm text-fg-2">Loading…</p>;
   if (queue.isError) return <p role="alert">Could not load the queue. Try again shortly.</p>;
   const { ready, needsYou, finishYourself, keywordOnly, olderMatches, notDrafted } = queue.data;
+  const groups: Record<QueueTab, JobHit[]> = {
+    ready,
+    needs: needsYou,
+    finish: finishYourself,
+    older: olderMatches,
+    keyword: keywordOnly,
+  };
+  const asked = params.get('tab') as QueueTab | null;
+  // Without a choice: the first group with something in it.
+  const tab: QueueTab =
+    asked && asked in groups
+      ? asked
+      : (QUEUE_TABS.find((entry) => groups[entry.id].length > 0)?.id ?? 'ready');
+  const current = QUEUE_TABS.find((entry) => entry.id === tab) ?? QUEUE_TABS[0];
+  const hits = groups[tab];
 
   return (
     <div className="flex flex-col gap-6">
+      <JobSearchNav current="queue" />
       <PageHeader
         title="Apply queue"
         subtitle="Each job with every answer for its form. Claude in Chrome fills them from this page; you can too."
       />
-      <ResumeTextBlock />
-      {notDrafted > 0 && (
+
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap gap-3">
+          <a className="btn-w" href="/api/resume/file" download>
+            Download resume
+          </a>
+        </div>
+        <details className="rounded-tile bg-s2 p-3">
+          <summary className="cursor-pointer text-sm font-medium">
+            Your standard answers and resume text
+          </summary>
+          <div className="mt-3 flex flex-col gap-4">
+            <StandardAnswers profile={profile} />
+            <ResumeTextBlock />
+          </div>
+        </details>
+      </div>
+
+      <nav
+        aria-label="Queue sections"
+        className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none]"
+      >
+        <ul className="flex gap-2">
+          {QUEUE_TABS.map((entry) => {
+            const active = entry.id === tab;
+            return (
+              <li key={entry.id} className="shrink-0">
+                <button
+                  type="button"
+                  aria-current={active ? 'page' : undefined}
+                  onClick={() => setParams({ tab: entry.id })}
+                  className={`flex min-h-11 items-center gap-2 rounded-full px-4 text-sm transition-colors ${
+                    active ? 'bg-fg text-bg' : 'bg-s2 text-fg-2 hover:text-fg'
+                  }`}
+                >
+                  {entry.label}
+                  <span className="tabular-nums opacity-70">{groups[entry.id].length}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+
+      {notDrafted > 0 && tab === 'ready' && (
         <p className="text-sm text-fg-3">
           {notDrafted} more job{notDrafted === 1 ? ' is' : 's are'} still being drafted; they appear
           here within the hour.
         </p>
       )}
 
-      <section aria-labelledby="ready-heading" className="flex flex-col gap-4">
-        <h2 id="ready-heading" className="text-2xl font-semibold tracking-[-0.03em]">
-          Ready to apply ({ready.length})
+      <section aria-labelledby="queue-section-heading" className="flex flex-col gap-4">
+        <h2 id="queue-section-heading" className="text-2xl font-semibold tracking-[-0.03em]">
+          {current?.label} ({hits.length})
         </h2>
-        {ready.length === 0 && <p className="text-fg-2">Nothing ready right now.</p>}
-        {ready.map((hit) => (
-          <QueueJob key={hit.id} hit={hit} profile={profile} />
-        ))}
+        <p className="text-sm text-fg-3">
+          {tab === 'ready' && 'Drafted and ready. Open a job to see every answer for its form.'}
+          {tab === 'needs' && 'Answer what only you can, then the job moves to Ready to apply.'}
+          {tab === 'finish' &&
+            "These need an account on the company's site, which can't be created for you. The answers are ready to copy."}
+          {tab === 'older' &&
+            'These match your titles and location but were posted before your time window. Add one to have it drafted.'}
+          {tab === 'keyword' &&
+            'These mention your keywords, but the title is a different role. Add one to the queue to have it drafted.'}
+        </p>
+        {hits.length === 0 && <p className="text-fg-2">Nothing here right now.</p>}
+        {(tab === 'ready' || tab === 'needs' || tab === 'finish') &&
+          hits.map((hit) => (
+            <QueueJob key={hit.id} hit={hit} profile={profile} open={tab === 'needs'} />
+          ))}
+        {tab === 'older' && <JobRows hits={hits} addLabel="Add to queue" />}
+        {tab === 'keyword' && <JobRows hits={hits} addLabel="Add to queue" />}
       </section>
-
-      {needsYou.length > 0 && (
-        <section aria-labelledby="needs-heading" className="flex flex-col gap-4">
-          <h2 id="needs-heading" className="text-2xl font-semibold tracking-[-0.03em]">
-            Needs you ({needsYou.length})
-          </h2>
-          <p className="text-sm text-fg-3">
-            Answer what only you can, then the job moves to Ready to apply.
-          </p>
-          {needsYou.map((hit) => (
-            <QueueJob key={hit.id} hit={hit} profile={profile} />
-          ))}
-        </section>
-      )}
-
-      <StandardAnswers profile={profile} />
-
-      {finishYourself.length > 0 && (
-        <section aria-labelledby="finish-heading" className="flex flex-col gap-4">
-          <h2 id="finish-heading" className="text-2xl font-semibold tracking-[-0.03em]">
-            Finish yourself ({finishYourself.length})
-          </h2>
-          <p className="text-sm text-fg-3">
-            These need an account on the company's site, which can't be created for you. The answers
-            are ready to copy.
-          </p>
-          {finishYourself.map((hit) => (
-            <QueueJob key={hit.id} hit={hit} profile={profile} />
-          ))}
-        </section>
-      )}
-
-      {keywordOnly.length > 0 && (
-        <section aria-labelledby="keyword-heading" className="flex flex-col gap-3">
-          <h2 id="keyword-heading" className="text-2xl font-semibold tracking-[-0.03em]">
-            Keyword only ({keywordOnly.length})
-          </h2>
-          <p className="text-sm text-fg-3">
-            These mention your keywords, but the title is a different role. Add one to the queue to
-            have it drafted.
-          </p>
-          <ul className="flex flex-col gap-2">
-            {keywordOnly.map((hit) => (
-              <li
-                key={hit.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-tile bg-s2 p-3"
-              >
-                <div>
-                  <p className="font-medium">
-                    {hit.company} · {hit.role} <TrackedLabel hit={hit} />
-                  </p>
-                  <p className="text-sm text-fg-3">
-                    {posted(hit)} ·{' '}
-                    <a
-                      className="link underline"
-                      href={hit.jobLink}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      posting
-                    </a>
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className="btn-d"
-                    disabled={action.isPending}
-                    aria-label={`Add to queue: ${hit.company}, ${hit.role}`}
-                    onClick={() => action.mutate({ id: hit.id, action: 'queue' })}
-                  >
-                    Add to queue
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-d"
-                    disabled={action.isPending}
-                    aria-label={`Skip: ${hit.company}, ${hit.role}`}
-                    onClick={() => action.mutate({ id: hit.id, action: 'skip' })}
-                  >
-                    Skip
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-      {olderMatches.length > 0 && (
-        <section aria-labelledby="older-heading" className="flex flex-col gap-3">
-          <h2 id="older-heading" className="text-2xl font-semibold tracking-[-0.03em]">
-            Older matches ({olderMatches.length})
-          </h2>
-          <p className="text-sm text-fg-3">
-            These match your titles and location, but were posted before your time window. They were
-            open when found; add one to the queue to have it drafted.
-          </p>
-          <ul className="flex flex-col gap-2">
-            {olderMatches.map((hit) => (
-              <li
-                key={hit.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-tile bg-s2 p-3"
-              >
-                <div>
-                  <p className="font-medium">
-                    {hit.company} · {hit.role} <TrackedLabel hit={hit} />
-                  </p>
-                  <p className="text-sm text-fg-3">
-                    {posted(hit)}
-                    {hit.location ? ` · ${hit.location}` : ''} ·{' '}
-                    <a
-                      className="link underline"
-                      href={hit.jobLink}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      posting
-                    </a>
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="btn-d"
-                  disabled={action.isPending}
-                  aria-label={`Add to queue: ${hit.company}, ${hit.role}`}
-                  onClick={() => action.mutate({ id: hit.id, action: 'queue' })}
-                >
-                  Add to queue
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
     </div>
   );
 }

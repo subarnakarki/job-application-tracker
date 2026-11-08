@@ -569,7 +569,8 @@ describe('assembleDraft', () => {
 describe('chromePrompt', () => {
   it('points at the queue and carries every safety rule, with no personal data', () => {
     const prompt = chromePrompt('https://jat.vercel.app/');
-    expect(prompt).toContain('Open https://jat.vercel.app/apply-queue');
+    expect(prompt).toContain('Open https://jat.vercel.app/apply-queue?tab=ready');
+    expect(prompt).toContain('Show answers');
     for (const rule of [
       'wait for me to say "go"',
       '"go all"',

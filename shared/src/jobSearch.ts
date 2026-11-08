@@ -1361,11 +1361,11 @@ export function chromePrompt(origin: string): string {
   const queue = `${origin.replace(/\/+$/, '')}/apply-queue`;
   return `You are running my recurring job-application workflow in my browser.
 
-1. Open ${queue} (I am signed in there). It lists every job my tracker has drafted, under "Ready to apply". Before applying, show me the list: company, role, time posted and link for each, with the "Keyword only" and "Finish yourself" jobs listed separately.
+1. Open ${queue}?tab=ready (I am signed in there). The queue is split into tabs; the "Ready to apply" tab lists every job my tracker has drafted. Before applying, show me the list: company, role, time posted and link for each, then list the jobs on the "Keyword only" and "Finish yourself" tabs separately.
 
-2. For each job under "Ready to apply", one at a time:
-   - Open its application link. Fill in every field using only the answers listed for that job on the queue page, matching each question by its wording. For a choice question, pick the option given.
-   - Attach my resume: use "Download resume" on the queue page, then attach that file. If attaching a file is not possible, use the form's "Enter manually" option and paste the resume text shown on the queue page.
+2. For each job on the "Ready to apply" tab, one at a time:
+   - Press "Show answers" on its card to see every answer. Open its application link. Fill in every field using only the answers listed for that job on the queue page, matching each question by its wording. For a choice question, pick the option given.
+   - Attach my resume: use "Download resume" on the queue page, then attach that file. If attaching a file is not possible, use the form's "Enter manually" option and paste the resume text shown under "Your standard answers and resume text" on the queue page.
    - For a cover letter box, paste the cover letter given for that job.
    - Before submitting, show me the filled form and wait for me to say "go". Once I say "go all", stop asking and submit the rest yourself.
    - After submitting, wait for the confirmation message, then return to the queue page and press "Mark applied" for that job.

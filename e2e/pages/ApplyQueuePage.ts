@@ -13,6 +13,20 @@ export class ApplyQueuePage {
     await this.heading.waitFor();
   }
 
+  /** Switches to a tab of the queue ("Ready to apply", "Needs you", ...). */
+  async openTab(name: string) {
+    await this.page
+      .getByRole('navigation', { name: 'Queue sections' })
+      .getByRole('button', { name: new RegExp(`^${name} \\d+$`) })
+      .click();
+    await this.page.getByRole('heading', { name: new RegExp(`^${name} \\(`), level: 2 }).waitFor();
+  }
+
+  /** Unfolds a job's answers (folded away on its card at first). */
+  async showAnswers(job: Locator) {
+    await job.locator('summary', { hasText: 'Show answers' }).click();
+  }
+
   /** A section of the queue ("Ready to apply", "Needs you", ...), by its heading. */
   section(name: RegExp): Locator {
     return this.page.locator('section').filter({
