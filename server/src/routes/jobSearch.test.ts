@@ -10,14 +10,15 @@ import {
   type JobSearchProfile,
   type ModelDraft,
   type SearchSource,
+  type TailorAnswer,
 } from '@jat/shared';
 import type { LightMyRequestResponse } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import type { JobSearchClaude } from '../jobsearch/claude';
+import type { JobSearchClaude, TailorRequest } from '../jobsearch/claude';
 import { FetchError, type PageFetcher } from '../postings/fetchPage';
 import { createTestApp, SAME_ORIGIN, T0, type TestApp } from '../test/app';
 import { TEST_DATABASE_URL } from '../test/testDb';
-import { CHECK_RULE, MANUAL_RUN_RULE } from './jobSearch';
+import { CHECK_RULE, MANUAL_RUN_RULE, TAILOR_RULE } from './jobSearch';
 
 const MISSING_ID = '00000000-0000-4000-8000-000000000000';
 const CRON_SECRET = 'cron-secret-for-tests-0123456789abcdef';
@@ -79,6 +80,9 @@ interface StubClaude extends JobSearchClaude {
   draftsFail: boolean;
   /** The posting keywords every draft returns. */
   keywords: string[];
+  /** What "Tailor my resume" answers, and what it was asked. */
+  tailorAnswer: TailorAnswer | null;
+  tailorRequests: TailorRequest[];
 }
 const claude: StubClaude = {
   links: [101, 102, 103, 104].map(jobLink),
@@ -87,6 +91,12 @@ const claude: StubClaude = {
   drafts: 0,
   draftsFail: false,
   keywords: [],
+  tailorAnswer: null,
+  tailorRequests: [],
+  tailor(request: TailorRequest) {
+    claude.tailorRequests.push(request);
+    return Promise.resolve(claude.tailorAnswer);
+  },
   search(query: string, sources: SearchSource[]) {
     claude.searches.push({ query, sources });
     return Promise.resolve({
@@ -189,6 +199,8 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
     claude.drafts = 0;
     claude.draftsFail = false;
     claude.keywords = [];
+    claude.tailorAnswer = null;
+    claude.tailorRequests = [];
     GONE.clear();
     TIMING_OUT.clear();
     t.clock.set(T0);
@@ -721,6 +733,82 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
     });
   });
 
+  describe('tailor my resume', () => {
+    const LINE = 'Senior product manager, eight years of roadmaps.';
+    async function drafted() {
+      claude.keywords = ['roadmaps', 'product manager', 'SQL', 'Figma', 'Jira'];
+      const login = await member();
+      const { hits } = runOf(await run(login.cookie));
+      return { ...login, target: byRole(hits, 'Senior Product Manager') };
+    }
+    const tailor = (cookie: string, id: string) =>
+      send('POST', `/api/job-search/hits/${id}/tailor`, cookie);
+
+    it('stores the checked edits: invented lines dropped, invented facts flagged', async () => {
+      const { cookie, target } = await drafted();
+      claude.tailorAnswer = {
+        edits: [
+          {
+            original: LINE,
+            suggested: 'Senior product manager, eight years of roadmaps planned in Jira with SQL.',
+            keywordsAdded: ['Jira', 'SQL', 'Kubernetes'],
+            why: 'Roadmap work.',
+          },
+          {
+            original: 'Led a Figma design system for 30 teams.',
+            suggested: 'Led a Figma design system for 30 teams.',
+            keywordsAdded: ['Figma'],
+            why: 'Invented.',
+          },
+        ],
+        notCovered: [{ keyword: 'Figma', why: 'No design tools in the resume.' }],
+      };
+
+      const hit = hitOf(await tailor(cookie, target.id));
+
+      expect(claude.tailorRequests[0]).toMatchObject({
+        company: target.company,
+        role: 'Senior Product Manager',
+        missing: ['SQL', 'Figma', 'Jira'],
+      });
+      expect(hit.tailoring).toMatchObject({
+        edits: [
+          {
+            original: 'Senior product manager, eight years of roadmaps.',
+            keywordsAdded: ['SQL', 'Jira'],
+            unverified: ['SQL', 'Jira'],
+          },
+        ],
+        notCovered: [{ keyword: 'Figma', why: 'No design tools in the resume.' }],
+        model: 'claude-opus-5-5',
+        createdAt: T0.toISOString(),
+      });
+
+      // Asking again replaces the suggestions.
+      claude.tailorAnswer = { edits: [], notCovered: [] };
+      expect(hitOf(await tailor(cookie, target.id)).tailoring?.edits).toEqual([]);
+    });
+
+    it('says why it cannot tailor: no keywords yet, a failed answer, the daily limit', async () => {
+      const { cookie, target } = await drafted();
+      expect((await tailor(cookie, target.id)).statusCode).toBe(502);
+
+      claude.tailorAnswer = { edits: [], notCovered: [] };
+      for (let index = 1; index < TAILOR_RULE.limit; index += 1)
+        expect((await tailor(cookie, target.id)).statusCode).toBe(200);
+      const limited = await tailor(cookie, target.id);
+      expect(limited.statusCode).toBe(429);
+
+      await t.db.query("update job_search_hits set draft = draft - 'keywords' where id = $1", [
+        target.id,
+      ]);
+      await t.db.query("delete from rate_limits where key like 'job-search%'");
+      const noKeywords = await tailor(cookie, target.id);
+      expect(noKeywords.statusCode).toBe(409);
+      expect(noKeywords.json()).toMatchObject({ error: 'no_keywords' });
+    });
+  });
+
   describe('the data export', () => {
     it('includes the setup, the runs and the jobs found', async () => {
       const { cookie } = await member();
@@ -749,6 +837,7 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
         ['POST', `/api/job-search/hits/{id}/blocked`, { reason: 'x' }],
         ['POST', `/api/job-search/hits/{id}/skip`, undefined],
         ['POST', `/api/job-search/hits/{id}/closed`, undefined],
+        ['POST', `/api/job-search/hits/{id}/tailor`, undefined],
         ['POST', `/api/job-search/hits/{id}/queue`, undefined],
         ['POST', `/api/job-search/hits/{id}/redraft`, undefined],
         ['PUT', `/api/job-search/hits/{id}/draft`, { answers: [], coverLetter: '' }],

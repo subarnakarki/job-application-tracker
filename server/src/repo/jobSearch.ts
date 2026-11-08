@@ -3,6 +3,8 @@ import {
   ApplicationQuestionSchema,
   JobSearchProfileSchema,
   jobFit,
+  TailoringSchema,
+  type Tailoring,
   trackedMatcher,
   type Status,
   type TrackedApplication,
@@ -237,17 +239,19 @@ interface HitRow {
   application_id: string | null;
   created_at: Date;
   checked_at: Date | null;
+  tailoring: unknown;
 }
 
 const HIT_COLUMNS = `id, run_id, source, job_link, apply_link, company, role, location, work_mode,
   posted_at, kind, reason, state, questions, draft, draft_error, block_reason, application_id,
-  created_at, checked_at`;
+  created_at, checked_at, tailoring`;
 
 const QuestionsSchema = z.array(ApplicationQuestionSchema).nullable();
 
 function toHit(row: HitRow): JobHit {
   const questions = QuestionsSchema.safeParse(row.questions);
   const draft = ApplicationDraftSchema.nullable().safeParse(row.draft);
+  const tailoring = TailoringSchema.nullable().safeParse(row.tailoring);
   return {
     id: row.id,
     runId: row.run_id,
@@ -270,6 +274,7 @@ function toHit(row: HitRow): JobHit {
     createdAt: row.created_at.toISOString(),
     checkedAt: row.checked_at?.toISOString() ?? null,
     fit: null,
+    tailoring: tailoring.success ? tailoring.data : null,
     tracked: null,
   };
 }
@@ -586,4 +591,18 @@ export async function checkSummary(
     lastCheckedAt: row?.last_checked?.toISOString() ?? null,
     closedThisWeek: row?.closed ?? 0,
   };
+}
+
+/** Stores the suggested resume edits for a job (tailoring again replaces them). */
+export async function saveTailoring(
+  db: Queryable,
+  userId: string,
+  id: string,
+  tailoring: Tailoring,
+  now: Date,
+): Promise<void> {
+  await db.query(
+    `update job_search_hits set tailoring = $3, updated_at = $4 where user_id = $1 and id = $2`,
+    [userId, id, JSON.stringify(tailoring), now],
+  );
 }

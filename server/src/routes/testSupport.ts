@@ -297,6 +297,7 @@ export function registerTestRoutes(app: FastifyInstance, deps: TestRouteDeps): v
           : Promise.reject(new FetchError('network', 'test pages only'));
       };
       const claude: JobSearchClaude = {
+        tailor: () => Promise.resolve(null),
         search: () =>
           Promise.resolve({ links: [...pages.values()].map((page) => page.link), searches: 1 }),
         draft: (draftRequest): Promise<ModelDraft> =>

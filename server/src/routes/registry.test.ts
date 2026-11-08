@@ -62,6 +62,7 @@ const ISOLATION_COVERAGE: Record<string, string> = {
   'POST /api/job-search/hits/:id/blocked': 'server/src/routes/jobSearch.test.ts',
   'POST /api/job-search/hits/:id/skip': 'server/src/routes/jobSearch.test.ts',
   'POST /api/job-search/hits/:id/closed': 'server/src/routes/jobSearch.test.ts',
+  'POST /api/job-search/hits/:id/tailor': 'server/src/routes/jobSearch.test.ts',
   'POST /api/job-search/hits/:id/queue': 'server/src/routes/jobSearch.test.ts',
   'POST /api/job-search/hits/:id/redraft': 'server/src/routes/jobSearch.test.ts',
   'PUT /api/job-search/hits/:id/draft': 'server/src/routes/jobSearch.test.ts',

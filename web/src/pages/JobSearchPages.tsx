@@ -1,5 +1,7 @@
 import {
+  applyEdits,
   chromePrompt,
+  jobFit,
   titleSuggestions,
   searchQueries,
   type SearchSource,
@@ -36,6 +38,7 @@ import {
   useResumeText,
   useRunJobSearch,
   useSaveJobSearchProfile,
+  useTailorResume,
   type HitAction,
 } from '../api/hooks';
 import { Breadcrumbs } from '../components/Breadcrumbs';
@@ -1340,6 +1343,172 @@ function NeedsYouForm({ hit }: { hit: JobHit }) {
   );
 }
 
+/**
+ * "Tailor my resume": suggested rewordings of existing resume lines that add the posting's missing
+ * keywords, each checked by the server. The owner picks which to use and copies the result into
+ * their own document.
+ */
+function TailorPanel({ hit }: { hit: JobHit }) {
+  const tailor = useTailorResume();
+  const toast = useToast();
+  const tailoring = hit.tailoring;
+  const [skipped, setSkipped] = useState<Set<number> | null>(null);
+  const resume = useResumeText(tailoring !== null);
+  const fit = hit.fit;
+  if (!fit || (fit.missing.length === 0 && !tailoring)) return null;
+  const job = `${hit.company}, ${hit.role}`;
+  // Suggestions with something to check start unticked; the rest start ticked.
+  const off =
+    skipped ??
+    new Set(
+      (tailoring?.edits ?? []).flatMap((edit, index) => (edit.unverified.length ? [index] : [])),
+    );
+  const chosen = (tailoring?.edits ?? []).filter((_, index) => !off.has(index));
+  const tailoredText = resume.data ? applyEdits(resume.data.text, chosen) : null;
+  const after = tailoredText ? jobFit(hit.draft, tailoredText) : null;
+  const copy = (text: string, done: string) =>
+    void navigator.clipboard
+      .writeText(text)
+      .then(() => toast(done))
+      .catch(() => toast('Copying is blocked in this browser'));
+  const button = (
+    <button
+      type="button"
+      className="btn-d self-start"
+      disabled={tailor.isPending}
+      aria-label={`${tailoring ? 'Tailor again' : 'Tailor my resume'}: ${job}`}
+      onClick={() =>
+        tailor.mutate(hit.id, {
+          onSuccess: () => {
+            setSkipped(null);
+            toast(`Suggestions ready for ${hit.company}`);
+          },
+        })
+      }
+    >
+      {tailor.isPending ? 'Tailoring…' : tailoring ? 'Tailor again' : 'Tailor my resume'}
+    </button>
+  );
+  return (
+    <section aria-label={`Tailored resume: ${job}`} className="flex flex-col gap-3">
+      {!tailoring && (
+        <p className="text-sm text-fg-3">
+          Suggests rewording lines you already have so {fit.missing.slice(0, 3).join(', ')}
+          {fit.missing.length > 3 ? ' and more' : ''} appear where your resume supports them.
+          Nothing is invented, and nothing changes until you copy it. Up to 10 a day.
+        </p>
+      )}
+      {tailor.isPending && (
+        <p role="status" className="text-sm text-fg-3">
+          Reading the posting and your resume. Usually under a minute…
+        </p>
+      )}
+      {tailor.isError && (
+        <p role="alert" className="text-sm text-red">
+          {errorText(tailor.error)}
+        </p>
+      )}
+      {tailoring && (
+        <details open className="rounded-tile bg-s2 p-3">
+          <summary className="cursor-pointer text-sm font-medium">
+            Tailored resume: {String(tailoring.edits.length)} suggestion
+            {tailoring.edits.length === 1 ? '' : 's'}
+          </summary>
+          <div className="mt-3 flex flex-col gap-4">
+            <p className="text-sm" role="status">
+              Fit {String(fit.percent)}%
+              {after ? ` → ${String(after.percent)}% with the ticked edits` : ''}
+            </p>
+            {tailoring.edits.length === 0 && (
+              <p className="text-sm text-fg-3">
+                No honest rewording adds the missing keywords; see below for why.
+              </p>
+            )}
+            <ol className="flex flex-col gap-3">
+              {tailoring.edits.map((edit, index) => (
+                <li key={edit.original} className="flex flex-col gap-2 rounded-tile bg-s3 p-3">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      checked={!off.has(index)}
+                      onChange={(event) => {
+                        const next = new Set(off);
+                        if (event.target.checked) next.delete(index);
+                        else next.add(index);
+                        setSkipped(next);
+                      }}
+                    />
+                    Use suggestion {String(index + 1)}
+                    {edit.keywordsAdded.length > 0 && (
+                      <span className="font-normal text-fg-3">
+                        (adds {edit.keywordsAdded.join(', ')})
+                      </span>
+                    )}
+                  </label>
+                  <dl className="grid gap-2 text-sm sm:grid-cols-2">
+                    <div>
+                      <dt className="text-fg-3">Your line</dt>
+                      <dd>{edit.original}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-fg-3">Suggested</dt>
+                      <dd>{edit.suggested}</dd>
+                    </div>
+                  </dl>
+                  {edit.unverified.length > 0 && (
+                    <p className="text-sm text-amber" role="note">
+                      Check this: not in your resume: {edit.unverified.join(', ')}
+                    </p>
+                  )}
+                  <p className="text-xs text-fg-3">{edit.why}</p>
+                </li>
+              ))}
+            </ol>
+            {tailoring.notCovered.length > 0 && (
+              <div className="flex flex-col gap-1 text-sm">
+                <p className="font-medium">Not added</p>
+                <ul className="flex flex-col gap-1 text-fg-3">
+                  {tailoring.notCovered.map((entry) => (
+                    <li key={entry.keyword}>
+                      {entry.keyword}: {entry.why}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="btn-w"
+                disabled={!tailoredText || chosen.length === 0}
+                onClick={() => tailoredText && copy(tailoredText, 'Tailored resume copied')}
+              >
+                Copy tailored resume
+              </button>
+              <button
+                type="button"
+                className="btn-d"
+                disabled={chosen.length === 0}
+                onClick={() =>
+                  copy(
+                    chosen
+                      .map((edit) => `Before: ${edit.original}\nAfter: ${edit.suggested}`)
+                      .join('\n\n'),
+                    'Changes copied',
+                  )
+                }
+              >
+                Copy changes only
+              </button>
+            </div>
+          </div>
+        </details>
+      )}
+      {button}
+    </section>
+  );
+}
+
 /** "Fit 82%" and the posting's keywords missing from the resume; or how to get a score. */
 function FitLine({ hit }: { hit: JobHit }) {
   if (!hit.draft) return null;
@@ -1465,6 +1634,7 @@ function QueueJob({
           and the standard answers below; mark the job blocked for anything else.
         </p>
       )}
+      <TailorPanel hit={hit} />
       <HitActions hit={hit} />
     </Glow>
   );

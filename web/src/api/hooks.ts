@@ -631,6 +631,19 @@ export function useApplyQueue(enabled = true) {
 
 export type HitAction = 'applied' | 'blocked' | 'skip' | 'queue' | 'redraft' | 'closed';
 
+/** "Tailor my resume": suggested edits for one job, stored on it. */
+export function useTailorResume() {
+  const refresh = useRefreshJobSearch();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiRequest(`/api/job-search/hits/${encodeURIComponent(id)}/tailor`, JobHitSchema, {
+        method: 'POST',
+        body: {},
+      }),
+    onSuccess: refresh,
+  });
+}
+
 /** "Check they're still open": reads each waiting job again; closed ones leave the queue. */
 export function useCheckQueue() {
   const refresh = useRefreshJobSearch();

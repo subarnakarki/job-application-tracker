@@ -66,8 +66,11 @@ export function PrivacyPage() {
           Anthropic&apos;s web search, the jobs found are read from the job boards&apos; public
           pages, and your resume text, each posting and its questions are sent to Anthropic&apos;s
           API to draft your answers. Demographic questions are never sent; they get the answer you
-          chose. The server never sends anything to an employer: you, or Claude in Chrome in your
-          own browser, submit each application.
+          chose. &quot;Tailor my resume&quot; sends your resume text and that posting to Anthropic
+          too, and keeps the suggested edits with the job until you tailor it again. Waiting jobs
+          are read again from their boards about once a day, to see they are still open. The server
+          never sends anything to an employer: you, or Claude in Chrome in your own browser, submit
+          each application.
         </p>
 
         <h2 className="mt-6 text-xl font-semibold tracking-[-0.03em]">Cookies</h2>

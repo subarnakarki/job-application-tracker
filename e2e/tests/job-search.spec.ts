@@ -423,3 +423,63 @@ test('the ready jobs are ordered by fit with the resume, with the missing keywor
     queue.job('Hooli: Senior Product Manager').getByText('Resume fit: Fit 80%'),
   ).toBeVisible();
 });
+
+test('tailor my resume: checked suggestions, the fit after, and the tailored text', async ({
+  page,
+  api,
+  context,
+}) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const rest =
+    '\nRan SQL reports for the growth team.\nWrote product specs and release notes.'.repeat(3);
+  await api.uploadResumeText(
+    `Senior product manager with eight years of roadmaps and launches.${rest}`,
+  );
+  await api.seedJobSearch({
+    profile: PROFILE,
+    jobs: [
+      {
+        board: 'initech',
+        company: 'Initech',
+        title: 'Senior Product Manager',
+        location: 'Remote, US',
+        hoursAgo: 3,
+        content: 'Own the roadmap. '.repeat(20),
+        questions: QUESTIONS.filter((question) => !/clearance/.test(question.label)),
+        keywords: ['roadmaps', 'SQL', 'launches', 'stakeholder management', 'Figma'],
+      },
+    ],
+    answers: { 'Why do you want to work here?': 'Your roadmap work matches my launches.' },
+  });
+  const queue = new ApplyQueuePage(page);
+  await queue.goto();
+  const job = queue.job('Initech: Senior Product Manager');
+  await expect(job.getByText('Resume fit: Fit 60%')).toBeVisible();
+
+  await job
+    .getByRole('button', { name: 'Tailor my resume: Initech, Senior Product Manager' })
+    .click();
+  const panel = job.getByRole('region', {
+    name: 'Tailored resume: Initech, Senior Product Manager',
+  });
+  await expect(panel.getByText('Tailored resume: 1 suggestion')).toBeVisible();
+  await expect(panel).toContainText(
+    'Senior product manager with eight years of roadmaps and launches, including stakeholder management across 12 teams.',
+  );
+  await expect(panel.getByRole('note')).toHaveText('Check this: not in your resume: 12');
+  await expect(panel).toContainText('Figma: No Figma experience in the resume.');
+
+  // A suggestion with something to check starts unticked; ticking it shows the fit after.
+  const use = panel.getByRole('checkbox', { name: /Use suggestion 1/ });
+  await expect(use).not.toBeChecked();
+  await expect(panel.getByRole('status')).toHaveText('Fit 60% → 60% with the ticked edits');
+  await use.check();
+  await expect(panel.getByRole('status')).toHaveText('Fit 60% → 80% with the ticked edits');
+
+  await panel.getByRole('button', { name: 'Copy tailored resume' }).click();
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe(
+      `Senior product manager with eight years of roadmaps and launches, including stakeholder management across 12 teams.${rest}`,
+    );
+});

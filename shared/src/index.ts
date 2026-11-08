@@ -10,3 +10,4 @@ export * from './resume';
 export * from './schemas';
 export * from './stats';
 export * from './status';
+export * from './tailor';

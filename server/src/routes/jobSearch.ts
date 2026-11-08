@@ -1,11 +1,13 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import {
   ApplicationInputSchema,
+  acceptTailoring,
   ApplyQueueSchema,
   BlockHitSchema,
   byFit,
   DraftEditSchema,
   isRunDue,
+  jobRefOf,
   JobHitSchema,
   JobSearchProfileSchema,
   JobSearchRunDetailSchema,
@@ -25,7 +27,8 @@ import { consumeRateLimit, rateLimitKey, type RateLimitRule } from '../auth/rate
 import type { Clock } from '../clock';
 import type { Db } from '../db/types';
 import { ApiError, parseInput } from '../http/errors';
-import type { JobSearchClaude } from '../jobsearch/claude';
+import { JOB_SEARCH_MODEL, type JobSearchClaude } from '../jobsearch/claude';
+import { readJob } from '../jobsearch/readJob';
 import { checkOpenJobs, MANUAL_CHECK_AGE_MS, SCHEDULED_CHECK_AGE_MS } from '../jobsearch/check';
 import { draftHit, draftPending, runJobSearch } from '../jobsearch/run';
 import type { PageFetcher } from '../postings/fetchPage';
@@ -42,6 +45,7 @@ import {
   listRuns,
   saveDraft,
   saveProfile,
+  saveTailoring,
   setHitState,
 } from '../repo/jobSearch';
 import { getResume, getResumeText } from '../repo/resumes';
@@ -58,6 +62,12 @@ export const MANUAL_RUN_RULE: RateLimitRule = {
 export const ALL_RUNS_RULE: RateLimitRule = { name: 'job-search-all', limit: 50, windowMs: DAY_MS };
 /** Single drafts (re-draft, move to queue). */
 export const DRAFT_RULE: RateLimitRule = { name: 'job-search-draft', limit: 30, windowMs: DAY_MS };
+/** "Tailor my resume": one model call each, about $0.10 to $0.20. */
+export const TAILOR_RULE: RateLimitRule = {
+  name: 'job-search-tailor',
+  limit: 10,
+  windowMs: DAY_MS,
+};
 /** "Check they're still open" by hand: each reads up to 60 boards. */
 export const CHECK_RULE: RateLimitRule = { name: 'job-search-check', limit: 6, windowMs: DAY_MS };
 /** A check by hand answers within the request: well under the function limit. */
@@ -89,10 +99,37 @@ export interface JobSearchRouteDeps {
   openToTestUsers?: boolean;
 }
 
-/** Finds nothing and drafts nothing: the stand-in for test users when there is no key. */
+/**
+ * The stand-in for test users when there is no key: finds nothing and drafts nothing; tailoring
+ * rewords the resume's first line to add the first missing keyword, and invents a number, so e2e
+ * tests see a real answer go through the server's checks.
+ */
 const NO_CLAUDE: JobSearchClaude = {
   search: () => Promise.resolve({ links: [], searches: 0 }),
   draft: () => Promise.resolve(null),
+  tailor: (request) => {
+    const line = request.resumeText
+      .split(/\r?\n|(?<=\.)\s+/)
+      .map((entry) => entry.trim())
+      .find((entry) => entry.split(/\s+/).length >= 3);
+    const keyword = request.missing[0];
+    return Promise.resolve({
+      edits:
+        line && keyword
+          ? [
+              {
+                original: line,
+                suggested: `${line.replace(/\.$/, '')}, including ${keyword} across 12 teams.`,
+                keywordsAdded: [keyword],
+                why: "The same work, in the posting's words.",
+              },
+            ]
+          : [],
+      notCovered: request.missing
+        .slice(1, 2)
+        .map((term) => ({ keyword: term, why: `No ${term} experience in the resume.` })),
+    });
+  },
 };
 
 /** Owner-only at first: the users listed in JOB_SEARCH_USER_IDS (comma-separated ids). */
@@ -486,6 +523,55 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
     async ({ db, user, hit }) => {
       if (!['new', 'ready', 'needs_you'].includes(hit.state)) return;
       await setHitState(db, user.id, hit.id, { state: 'closed' }, deps.clock.now());
+    },
+  );
+
+  hitRoute(
+    'tailor',
+    'Tailor my resume: suggested edits of existing resume lines that add the missing keywords',
+    undefined,
+    {
+      409: 'Not drafted with keywords yet, no resume, or the job is done',
+      429: 'Too many tailorings today',
+      502: 'The suggestions did not finish',
+    },
+    async ({ db, user, claude, hit, reply }) => {
+      if (!['new', 'ready', 'needs_you'].includes(hit.state))
+        throw new ApiError(409, 'hit_closed', 'This job is already done');
+      const keywords = hit.draft?.keywords;
+      if (!keywords || !hit.fit)
+        throw new ApiError(409, 'no_keywords', 'Redraft this job first to get its keywords');
+      const resume = await getResumeText(db, user.id);
+      if (!resume) throw new ApiError(409, 'no_resume', 'Upload your resume first');
+      await spend(db, TAILOR_RULE, user.id, reply);
+      let postingText = '';
+      const ref = jobRefOf(hit.jobLink);
+      try {
+        if (ref) postingText = (await readJob(ref, deps.fetchPage, deps.fetchBoard)).text;
+      } catch {
+        // The keywords and the title are enough to tailor from.
+      }
+      const answer = await claude.tailor({
+        resumeText: resume.text,
+        company: hit.company,
+        role: hit.role,
+        postingText,
+        missing: hit.fit.missing,
+      });
+      if (!answer)
+        throw new ApiError(502, 'tailor_failed', 'The suggestions did not finish. Try again.');
+      const now = deps.clock.now();
+      await saveTailoring(
+        db,
+        user.id,
+        hit.id,
+        {
+          ...acceptTailoring(answer, resume.text, keywords),
+          model: JOB_SEARCH_MODEL,
+          createdAt: now.toISOString(),
+        },
+        now,
+      );
     },
   );
 

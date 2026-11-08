@@ -10,6 +10,7 @@ import {
   type ResumeTitle,
 } from './resume';
 import { isHttpUrl } from './schemas';
+import { TailoringSchema } from './tailor';
 
 /**
  * Phase 15, scheduled job search: the saved profile, the Google-style query, which job links the
@@ -1387,6 +1388,8 @@ export const JobHitSchema = z.strictObject({
   checkedAt: instantSchema.nullable(),
   /** The resume's fit with the posting's keywords (on each read); null until drafted. */
   fit: JobFitSchema.nullable(),
+  /** Suggested resume edits for this job ("Tailor my resume"); null until asked for. */
+  tailoring: TailoringSchema.nullable(),
   /** The application in the tracker for this same job, when there is one (checked on each read). */
   tracked: z.strictObject({ applicationId: z.uuid(), status: z.enum(STATUSES) }).nullable(),
 });
