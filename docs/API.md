@@ -148,6 +148,11 @@ Open to the users in `JOB_SEARCH_USER_IDS` when `ANTHROPIC_API_KEY` is set; ever
 | POST   | `/api/job-search/hits/:id/blocked` | user   | `{ reason }`                                                          |
 | POST   | `/api/job-search/hits/:id/skip`    | user   |                                                                       |
 | POST   | `/api/job-search/hits/:id/closed`  | user   | The job's page says it is closed (only while it is waiting)           |
+| POST   | `/api/job-search/hits/:id/tailor`  | user   | Suggested edits of existing resume lines that add the posting's       |
+|        |                                    |        | missing keywords, checked by code (an invented line is dropped, a     |
+|        |                                    |        | number or name not in the resume is listed in `unverified`); stored   |
+|        |                                    |        | as the job's `tailoring`. 409 `no_keywords` (redraft first), 502,     |
+|        |                                    |        | 10 a day                                                              |
 | POST   | `/api/job-search/hits/:id/queue`   | user   | A keyword-only job becomes a target and is drafted (30 drafts a day)  |
 | POST   | `/api/job-search/hits/:id/redraft` | user   | Drafts again                                                          |
 | PUT    | `/api/job-search/hits/:id/draft`   | user   | `{ answers: [{ question, answer }], coverLetter }`; answers sent back |

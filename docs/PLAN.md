@@ -794,6 +794,24 @@ Tests, per the conventions:
   fit and shows the missing keywords; Tailor my resume shows side-by-side edits, a flagged number, and copies the
   tailored text (model stubbed through a test-only route).
 
+## Phase 16 outcome
+
+Built as planned (16a, 16b, 16c), with these details:
+
+- **Migration 0012** (state `closed`, `checked_at`, `tailoring`) was applied to Neon before the code.
+- **Still-open check:** a job that could not be read is not marked checked, so the next check tries it again;
+  only a board's clear "gone" closes a job. "Last checked" counts any job, closed ones included.
+- **Fit score** reuses Phase 14c's matcher (`matchPosting`) on the keywords the drafting call now returns;
+  fewer than 5 keywords give no score, as in 14c.
+- **Tailoring checks** (`shared/src/tailor.ts`): a quoted line must be in the resume (case, spacing and
+  punctuation ignored, at least 3 words) and is replaced with its own closing punctuation; numbers, acronyms,
+  mixed-case names, capitalised words mid-sentence and added tools or certifications that the resume never
+  mentions are listed as "check this". Such suggestions start unticked.
+- **Test users without a key** get a predictable stand-in for tailoring (rewords the first line, adds the first
+  missing keyword and an invented number), so e2e covers the server's checks end to end. Pressing "Check
+  they're still open" in e2e would reach the real boards, so e2e covers Mark closed and the API tests cover
+  the check with fake boards.
+
 ## Planned but not built
 
 | Item                                | Status                                                                                                    |
