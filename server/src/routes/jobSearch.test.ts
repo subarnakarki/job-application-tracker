@@ -750,7 +750,8 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
         edits: [
           {
             original: LINE,
-            suggested: 'Senior product manager, eight years of roadmaps planned in Jira with SQL.',
+            suggested:
+              'Senior product manager, eight years of roadmaps planned in Jira with SQL at Google.',
             keywordsAdded: ['Jira', 'SQL', 'Kubernetes'],
             why: 'Roadmap work.',
           },
@@ -776,7 +777,8 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
           {
             original: 'Senior product manager, eight years of roadmaps.',
             keywordsAdded: ['SQL', 'Jira'],
-            unverified: ['SQL', 'Jira'],
+            // An employer the resume never mentions; the skills it adds are judged by their group.
+            unverified: ['Google'],
           },
         ],
         notCovered: [{ keyword: 'Figma', why: 'No design tools in the resume.' }],

@@ -41,6 +41,14 @@ describe('findInResume: the line the model quoted, as the resume writes it', () 
 });
 
 describe('unverifiedIn: numbers and names the resume never mentions', () => {
+  it('judges joined terms whole, and not a skill the edit sets out to add', () => {
+    expect(
+      unverifiedIn('Owned CI/CD and A/B tests, including CI/CD across Node.js', RESUME, [
+        { term: 'CI/CD', group: 'hard_skill' },
+      ]),
+    ).toEqual(['A/B', 'Node.js']);
+  });
+
   it('flags a product or company named mid-sentence, not the first word', () => {
     expect(unverifiedIn('Planned releases in Jira with Playwright suites', RESUME, [])).toEqual([
       'Jira',

@@ -66,11 +66,13 @@ export function findInResume(resumeText: string, quoted: string): string | null 
 
 /** Digits as written, without thousands separators: "2,500" and "2500" are the same number. */
 const NUMBER = /\d[\d,.]*%?/g;
+/** A word with what joins it ("CI/CD", "Node.js", "C++", "A/B"), so it is judged whole. */
+const TERM = /[\p{L}\p{N}]+(?:[/.&+#-][\p{L}\p{N}]+)*[+#]*/gu;
 /** Names a reader would check: acronyms, mixed case or with digits (AWS, GraphQL, k6, S3). */
-const NAME =
-  /\b(?:[A-Z]{2,}[A-Za-z0-9]*|[A-Z][a-z0-9]*[A-Z][A-Za-z0-9]*|[A-Za-z]+\d[A-Za-z0-9]*)\b/g;
-/** A capitalised word in the middle of a sentence: a product, company or place (Jira, Docker). */
-const PROPER = /(?<=[\p{Ll}\p{N},;:)]\s+)\p{Lu}[\p{L}\p{N}+#.-]*[\p{L}\p{N}+#]/gu;
+const isName = (term: string) =>
+  /\p{Lu}.*\p{Lu}/u.test(term) || (/\p{L}/u.test(term) && /\p{N}/u.test(term));
+/** Starts a sentence (where a capital means nothing). */
+const sentenceStart = (text: string, at: number) => /(^|[.!?:]\s*|\n\s*)$/.test(text.slice(0, at));
 const bareNumber = (value: string) => value.replace(/[,%]/g, '').replace(/\.$/, '');
 
 /**
@@ -91,8 +93,15 @@ export function unverifiedIn(
   };
   for (const number of suggested.match(NUMBER) ?? [])
     if (!resumeNumbers.has(bareNumber(number))) flag(number.replace(/[.,]$/, ''));
-  for (const name of suggested.match(NAME) ?? []) if (!index.has(name)) flag(name);
-  for (const name of suggested.match(PROPER) ?? []) if (!index.has(name)) flag(name);
+  // A product, company or tool: an acronym, mixed case, letters with digits, or a capital mid-sentence.
+  // A skill the edit sets out to add is judged below, by its group.
+  const adding = new Set(added.map((keyword) => keyword.term.toLowerCase()));
+  for (const match of suggested.matchAll(TERM)) {
+    const term = match[0];
+    if (/^[\d,.]+%?$/.test(term) || adding.has(term.toLowerCase())) continue;
+    const capitalised = /^\p{Lu}/u.test(term) && !sentenceStart(suggested, match.index);
+    if ((isName(term) || capitalised) && !index.has(term)) flag(term);
+  }
   for (const keyword of added)
     if ((keyword.group === 'tool' || keyword.group === 'certification') && !index.has(keyword.term))
       flag(keyword.term);
