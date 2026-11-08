@@ -2,6 +2,7 @@ import {
   ApplicationDraftSchema,
   ApplicationQuestionSchema,
   JobSearchProfileSchema,
+  jobFit,
   trackedMatcher,
   type Status,
   type TrackedApplication,
@@ -20,6 +21,7 @@ import {
 } from '@jat/shared';
 import { z } from 'zod';
 import type { Queryable } from '../db/types';
+import { getResumeText } from './resumes';
 
 /**
  * All SQL for the job search: the profile, runs and hits. Every statement is scoped by `user_id`,
@@ -267,6 +269,7 @@ function toHit(row: HitRow): JobHit {
     applicationId: row.application_id,
     createdAt: row.created_at.toISOString(),
     checkedAt: row.checked_at?.toISOString() ?? null,
+    fit: null,
     tracked: null,
   };
 }
@@ -293,11 +296,18 @@ export async function listTrackedApplications(
 }
 
 /**
- * Marks each hit that is already in the tracker, checked now (not when found): the application
- * a hit created, else the same posting by link, else the same company and role.
+ * Annotates hits as they are read, never stored: whether each is already in the tracker (the
+ * application a hit created, else the same posting by link, else the same company and role), and
+ * its fit with the resume as it is now.
  */
 async function withTracked(db: Queryable, userId: string, hits: JobHit[]): Promise<JobHit[]> {
   if (hits.length === 0) return hits;
+  const resume = hits.some((hit) => hit.draft?.keywords) ? await getResumeText(db, userId) : null;
+  const scored = hits.map((hit) => ({ ...hit, fit: jobFit(hit.draft, resume?.text ?? null) }));
+  return withApplications(db, userId, scored);
+}
+
+async function withApplications(db: Queryable, userId: string, hits: JobHit[]): Promise<JobHit[]> {
   const applications = await listTrackedApplications(db, userId);
   const byId = new Map(applications.map((application) => [application.id, application]));
   const find = trackedMatcher(applications);

@@ -138,6 +138,9 @@ Open to the users in `JOB_SEARCH_USER_IDS` when `ANTHROPIC_API_KEY` is set; ever
 | GET    | `/api/job-search/runs/:id`         | user   | One run and every job it found                                        |
 | GET    | `/api/job-search/queue`            | user   | `{ ready, needsYou, finishYourself, keywordOnly, olderMatches,`       |
 |        |                                    |        | `notDrafted, checks: { lastCheckedAt, closedThisWeek } }`             |
+|        |                                    |        | Ready and Needs you are sorted by `fit` (best first). Each job's      |
+|        |                                    |        | `fit` is `{ percent, found, missing }` against the current resume,    |
+|        |                                    |        | from the posting keywords its draft kept (null before that)           |
 | POST   | `/api/job-search/queue/check`      | user   | Reads each waiting job again (up to 60); a board that says it is gone |
 |        |                                    |        | closes it. `{ checked, closed, unknown }`. 6 a day; the hourly        |
 |        |                                    |        | schedule also checks each job about once a day                        |

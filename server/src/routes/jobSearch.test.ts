@@ -77,6 +77,8 @@ interface StubClaude extends JobSearchClaude {
   searches: { query: string; sources: SearchSource[] }[];
   drafts: number;
   draftsFail: boolean;
+  /** The posting keywords every draft returns. */
+  keywords: string[];
 }
 const claude: StubClaude = {
   links: [101, 102, 103, 104].map(jobLink),
@@ -84,6 +86,7 @@ const claude: StubClaude = {
   searches: [],
   drafts: 0,
   draftsFail: false,
+  keywords: [],
   search(query: string, sources: SearchSource[]) {
     claude.searches.push({ query, sources });
     return Promise.resolve({
@@ -111,6 +114,7 @@ const claude: StubClaude = {
       })),
       coverLetter: 'Dear Acme team, ...',
       whyInterested: 'The roadmap work.',
+      keywords: claude.keywords.map((term) => ({ term, group: 'hard_skill' as const })),
     });
   },
 };
@@ -184,6 +188,7 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
     claude.searches = [];
     claude.drafts = 0;
     claude.draftsFail = false;
+    claude.keywords = [];
     GONE.clear();
     TIMING_OUT.clear();
     t.clock.set(T0);
@@ -528,6 +533,37 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
       });
       queue = queueOf(await send('GET', '/api/job-search/queue', cookie));
       expect(queue.ready.map((hit) => hit.id)).toEqual([target.id]);
+    });
+
+    it("scores each drafted job's fit against the current resume, best fit first", async () => {
+      claude.keywords = ['roadmaps', 'product manager', 'SQL', 'Figma', 'Jira'];
+      const { cookie, hits } = await withRun();
+      const target = byRole(hits, 'Senior Product Manager');
+      expect(target.fit).toEqual({
+        percent: 40,
+        found: ['roadmaps', 'product manager'],
+        missing: ['SQL', 'Figma', 'Jira'],
+      });
+      expect(target.draft?.keywords).toHaveLength(5);
+
+      // A new resume rescores every job on the next read, with no new draft.
+      await send('PUT', '/api/resume', cookie, {
+        kind: 'text',
+        text: 'Pat Example. Senior product manager: roadmaps, SQL, Figma and Jira. '.repeat(5),
+      });
+      const queue = queueOf(await send('GET', '/api/job-search/queue', cookie));
+      expect(queue.needsYou[0]?.fit).toMatchObject({ percent: 100, missing: [] });
+      expect(claude.drafts).toBe(1);
+    });
+
+    it('has no fit for a job drafted before keywords were kept', async () => {
+      const { cookie, hits } = await withRun();
+      const target = byRole(hits, 'Senior Product Manager');
+      await t.db.query("update job_search_hits set draft = draft - 'keywords' where id = $1", [
+        target.id,
+      ]);
+      const queue = queueOf(await send('GET', '/api/job-search/queue', cookie));
+      expect(queue.needsYou[0]).toMatchObject({ id: target.id, fit: null });
     });
 
     it('lists older matches, and adds one to the queue', async () => {

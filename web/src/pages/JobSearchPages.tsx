@@ -1340,6 +1340,30 @@ function NeedsYouForm({ hit }: { hit: JobHit }) {
   );
 }
 
+/** "Fit 82%" and the posting's keywords missing from the resume; or how to get a score. */
+function FitLine({ hit }: { hit: JobHit }) {
+  if (!hit.draft) return null;
+  const fit = hit.fit;
+  if (!fit)
+    return (
+      <p className="mt-2 text-sm text-fg-3">
+        {hit.draft.keywords ? 'No fit score (too few keywords).' : 'Redraft to see the fit score.'}
+      </p>
+    );
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+      <Pill>
+        <span className="sr-only">Resume fit: </span>Fit {String(fit.percent)}%
+      </Pill>
+      <span className="text-fg-3">
+        {fit.missing.length > 0
+          ? `Missing from your resume: ${fit.missing.join(', ')}`
+          : 'Every keyword is in your resume'}
+      </span>
+    </div>
+  );
+}
+
 function QueueJob({
   hit,
   profile,
@@ -1370,6 +1394,7 @@ function QueueJob({
           {posted(hit)} · {SOURCE_LABELS[hit.source]}
           {hit.location ? ` · ${hit.location}` : ''}
         </p>
+        <FitLine hit={hit} />
       </div>
       <p className="text-sm">
         <a
@@ -1712,8 +1737,10 @@ export function ApplyQueuePage() {
           {current?.label} ({hits.length})
         </h2>
         <p className="text-sm text-fg-3">
-          {tab === 'ready' && 'Drafted and ready. Open a job to see every answer for its form.'}
-          {tab === 'needs' && 'Answer what only you can, then the job moves to Ready to apply.'}
+          {tab === 'ready' &&
+            'Drafted and ready, best fit with your resume first. Open a job to see every answer for its form.'}
+          {tab === 'needs' &&
+            'Answer what only you can, then the job moves to Ready to apply. Best fit first.'}
           {tab === 'finish' &&
             "These need an account on the company's site, which can't be created for you. The answers are ready to copy."}
           {tab === 'older' &&

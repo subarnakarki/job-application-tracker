@@ -15,7 +15,9 @@ import {
   progressPercent,
   type RunProgress,
   eeoOption,
+  byFit,
   chromePrompt,
+  jobFit,
   DEFAULT_QUERY,
   SEARCH_SOURCES,
   googleSearchUrl,
@@ -32,6 +34,7 @@ import {
   questionsForModel,
   sortJob,
   uniqueJobRefs,
+  type ApplicationDraft,
   type ApplicationQuestion,
   type JobFacts,
   type ModelDraft,
@@ -462,6 +465,66 @@ describe('screening questions answered from the profile', () => {
   });
 });
 
+describe('jobFit and byFit: how well the resume fits a drafted job', () => {
+  const draft = (terms: string[]): ApplicationDraft => ({
+    answers: [],
+    coverLetter: '',
+    whyInterested: '',
+    keywords: terms.map((term) => ({ term, group: 'tool' as const })),
+  });
+  const RESUME =
+    'Senior SDET: Playwright and TypeScript suites, CI/CD in GitHub Actions, Postgres.';
+
+  it('marks each posting keyword found or missing in the current resume, by code', () => {
+    const fit = jobFit(
+      draft(['Playwright', 'TypeScript', 'PostgreSQL', 'Kubernetes', 'k6', 'CI/CD']),
+      RESUME,
+    );
+    expect(fit).toEqual({
+      percent: 67,
+      found: ['Playwright', 'TypeScript', 'PostgreSQL', 'CI/CD'],
+      missing: ['Kubernetes', 'k6'],
+    });
+    // A new resume changes the score, with no new model call.
+    expect(
+      jobFit(
+        draft(['Playwright', 'TypeScript', 'PostgreSQL', 'Kubernetes', 'k6']),
+        RESUME + ' Kubernetes, k6.',
+      )?.percent,
+    ).toBe(100);
+  });
+
+  it('has no score without keywords (an older draft), a resume, or enough keywords', () => {
+    expect(jobFit(null, RESUME)).toBeNull();
+    expect(jobFit({ answers: [], coverLetter: '', whyInterested: '' }, RESUME)).toBeNull();
+    expect(jobFit(draft(['Playwright', 'TypeScript', 'Go', 'Rust', 'Java']), null)).toBeNull();
+    expect(jobFit(draft(['Playwright', 'TypeScript']), RESUME)).toBeNull();
+  });
+
+  it('sorts the best fit first, unscored last, then the newest posting', () => {
+    const job = (id: string, percent: number | null, postedAt: string | null) => ({
+      id,
+      fit: percent === null ? null : { percent, found: [], missing: [] },
+      postedAt,
+      createdAt: '2026-11-01T00:00:00.000Z',
+    });
+    const jobs = [
+      job('none', null, '2026-11-07T00:00:00.000Z'),
+      job('low', 40, '2026-11-07T00:00:00.000Z'),
+      job('high-old', 90, '2026-11-01T00:00:00.000Z'),
+      job('high-new', 90, '2026-11-06T00:00:00.000Z'),
+      job('high-undated', 90, null),
+    ];
+    expect([...jobs].sort(byFit).map((entry) => entry.id)).toEqual([
+      'high-new',
+      'high-old',
+      'high-undated',
+      'low',
+      'none',
+    ]);
+  });
+});
+
 describe('assembleDraft', () => {
   const q = (
     label: string,
@@ -478,6 +541,10 @@ describe('assembleDraft', () => {
     ],
     coverLetter: 'Dear team, ...',
     whyInterested: 'The mission.',
+    keywords: [
+      { term: 'Playwright', group: 'tool' },
+      { term: ' ', group: 'tool' },
+    ],
   };
 
   it('answers profile questions by code and the rest from the draft', () => {
@@ -495,6 +562,8 @@ describe('assembleDraft', () => {
       model,
     );
     expect(needsYou).toBe(false);
+    // The posting's keywords are kept for the fit score; a blank one is dropped.
+    expect(draft.keywords).toEqual([{ term: 'Playwright', group: 'tool' }]);
     expect(draft.answers).toEqual([
       { question: 'First Name', answer: 'Pat', source: 'profile', option: null },
       {
@@ -711,6 +780,7 @@ describe('self-identification answers against real form options', () => {
         answers: [{ question: 'Gender', answer: 'Male', needsCandidate: false }],
         coverLetter: '',
         whyInterested: '',
+        keywords: [],
       },
     );
     expect(needsYou).toBe(false);

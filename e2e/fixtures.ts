@@ -50,6 +50,8 @@ export class Api {
       hoursAgo: number;
       content: string;
       questions: { label: string; required: boolean; options: string[] }[];
+      /** The posting keywords its draft returns (for the fit score). */
+      keywords?: string[];
     }[];
     answers: Record<string, string>;
   }) {

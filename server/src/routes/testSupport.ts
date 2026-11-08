@@ -57,6 +57,8 @@ const JobSearchSeedBody = z.strictObject({
             }),
           )
           .max(30),
+        /** The posting keywords the draft returns (for the fit score). */
+        keywords: z.array(z.string().min(1).max(100)).max(30).default([]),
       }),
     )
     .max(20),
@@ -309,6 +311,11 @@ export function registerTestRoutes(app: FastifyInstance, deps: TestRouteDeps): v
             }),
             coverLetter: `Dear ${draftRequest.company} team, I would love to join as ${draftRequest.role}.`,
             whyInterested: 'The work matches my experience.',
+            keywords: (
+              body.jobs.find(
+                (job) => job.company === draftRequest.company && job.title === draftRequest.role,
+              )?.keywords ?? []
+            ).map((term) => ({ term, group: 'hard_skill' as const })),
           }),
       };
       const result = await runJobSearch(

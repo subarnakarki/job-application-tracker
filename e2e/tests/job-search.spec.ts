@@ -383,3 +383,43 @@ test('a job found closed on its form is marked closed and leaves the queue', asy
     '1 closed this week',
   );
 });
+
+test('the ready jobs are ordered by fit with the resume, with the missing keywords', async ({
+  page,
+  api,
+}) => {
+  await api.uploadResumeText(
+    'Pat Example. Senior product manager: roadmaps, SQL and A/B testing. '.repeat(4),
+  );
+  const job = (company: string, keywords: string[]) => ({
+    board: company.toLowerCase(),
+    company,
+    title: 'Senior Product Manager',
+    location: 'Remote, US',
+    hoursAgo: 3,
+    content: 'Own the roadmap. '.repeat(20),
+    questions: QUESTIONS.filter((question) => !/clearance/.test(question.label)),
+    keywords,
+  });
+  await api.seedJobSearch({
+    profile: PROFILE,
+    jobs: [
+      job('Initech', ['roadmaps', 'Figma', 'Jira', 'Kubernetes', 'SQL']),
+      job('Hooli', ['roadmaps', 'SQL', 'A/B testing', 'product manager', 'Figma']),
+    ],
+    answers: { 'Why do you want to work here?': 'Your roadmap work matches my launches.' },
+  });
+  const queue = new ApplyQueuePage(page);
+  await queue.goto();
+  const cards = queue.section(/^Ready to apply/).getByRole('article');
+  await expect(cards.getByRole('heading', { level: 3 })).toHaveText([
+    'Hooli: Senior Product Manager',
+    'Initech: Senior Product Manager',
+  ]);
+  const initech = queue.job('Initech: Senior Product Manager');
+  await expect(initech.getByText('Resume fit: Fit 40%')).toBeVisible();
+  await expect(initech).toContainText('Missing from your resume: Figma, Jira, Kubernetes');
+  await expect(
+    queue.job('Hooli: Senior Product Manager').getByText('Resume fit: Fit 80%'),
+  ).toBeVisible();
+});

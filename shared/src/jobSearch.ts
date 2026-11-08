@@ -1,7 +1,14 @@
 import { z } from 'zod';
 import { LIMITS, STATUSES, WORK_MODES, type Status, type WorkMode } from './constants';
 import { localDateIn } from './dates';
-import { indexText, type FitLevel, type ResumeTitle } from './resume';
+import {
+  indexText,
+  KEYWORD_GROUPS,
+  matchPosting,
+  POSTING_KEYWORDS_MAX,
+  type FitLevel,
+  type ResumeTitle,
+} from './resume';
 import { isHttpUrl } from './schemas';
 
 /**
@@ -1102,6 +1109,14 @@ export const ApplicationDraftSchema = z.strictObject({
   coverLetter: z.string().max(5000),
   /** "Why this company/role", reusable for similar free-text questions on the form. */
   whyInterested: z.string().max(2000),
+  /**
+   * The posting's ATS keywords, from the drafting call. Found or missing is decided by code against
+   * the current resume on every read (`jobFit`). Absent on drafts made before it existed.
+   */
+  keywords: z
+    .array(z.strictObject({ term: z.string().max(100), group: z.enum(KEYWORD_GROUPS) }))
+    .max(POSTING_KEYWORDS_MAX)
+    .optional(),
 });
 export type ApplicationDraft = z.infer<typeof ApplicationDraftSchema>;
 
@@ -1118,6 +1133,11 @@ export const ModelDraftSchema = z.strictObject({
   ),
   coverLetter: z.string().describe('Under 200 words, specific to this job, grounded in the resume'),
   whyInterested: z.string().describe('Two or three sentences, grounded in the posting and resume'),
+  keywords: z
+    .array(z.strictObject({ term: z.string(), group: z.enum(KEYWORD_GROUPS) }))
+    .describe(
+      'The 10 to 20 terms this posting asks for (skills, tools, certifications), as written in it, most important first',
+    ),
 });
 export type ModelDraft = z.infer<typeof ModelDraftSchema>;
 
@@ -1181,9 +1201,48 @@ export function assembleDraft(
       answers,
       coverLetter: clip(model.coverLetter, 5000),
       whyInterested: clip(model.whyInterested, 2000),
+      keywords: model.keywords
+        .map((keyword) => ({ term: clip(keyword.term, 100), group: keyword.group }))
+        .filter((keyword) => keyword.term)
+        .slice(0, POSTING_KEYWORDS_MAX),
     },
     needsYou,
   };
+}
+
+export const JobFitSchema = z.strictObject({
+  /** Share of the posting's keywords already in the resume, rounded. */
+  percent: z.number().int().min(0).max(100),
+  found: z.array(z.string()),
+  missing: z.array(z.string()),
+});
+export type JobFit = z.infer<typeof JobFitSchema>;
+
+/**
+ * How well the resume fits a drafted job: its posting keywords marked found or missing by code,
+ * against the resume as it is now. Null without a draft, keywords, or a resume (or too few keywords
+ * to be worth a score).
+ */
+export function jobFit(draft: ApplicationDraft | null, resumeText: string | null): JobFit | null {
+  if (!draft?.keywords || resumeText === null) return null;
+  const match = matchPosting({ keywords: draft.keywords }, resumeText);
+  if (!match) return null;
+  return {
+    percent: match.matchPercent,
+    found: match.keywords.filter((keyword) => keyword.found).map((keyword) => keyword.term),
+    missing: match.keywords.filter((keyword) => !keyword.found).map((keyword) => keyword.term),
+  };
+}
+
+/** Best fit first (jobs without a score last), then the newest posting, then the newest found. */
+export function byFit(
+  a: Pick<JobHit, 'fit' | 'postedAt' | 'createdAt'>,
+  b: Pick<JobHit, 'fit' | 'postedAt' | 'createdAt'>,
+): number {
+  const fit = (b.fit?.percent ?? -1) - (a.fit?.percent ?? -1);
+  if (fit !== 0) return fit;
+  const posted = (b.postedAt ?? '').localeCompare(a.postedAt ?? '');
+  return posted !== 0 ? posted : b.createdAt.localeCompare(a.createdAt);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1326,6 +1385,8 @@ export const JobHitSchema = z.strictObject({
   createdAt: instantSchema,
   /** When the job was last read again from its board, to see that it is still open. */
   checkedAt: instantSchema.nullable(),
+  /** The resume's fit with the posting's keywords (on each read); null until drafted. */
+  fit: JobFitSchema.nullable(),
   /** The application in the tracker for this same job, when there is one (checked on each read). */
   tracked: z.strictObject({ applicationId: z.uuid(), status: z.enum(STATUSES) }).nullable(),
 });

@@ -6826,6 +6826,33 @@
                             "whyInterested": {
                               "type": "string",
                               "maxLength": 2000
+                            },
+                            "keywords": {
+                              "maxItems": 30,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "term": {
+                                    "type": "string",
+                                    "maxLength": 100
+                                  },
+                                  "group": {
+                                    "type": "string",
+                                    "enum": [
+                                      "hard_skill",
+                                      "tool",
+                                      "certification",
+                                      "soft_skill"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "term",
+                                  "group"
+                                ],
+                                "additionalProperties": false
+                              }
                             }
                           },
                           "required": [
@@ -6875,6 +6902,41 @@
                           "type": "string",
                           "format": "date-time",
                           "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "fit": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "percent": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100
+                            },
+                            "found": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "missing": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "percent",
+                            "found",
+                            "missing"
+                          ],
+                          "additionalProperties": false
                         },
                         {
                           "type": "null"
@@ -6937,6 +6999,7 @@
                     "applicationId",
                     "createdAt",
                     "checkedAt",
+                    "fit",
                     "tracked"
                   ],
                   "additionalProperties": false
@@ -7270,6 +7333,33 @@
                             "whyInterested": {
                               "type": "string",
                               "maxLength": 2000
+                            },
+                            "keywords": {
+                              "maxItems": 30,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "term": {
+                                    "type": "string",
+                                    "maxLength": 100
+                                  },
+                                  "group": {
+                                    "type": "string",
+                                    "enum": [
+                                      "hard_skill",
+                                      "tool",
+                                      "certification",
+                                      "soft_skill"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "term",
+                                  "group"
+                                ],
+                                "additionalProperties": false
+                              }
                             }
                           },
                           "required": [
@@ -7319,6 +7409,41 @@
                           "type": "string",
                           "format": "date-time",
                           "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "fit": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "percent": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100
+                            },
+                            "found": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "missing": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "percent",
+                            "found",
+                            "missing"
+                          ],
+                          "additionalProperties": false
                         },
                         {
                           "type": "null"
@@ -7381,6 +7506,7 @@
                     "applicationId",
                     "createdAt",
                     "checkedAt",
+                    "fit",
                     "tracked"
                   ],
                   "additionalProperties": false
@@ -7684,6 +7810,33 @@
                             "whyInterested": {
                               "type": "string",
                               "maxLength": 2000
+                            },
+                            "keywords": {
+                              "maxItems": 30,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "term": {
+                                    "type": "string",
+                                    "maxLength": 100
+                                  },
+                                  "group": {
+                                    "type": "string",
+                                    "enum": [
+                                      "hard_skill",
+                                      "tool",
+                                      "certification",
+                                      "soft_skill"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "term",
+                                  "group"
+                                ],
+                                "additionalProperties": false
+                              }
                             }
                           },
                           "required": [
@@ -7733,6 +7886,41 @@
                           "type": "string",
                           "format": "date-time",
                           "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "fit": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "percent": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100
+                            },
+                            "found": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "missing": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "percent",
+                            "found",
+                            "missing"
+                          ],
+                          "additionalProperties": false
                         },
                         {
                           "type": "null"
@@ -7795,6 +7983,7 @@
                     "applicationId",
                     "createdAt",
                     "checkedAt",
+                    "fit",
                     "tracked"
                   ],
                   "additionalProperties": false
@@ -8141,6 +8330,33 @@
                             "whyInterested": {
                               "type": "string",
                               "maxLength": 2000
+                            },
+                            "keywords": {
+                              "maxItems": 30,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "term": {
+                                    "type": "string",
+                                    "maxLength": 100
+                                  },
+                                  "group": {
+                                    "type": "string",
+                                    "enum": [
+                                      "hard_skill",
+                                      "tool",
+                                      "certification",
+                                      "soft_skill"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "term",
+                                  "group"
+                                ],
+                                "additionalProperties": false
+                              }
                             }
                           },
                           "required": [
@@ -8190,6 +8406,41 @@
                           "type": "string",
                           "format": "date-time",
                           "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "fit": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "percent": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100
+                            },
+                            "found": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "missing": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "percent",
+                            "found",
+                            "missing"
+                          ],
+                          "additionalProperties": false
                         },
                         {
                           "type": "null"
@@ -8252,6 +8503,7 @@
                     "applicationId",
                     "createdAt",
                     "checkedAt",
+                    "fit",
                     "tracked"
                   ],
                   "additionalProperties": false
@@ -8565,6 +8817,33 @@
                             "whyInterested": {
                               "type": "string",
                               "maxLength": 2000
+                            },
+                            "keywords": {
+                              "maxItems": 30,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "term": {
+                                    "type": "string",
+                                    "maxLength": 100
+                                  },
+                                  "group": {
+                                    "type": "string",
+                                    "enum": [
+                                      "hard_skill",
+                                      "tool",
+                                      "certification",
+                                      "soft_skill"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "term",
+                                  "group"
+                                ],
+                                "additionalProperties": false
+                              }
                             }
                           },
                           "required": [
@@ -8614,6 +8893,41 @@
                           "type": "string",
                           "format": "date-time",
                           "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "fit": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "percent": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100
+                            },
+                            "found": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "missing": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "percent",
+                            "found",
+                            "missing"
+                          ],
+                          "additionalProperties": false
                         },
                         {
                           "type": "null"
@@ -8676,6 +8990,7 @@
                     "applicationId",
                     "createdAt",
                     "checkedAt",
+                    "fit",
                     "tracked"
                   ],
                   "additionalProperties": false
@@ -8999,6 +9314,33 @@
                             "whyInterested": {
                               "type": "string",
                               "maxLength": 2000
+                            },
+                            "keywords": {
+                              "maxItems": 30,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "term": {
+                                    "type": "string",
+                                    "maxLength": 100
+                                  },
+                                  "group": {
+                                    "type": "string",
+                                    "enum": [
+                                      "hard_skill",
+                                      "tool",
+                                      "certification",
+                                      "soft_skill"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "term",
+                                  "group"
+                                ],
+                                "additionalProperties": false
+                              }
                             }
                           },
                           "required": [
@@ -9048,6 +9390,41 @@
                           "type": "string",
                           "format": "date-time",
                           "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "fit": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "percent": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100
+                            },
+                            "found": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "missing": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "percent",
+                            "found",
+                            "missing"
+                          ],
+                          "additionalProperties": false
                         },
                         {
                           "type": "null"
@@ -9110,6 +9487,7 @@
                     "applicationId",
                     "createdAt",
                     "checkedAt",
+                    "fit",
                     "tracked"
                   ],
                   "additionalProperties": false
@@ -9433,6 +9811,33 @@
                             "whyInterested": {
                               "type": "string",
                               "maxLength": 2000
+                            },
+                            "keywords": {
+                              "maxItems": 30,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "term": {
+                                    "type": "string",
+                                    "maxLength": 100
+                                  },
+                                  "group": {
+                                    "type": "string",
+                                    "enum": [
+                                      "hard_skill",
+                                      "tool",
+                                      "certification",
+                                      "soft_skill"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "term",
+                                  "group"
+                                ],
+                                "additionalProperties": false
+                              }
                             }
                           },
                           "required": [
@@ -9482,6 +9887,41 @@
                           "type": "string",
                           "format": "date-time",
                           "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "fit": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "percent": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100
+                            },
+                            "found": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "missing": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "percent",
+                            "found",
+                            "missing"
+                          ],
+                          "additionalProperties": false
                         },
                         {
                           "type": "null"
@@ -9544,6 +9984,7 @@
                     "applicationId",
                     "createdAt",
                     "checkedAt",
+                    "fit",
                     "tracked"
                   ],
                   "additionalProperties": false
@@ -10903,6 +11344,33 @@
                                   "whyInterested": {
                                     "type": "string",
                                     "maxLength": 2000
+                                  },
+                                  "keywords": {
+                                    "maxItems": 30,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "term": {
+                                          "type": "string",
+                                          "maxLength": 100
+                                        },
+                                        "group": {
+                                          "type": "string",
+                                          "enum": [
+                                            "hard_skill",
+                                            "tool",
+                                            "certification",
+                                            "soft_skill"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "term",
+                                        "group"
+                                      ],
+                                      "additionalProperties": false
+                                    }
                                   }
                                 },
                                 "required": [
@@ -10952,6 +11420,41 @@
                                 "type": "string",
                                 "format": "date-time",
                                 "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "fit": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "percent": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 100
+                                  },
+                                  "found": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "missing": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "percent",
+                                  "found",
+                                  "missing"
+                                ],
+                                "additionalProperties": false
                               },
                               {
                                 "type": "null"
@@ -11014,6 +11517,7 @@
                           "applicationId",
                           "createdAt",
                           "checkedAt",
+                          "fit",
                           "tracked"
                         ],
                         "additionalProperties": false
@@ -11226,6 +11730,33 @@
                                   "whyInterested": {
                                     "type": "string",
                                     "maxLength": 2000
+                                  },
+                                  "keywords": {
+                                    "maxItems": 30,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "term": {
+                                          "type": "string",
+                                          "maxLength": 100
+                                        },
+                                        "group": {
+                                          "type": "string",
+                                          "enum": [
+                                            "hard_skill",
+                                            "tool",
+                                            "certification",
+                                            "soft_skill"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "term",
+                                        "group"
+                                      ],
+                                      "additionalProperties": false
+                                    }
                                   }
                                 },
                                 "required": [
@@ -11275,6 +11806,41 @@
                                 "type": "string",
                                 "format": "date-time",
                                 "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "fit": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "percent": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 100
+                                  },
+                                  "found": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "missing": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "percent",
+                                  "found",
+                                  "missing"
+                                ],
+                                "additionalProperties": false
                               },
                               {
                                 "type": "null"
@@ -11337,6 +11903,7 @@
                           "applicationId",
                           "createdAt",
                           "checkedAt",
+                          "fit",
                           "tracked"
                         ],
                         "additionalProperties": false
@@ -11549,6 +12116,33 @@
                                   "whyInterested": {
                                     "type": "string",
                                     "maxLength": 2000
+                                  },
+                                  "keywords": {
+                                    "maxItems": 30,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "term": {
+                                          "type": "string",
+                                          "maxLength": 100
+                                        },
+                                        "group": {
+                                          "type": "string",
+                                          "enum": [
+                                            "hard_skill",
+                                            "tool",
+                                            "certification",
+                                            "soft_skill"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "term",
+                                        "group"
+                                      ],
+                                      "additionalProperties": false
+                                    }
                                   }
                                 },
                                 "required": [
@@ -11598,6 +12192,41 @@
                                 "type": "string",
                                 "format": "date-time",
                                 "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "fit": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "percent": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 100
+                                  },
+                                  "found": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "missing": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "percent",
+                                  "found",
+                                  "missing"
+                                ],
+                                "additionalProperties": false
                               },
                               {
                                 "type": "null"
@@ -11660,6 +12289,7 @@
                           "applicationId",
                           "createdAt",
                           "checkedAt",
+                          "fit",
                           "tracked"
                         ],
                         "additionalProperties": false
@@ -11872,6 +12502,33 @@
                                   "whyInterested": {
                                     "type": "string",
                                     "maxLength": 2000
+                                  },
+                                  "keywords": {
+                                    "maxItems": 30,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "term": {
+                                          "type": "string",
+                                          "maxLength": 100
+                                        },
+                                        "group": {
+                                          "type": "string",
+                                          "enum": [
+                                            "hard_skill",
+                                            "tool",
+                                            "certification",
+                                            "soft_skill"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "term",
+                                        "group"
+                                      ],
+                                      "additionalProperties": false
+                                    }
                                   }
                                 },
                                 "required": [
@@ -11921,6 +12578,41 @@
                                 "type": "string",
                                 "format": "date-time",
                                 "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "fit": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "percent": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 100
+                                  },
+                                  "found": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "missing": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "percent",
+                                  "found",
+                                  "missing"
+                                ],
+                                "additionalProperties": false
                               },
                               {
                                 "type": "null"
@@ -11983,6 +12675,7 @@
                           "applicationId",
                           "createdAt",
                           "checkedAt",
+                          "fit",
                           "tracked"
                         ],
                         "additionalProperties": false
@@ -12195,6 +12888,33 @@
                                   "whyInterested": {
                                     "type": "string",
                                     "maxLength": 2000
+                                  },
+                                  "keywords": {
+                                    "maxItems": 30,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "term": {
+                                          "type": "string",
+                                          "maxLength": 100
+                                        },
+                                        "group": {
+                                          "type": "string",
+                                          "enum": [
+                                            "hard_skill",
+                                            "tool",
+                                            "certification",
+                                            "soft_skill"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "term",
+                                        "group"
+                                      ],
+                                      "additionalProperties": false
+                                    }
                                   }
                                 },
                                 "required": [
@@ -12244,6 +12964,41 @@
                                 "type": "string",
                                 "format": "date-time",
                                 "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "fit": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "percent": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 100
+                                  },
+                                  "found": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "missing": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "percent",
+                                  "found",
+                                  "missing"
+                                ],
+                                "additionalProperties": false
                               },
                               {
                                 "type": "null"
@@ -12306,6 +13061,7 @@
                           "applicationId",
                           "createdAt",
                           "checkedAt",
+                          "fit",
                           "tracked"
                         ],
                         "additionalProperties": false
@@ -13240,6 +13996,33 @@
                                   "whyInterested": {
                                     "type": "string",
                                     "maxLength": 2000
+                                  },
+                                  "keywords": {
+                                    "maxItems": 30,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "term": {
+                                          "type": "string",
+                                          "maxLength": 100
+                                        },
+                                        "group": {
+                                          "type": "string",
+                                          "enum": [
+                                            "hard_skill",
+                                            "tool",
+                                            "certification",
+                                            "soft_skill"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "term",
+                                        "group"
+                                      ],
+                                      "additionalProperties": false
+                                    }
                                   }
                                 },
                                 "required": [
@@ -13289,6 +14072,41 @@
                                 "type": "string",
                                 "format": "date-time",
                                 "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "fit": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "percent": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 100
+                                  },
+                                  "found": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "missing": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "percent",
+                                  "found",
+                                  "missing"
+                                ],
+                                "additionalProperties": false
                               },
                               {
                                 "type": "null"
@@ -13351,6 +14169,7 @@
                           "applicationId",
                           "createdAt",
                           "checkedAt",
+                          "fit",
                           "tracked"
                         ],
                         "additionalProperties": false
@@ -13904,6 +14723,33 @@
                                   "whyInterested": {
                                     "type": "string",
                                     "maxLength": 2000
+                                  },
+                                  "keywords": {
+                                    "maxItems": 30,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "term": {
+                                          "type": "string",
+                                          "maxLength": 100
+                                        },
+                                        "group": {
+                                          "type": "string",
+                                          "enum": [
+                                            "hard_skill",
+                                            "tool",
+                                            "certification",
+                                            "soft_skill"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "term",
+                                        "group"
+                                      ],
+                                      "additionalProperties": false
+                                    }
                                   }
                                 },
                                 "required": [
@@ -13953,6 +14799,41 @@
                                 "type": "string",
                                 "format": "date-time",
                                 "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "fit": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "percent": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 100
+                                  },
+                                  "found": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "missing": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "percent",
+                                  "found",
+                                  "missing"
+                                ],
+                                "additionalProperties": false
                               },
                               {
                                 "type": "null"
@@ -14015,6 +14896,7 @@
                           "applicationId",
                           "createdAt",
                           "checkedAt",
+                          "fit",
                           "tracked"
                         ],
                         "additionalProperties": false
@@ -17901,6 +18783,33 @@
                                       "whyInterested": {
                                         "type": "string",
                                         "maxLength": 2000
+                                      },
+                                      "keywords": {
+                                        "maxItems": 30,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "term": {
+                                              "type": "string",
+                                              "maxLength": 100
+                                            },
+                                            "group": {
+                                              "type": "string",
+                                              "enum": [
+                                                "hard_skill",
+                                                "tool",
+                                                "certification",
+                                                "soft_skill"
+                                              ]
+                                            }
+                                          },
+                                          "required": [
+                                            "term",
+                                            "group"
+                                          ],
+                                          "additionalProperties": false
+                                        }
                                       }
                                     },
                                     "required": [
@@ -17950,6 +18859,41 @@
                                     "type": "string",
                                     "format": "date-time",
                                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "fit": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "percent": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 100
+                                      },
+                                      "found": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "missing": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "percent",
+                                      "found",
+                                      "missing"
+                                    ],
+                                    "additionalProperties": false
                                   },
                                   {
                                     "type": "null"
@@ -18012,6 +18956,7 @@
                               "applicationId",
                               "createdAt",
                               "checkedAt",
+                              "fit",
                               "tracked"
                             ],
                             "additionalProperties": false

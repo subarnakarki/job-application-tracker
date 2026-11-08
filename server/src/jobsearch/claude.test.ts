@@ -160,6 +160,7 @@ describe('claudeJobSearch.draft', () => {
     answers: [{ question: 'Why us?', answer: 'Because.', needsCandidate: false }],
     coverLetter: 'Dear Acme',
     whyInterested: 'Testing.',
+    keywords: [{ term: 'Playwright', group: 'tool' }],
   };
 
   it('returns the draft, sent as delimited blocks with the questions numbered', async () => {

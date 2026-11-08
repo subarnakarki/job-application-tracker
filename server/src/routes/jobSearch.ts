@@ -3,6 +3,7 @@ import {
   ApplicationInputSchema,
   ApplyQueueSchema,
   BlockHitSchema,
+  byFit,
   DraftEditSchema,
   isRunDue,
   JobHitSchema,
@@ -348,8 +349,10 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
         : [];
       return {
         olderMatches,
-        ready: open.filter((hit) => hit.kind === 'target' && hit.state === 'ready'),
-        needsYou: open.filter((hit) => hit.kind === 'target' && hit.state === 'needs_you'),
+        ready: open.filter((hit) => hit.kind === 'target' && hit.state === 'ready').sort(byFit),
+        needsYou: open
+          .filter((hit) => hit.kind === 'target' && hit.state === 'needs_you')
+          .sort(byFit),
         finishYourself: open.filter((hit) => hit.kind === 'finish_yourself'),
         keywordOnly: open.filter((hit) => hit.kind === 'keyword_only'),
         notDrafted: open.filter((hit) => hit.kind === 'target' && hit.state === 'new').length,
