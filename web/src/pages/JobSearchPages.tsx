@@ -1,5 +1,6 @@
 import {
   chromePrompt,
+  titleSuggestions,
   searchQueries,
   type SearchSource,
   trackedLabel,
@@ -28,6 +29,8 @@ import {
   useJobSearchRuns,
   useJobSearchSetup,
   useMe,
+  useResumeAnalyses,
+  useResumeAnalysis,
   useResumeText,
   useRunJobSearch,
   useSaveJobSearchProfile,
@@ -38,6 +41,7 @@ import { Glow } from '../components/ui/Glow';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Pill } from '../components/ui/Pill';
 import { formatDateTime } from '../format';
+import { FIT_LABELS } from '../resume';
 import {
   CADENCE_LABELS,
   CADENCES,
@@ -292,6 +296,82 @@ function Summary({ profile }: { profile: JobSearchProfile }) {
   );
 }
 
+const FIT_ORDER = { strong: 0, good: 1, stretch: 2 } as const;
+
+/**
+ * The Resume match's titles, to add to the job titles: strong and good fits ticked, each shortened
+ * to its core ("Senior QA Automation Engineer" -> "QA Automation Engineer"), and those the list
+ * already covers shown as such.
+ */
+function ResumeTitles({ existing, onAdd }: { existing: string; onAdd: (cores: string[]) => void }) {
+  const analyses = useResumeAnalyses();
+  const latest = analyses.data?.items[0]?.id ?? null;
+  const analysis = useResumeAnalysis(latest);
+  const [picked, setPicked] = useState<Set<string> | null>(null);
+  if (!analysis.data) return null;
+  const terms = existing
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const suggestions = titleSuggestions(analysis.data.titles, terms);
+  const open = suggestions.filter((suggestion) => !suggestion.covered);
+  const chosen =
+    picked ?? new Set(open.filter((suggestion) => suggestion.fit !== 'stretch').map((s) => s.core));
+  const toggle = (core: string, on: boolean) => {
+    const next = new Set(chosen);
+    if (on) next.add(core);
+    else next.delete(core);
+    setPicked(next);
+  };
+  const adding = open.filter((suggestion) => chosen.has(suggestion.core));
+  return (
+    <details className="rounded-tile bg-s2 p-3">
+      <summary className="cursor-pointer text-sm font-medium">
+        From your Resume match ({open.length} not on your list yet)
+      </summary>
+      <div className="mt-3 flex flex-col gap-2">
+        <p className="text-xs text-fg-3">
+          Your top {analysis.data.titles.length} titles, shortened to their core so they match more
+          postings. Strong and good fits are ticked.
+        </p>
+        <ul className="flex flex-col" aria-label="Titles from your Resume match">
+          {[...suggestions]
+            .sort((a, b) => FIT_ORDER[a.fit] - FIT_ORDER[b.fit])
+            .map((suggestion) => (
+              <li key={suggestion.core}>
+                {suggestion.covered ? (
+                  <p className="flex min-h-11 items-center gap-2.5 text-sm text-fg-3">
+                    <span aria-hidden="true">✓</span>
+                    {suggestion.core} · already covered
+                  </p>
+                ) : (
+                  <Check
+                    label={`${suggestion.core} · ${FIT_LABELS[suggestion.fit]}`}
+                    checked={chosen.has(suggestion.core)}
+                    onChange={(on) => toggle(suggestion.core, on)}
+                  />
+                )}
+              </li>
+            ))}
+        </ul>
+        <div>
+          <button
+            type="button"
+            className="btn-d"
+            disabled={adding.length === 0}
+            onClick={() => {
+              onAdd(adding.map((suggestion) => suggestion.core));
+              setPicked(null);
+            }}
+          >
+            Add {adding.length} title{adding.length === 1 ? '' : 's'}
+          </button>
+        </div>
+      </div>
+    </details>
+  );
+}
+
 /** A checkbox per job site, the fillable ones first, with Select all and Select none. */
 function SiteChoices({
   sites,
@@ -491,6 +571,21 @@ function SetupForm({ initial, onSaved }: { initial: SetupValues; onSaved: () => 
           label="Job titles to search for"
           hint="One per line, e.g. SDET or QA automation engineer. Searches are made from these, and a job counts as a match when its title has one."
           {...field}
+        />
+        <ResumeTitles
+          existing={values.includeTitles}
+          onAdd={(cores) =>
+            setValues((current) => {
+              const have = current.includeTitles
+                .split('\n')
+                .map((line) => line.trim())
+                .filter(Boolean);
+              const added = cores.filter(
+                (core) => !have.some((line) => line.toLowerCase() === core.toLowerCase()),
+              );
+              return { ...current, includeTitles: [...have, ...added].join('\n') };
+            })
+          }
         />
         <SiteChoices
           sites={values.sites}

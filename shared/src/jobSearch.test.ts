@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   assembleDraft,
+  coreTitle,
+  titleSuggestions,
   searchQueries,
   withoutSites,
   companyKey,
@@ -990,5 +992,65 @@ describe('searchQueries', () => {
   it('loads an older setup as searching every site', () => {
     const old = Object.fromEntries(Object.entries(PROFILE).filter(([key]) => key !== 'sites'));
     expect(JobSearchProfileSchema.parse(old).sites).toEqual([...SEARCH_SOURCES]);
+  });
+});
+
+describe('titles from the Resume match', () => {
+  it.each([
+    [
+      'Senior Software Development Engineer in Test (SDET)',
+      'Software Development Engineer in Test',
+    ],
+    ['Senior QA Automation Engineer', 'QA Automation Engineer'],
+    ['Lead SDET', 'SDET'],
+    ['Staff Software Development Engineer in Test', 'Software Development Engineer in Test'],
+    ['QA Lead', 'QA Lead'],
+    ['Sr. Staff SDET, Customer Engineering', 'SDET'],
+    ['Software Engineer (TypeScript/Node.js)', 'Software Engineer'],
+    ['Senior Software Engineer in Test II', 'Software Engineer in Test'],
+    ['Build and Release Engineer', 'Build and Release Engineer'],
+    ['AI Inference Core - Senior SDET', 'AI Inference Core'],
+    ['Lead', 'Lead'],
+  ])('%s -> %s', (title, core) => {
+    expect(coreTitle(title)).toBe(core);
+  });
+
+  const title = (name: string, fit: 'strong' | 'good' | 'stretch') => ({
+    rank: 1,
+    title: name,
+    fit,
+    seniority: 'Senior' as const,
+    reason: 'r',
+    keywords: [],
+  });
+
+  it('offers each core once, and marks what the list already covers', () => {
+    expect(
+      titleSuggestions(
+        [
+          title('Senior Software Development Engineer in Test (SDET)', 'strong'),
+          title('Lead SDET', 'good'),
+          title('Developer Productivity Engineer', 'good'),
+          title('Senior Developer Productivity Engineer', 'good'),
+          title('QA Manager', 'stretch'),
+        ],
+        ['SDET', 'QA lead'],
+      ),
+    ).toEqual([
+      {
+        title: 'Senior Software Development Engineer in Test (SDET)',
+        fit: 'strong',
+        core: 'Software Development Engineer in Test',
+        covered: true,
+      },
+      { title: 'Lead SDET', fit: 'good', core: 'SDET', covered: true },
+      {
+        title: 'Developer Productivity Engineer',
+        fit: 'good',
+        core: 'Developer Productivity Engineer',
+        covered: false,
+      },
+      { title: 'QA Manager', fit: 'stretch', core: 'QA Manager', covered: false },
+    ]);
   });
 });

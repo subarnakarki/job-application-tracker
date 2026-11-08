@@ -276,3 +276,60 @@ test('a running search shows its progress, step by step', async ({ page, api }) 
   ]);
   await expect(panel.getByRole('status')).toContainText('Reading new jobs…');
 });
+
+test('adds titles from the Resume match to the job titles', async ({ page, api }) => {
+  await api.uploadResumeText('Pat Example. Senior SDET. '.repeat(10));
+  const id = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
+  const title = (rank: number, name: string, fit: 'strong' | 'good' | 'stretch') => ({
+    rank,
+    title: name,
+    fit,
+    seniority: 'Senior',
+    reason: 'r',
+    keywords: [],
+  });
+  // The analysis itself is covered by API tests; here the browser sees a saved one.
+  await page.route('**/api/resume/analyses', (route) =>
+    route.fulfill({
+      json: {
+        items: [{ id, fileName: 'cv.pdf', createdAt: new Date().toISOString(), topTitles: [] }],
+      },
+    }),
+  );
+  await page.route(`**/api/resume/analyses/${id}`, (route) =>
+    route.fulfill({
+      json: {
+        id,
+        fileName: 'cv.pdf',
+        model: 'claude-opus-5-5',
+        createdAt: new Date().toISOString(),
+        summary: 's',
+        gaps: [],
+        warnings: [],
+        titles: [
+          title(1, 'Senior Software Development Engineer in Test (SDET)', 'strong'),
+          title(2, 'Senior QA Automation Engineer', 'strong'),
+          title(3, 'Developer Productivity Engineer', 'good'),
+          title(4, 'DevOps Engineer', 'stretch'),
+        ],
+      },
+    }),
+  );
+  await page.goto('/job-search/setup');
+  const titles = page.getByLabel('Job titles to search for');
+  await titles.fill('SDET');
+
+  await page.getByText(/^From your Resume match/).click();
+  const list = page.getByRole('list', { name: 'Titles from your Resume match' });
+  await expect(list).toContainText('Software Development Engineer in Test · already covered');
+  await expect(
+    list.getByRole('checkbox', { name: 'QA Automation Engineer · Strong fit' }),
+  ).toBeChecked();
+  await expect(list.getByRole('checkbox', { name: 'DevOps Engineer · Stretch' })).not.toBeChecked();
+  await page.getByRole('button', { name: 'Add 2 titles' }).click();
+
+  await expect(titles).toHaveValue('SDET\nQA Automation Engineer\nDeveloper Productivity Engineer');
+  await expect(page.getByRole('list', { name: 'Searches that will run' })).toContainText(
+    '"Developer Productivity Engineer"',
+  );
+});

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { LIMITS, STATUSES, WORK_MODES, type Status, type WorkMode } from './constants';
 import { localDateIn } from './dates';
-import { indexText } from './resume';
+import { indexText, type FitLevel, type ResumeTitle } from './resume';
 import { isHttpUrl } from './schemas';
 
 /**
@@ -753,7 +753,7 @@ const link = z
   .trim()
   .max(LIMITS.profileLink)
   .refine((value) => value === '' || isHttpUrl(value), 'Must be an http(s) link');
-const termList = z.array(required(80)).max(20);
+const termList = z.array(required(80)).max(40);
 
 export const JobSearchProfileSchema = z
   .strictObject({
@@ -1550,4 +1550,75 @@ export function searchQueries(
   }
   const sites = sitePart(profile.sites);
   return bodies.map((body) => (sites ? `${sites} ${body}` : body));
+}
+
+// ---------------------------------------------------------------------------------------------
+// Titles from the Resume match
+
+const LEVEL_WORDS = new Set([
+  'senior',
+  'sr',
+  'staff',
+  'principal',
+  'lead',
+  'junior',
+  'jr',
+  'mid',
+  'entry',
+  'chief',
+  'head',
+]);
+
+/**
+ * The core of a job title, so it matches more postings: no parenthesised or bracketed notes, no
+ * level words in front ("Senior", "Staff", "Lead"), no level number after ("II", "3"), nothing after
+ * a comma or dash (a team or a focus). "QA Lead" keeps its "Lead": it is not in front.
+ */
+export function coreTitle(title: string): string {
+  let core =
+    title
+      .replace(/\([^)]*\)|\[[^\]]*\]/g, ' ')
+      .split(/\s*[,–—]\s*|\s+-\s+/)[0]
+      ?.replace(/\s+/g, ' ')
+      .trim() ?? '';
+  const words = core.split(' ');
+  while (words.length > 1 && LEVEL_WORDS.has((words[0] ?? '').toLowerCase().replace(/\.$/, '')))
+    words.shift();
+  while (words.length > 1 && /^(i{1,3}|iv|v|\d)$/i.test(words.at(-1) ?? '')) words.pop();
+  core = words.join(' ').replace(/\s*\/\s*/g, '/');
+  return core.slice(0, 80);
+}
+
+export interface TitleSuggestion {
+  /** As the Resume match named it. */
+  title: string;
+  fit: FitLevel;
+  /** What would be added to the job titles. */
+  core: string;
+  /** Already matched by a title on the list: adding it would change nothing. */
+  covered: boolean;
+}
+
+/**
+ * The Resume match's titles as job titles to search for: each one's core, and whether the list
+ * already covers it (a title on the list is part of it, e.g. "SDET" covers "Software Development
+ * Engineer in Test"). Each core once, best fit first.
+ */
+export function titleSuggestions(titles: ResumeTitle[], existing: string[]): TitleSuggestion[] {
+  const seen = new Set<string>();
+  const suggestions: TitleSuggestion[] = [];
+  for (const title of titles) {
+    const core = coreTitle(title.title);
+    const key = core.toLowerCase();
+    if (!core || seen.has(key)) continue;
+    seen.add(key);
+    const index = indexText(core);
+    suggestions.push({
+      title: title.title,
+      fit: title.fit,
+      core,
+      covered: existing.some((term) => term.trim() !== '' && index.has(term)),
+    });
+  }
+  return suggestions;
 }

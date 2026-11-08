@@ -9272,7 +9272,7 @@
                               }
                             },
                             "includeTitles": {
-                              "maxItems": 20,
+                              "maxItems": 40,
                               "type": "array",
                               "items": {
                                 "type": "string",
@@ -9280,7 +9280,7 @@
                               }
                             },
                             "skipTitles": {
-                              "maxItems": 20,
+                              "maxItems": 40,
                               "type": "array",
                               "items": {
                                 "type": "string",
@@ -9636,7 +9636,7 @@
                     }
                   },
                   "includeTitles": {
-                    "maxItems": 20,
+                    "maxItems": 40,
                     "type": "array",
                     "items": {
                       "type": "string",
@@ -9644,7 +9644,7 @@
                     }
                   },
                   "skipTitles": {
-                    "maxItems": 20,
+                    "maxItems": 40,
                     "type": "array",
                     "items": {
                       "type": "string",
@@ -9927,7 +9927,7 @@
                               }
                             },
                             "includeTitles": {
-                              "maxItems": 20,
+                              "maxItems": 40,
                               "type": "array",
                               "items": {
                                 "type": "string",
@@ -9935,7 +9935,7 @@
                               }
                             },
                             "skipTitles": {
-                              "maxItems": 20,
+                              "maxItems": 40,
                               "type": "array",
                               "items": {
                                 "type": "string",
@@ -16580,7 +16580,7 @@
                                   }
                                 },
                                 "includeTitles": {
-                                  "maxItems": 20,
+                                  "maxItems": 40,
                                   "type": "array",
                                   "items": {
                                     "type": "string",
@@ -16588,7 +16588,7 @@
                                   }
                                 },
                                 "skipTitles": {
-                                  "maxItems": 20,
+                                  "maxItems": 40,
                                   "type": "array",
                                   "items": {
                                     "type": "string",
