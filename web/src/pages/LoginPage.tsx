@@ -5,7 +5,12 @@ import { useDemoSignIn, useMe } from '../api/hooks';
 import { PublicHeader } from '../components/PublicHeader';
 import { RevealHeading } from '../components/ui/PageHeader';
 import { safeNext } from '../safeNext';
+import boardUrl from '../assets/preview-board.webp';
+import queueUrl from '../assets/preview-queue.webp';
+import resumeUrl from '../assets/preview-resume.webp';
+import tailorUrl from '../assets/preview-tailor.webp';
 import previewUrl from '../assets/signin-preview.webp';
+import { ScreenCarousel, type Screen } from '../components/ScreenCarousel';
 
 /** Why a Google sign-in ended back here (set by the server's callback). */
 const GOOGLE_ERRORS: Record<string, string> = {
@@ -82,6 +87,34 @@ const FEATURES: Feature[] = [
         <path d="m3 7 9 6 9-6" />
       </>
     ),
+  },
+];
+
+const SCREENS: Screen[] = [
+  {
+    src: previewUrl,
+    label: 'Applications',
+    alt: 'The applications page: a count per stage, this week’s next steps, and the list with each stage.',
+  },
+  {
+    src: boardUrl,
+    label: 'Board',
+    alt: 'The board: one column per stage, with a card for each application.',
+  },
+  {
+    src: resumeUrl,
+    label: 'Resume match',
+    alt: 'Resume match: the best-fit titles, each with its keywords marked found or missing.',
+  },
+  {
+    src: queueUrl,
+    label: 'Apply queue',
+    alt: 'The apply queue: tabs with counts, and each job with its fit score and the keywords it is missing.',
+  },
+  {
+    src: tailorUrl,
+    label: 'Tailored resume',
+    alt: 'A tailored resume: a suggested rewording beside the original line, the fit before and after, and a number to check.',
   },
 ];
 
@@ -173,13 +206,7 @@ export function LoginPage() {
 
         <div className="rise rise-7 mx-auto mt-4 max-w-[68rem] px-4 [perspective:1600px] md:px-6">
           <div className="signin-shot overflow-hidden rounded-[1.75rem] bg-s1 p-3 shadow-[inset_0_0_0_1px_var(--color-line-2),0_40px_120px_-30px_rgb(10_139_255/0.45)] md:p-5">
-            <img
-              src={previewUrl}
-              alt=""
-              width={1500}
-              height={1125}
-              className="block w-full rounded-2xl"
-            />
+            <ScreenCarousel screens={SCREENS} />
           </div>
         </div>
 
