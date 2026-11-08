@@ -735,6 +735,65 @@ Built as planned, with these changes and findings:
   **sweeps the boards** of every company found so far (this run's first, up to 40): their own lists hold only
   open jobs with posting days, so fresh, matching jobs come from there; search results fill the remaining room.
 
+## Phase 16 plan: still-open check, fit score, tailored resume (proposed, awaiting approval)
+
+**Goal:** make the apply queue trustworthy and ranked, and help each application land: never send the owner (or
+Claude in Chrome) to a closed job, put the best-fitting jobs first, and suggest honest resume edits for a
+specific job.
+
+### 16a. Check a job is still open
+
+| Area     | Decision                                                                                                                                                                                                                                                                             |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| What     | Every waiting job (state `new`, `ready` or `needs_you`) is read again from its board with the existing readers (`readJob`). A board that says the job is gone (`JobReadError.gone`: 404/410 or "no such job") moves it to a new state, **`closed`**                                  |
+| Not gone | Any other failure (timeout, 429, a changed page) leaves the job as it is: only a clear "gone" closes a job. Workday, iCIMS, Taleo and SuccessFactors have no reader and are not checked                                                                                              |
+| When     | (1) On the hourly cron, once per local day per user, before drafting: up to 60 jobs, oldest check first, within the run's time budget. (2) **Check they're still open** on the apply queue (6 a day, the same 60-job cap). (3) The Claude in Chrome prompt presses that button first |
+| Storage  | Migration `0012`: `checked_at timestamptz`, and `closed` added to the state check. Pushed and applied (Migrate workflow) before the code                                                                                                                                             |
+| UI       | The queue shows "Checked 2 hours ago · 3 closed since found"; closed jobs leave the queue and show as **Closed** on their run page. A job Claude in Chrome finds closed on the live form gets **Mark closed** (the same state, by hand)                                              |
+
+### 16b. Fit score on each job
+
+| Area     | Decision                                                                                                                                                                                                         |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Keywords | No extra model call: the drafting call (which already reads the posting) also returns that posting's 10 to 20 ATS keywords, in the Phase 14c shape (`PostingKeywordsAnswerSchema`). They are stored in the draft |
+| Score    | Plain code, on every read: `matchPosting` against the **current** resume text gives found/missing and a percentage, so replacing the resume updates every score. The model never decides what is "found"         |
+| UI       | Each card shows **Fit 82%** and the missing keywords. **Ready to apply** and **Needs you** sort by fit, then newest. Jobs drafted before this phase show "Redraft to see fit"                                    |
+| API      | `JobHit` gains `fit: { percent, found: string[], missing: string[] } \| null`                                                                                                                                    |
+
+### 16c. Tailored resume for one job
+
+| Area                | Decision                                                                                                                                                                                                                                                                                                                                           |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| What                | **Tailor my resume** on a drafted job. Claude, as a senior recruiter, suggests rewording existing resume lines so the posting's missing keywords appear **where the resume already supports them**                                                                                                                                                 |
+| Answer              | `{ edits: [{ original, suggested, keywordsAdded, why }] (up to 12), notCovered: [{ keyword, why }] }`. A keyword the resume gives no basis for goes in `notCovered` with an honest reason ("no Kubernetes experience in the resume"), never into an edit                                                                                           |
+| Guardrails, by code | An edit is dropped unless its `original` is really in the resume (whitespace and punctuation ignored). Each `keywordsAdded` must be a posting keyword that appears in `suggested`. A number, percentage, employer or tool name in `suggested` that is not in `original` or elsewhere in the resume is **flagged "check this: not in your resume"** |
+| UI                  | Original and suggested side by side, each with an **Use this** checkbox, the fit before and after ("Fit 64% → 85% with these edits"), **Copy tailored resume** (the resume text with the chosen edits applied) and **Copy changes only**. It does not produce a PDF: formatting stays in the owner's own document                                  |
+| Model               | `claude-opus-5-5`, effort `medium`, structured output, the same fallbacks and untrusted-text blocks as drafting. Injected into `buildApp`, so tests never call Anthropic                                                                                                                                                                           |
+| Storage             | `tailoring jsonb` on the job (migration `0012`); tailoring again replaces it                                                                                                                                                                                                                                                                       |
+| Limits              | Owner-only, like the job search. 10 a day per user (`consumeRateLimit`). About $0.10 to $0.20 each                                                                                                                                                                                                                                                 |
+| Route               | `POST /api/job-search/hits/:id/tailor` (`auth: 'user'`, in `ISOLATION_COVERAGE`)                                                                                                                                                                                                                                                                   |
+
+Also `POST /api/job-search/queue/check` (`auth: 'user'`, no id) and `POST /api/job-search/hits/:id/closed`
+(`auth: 'user'`, in `ISOLATION_COVERAGE`).
+
+### Order, deploys and tests
+
+1. `0012` pushed to `main` and applied to Neon (Migrate workflow) before any code that uses it.
+2. 16a, 16b and 16c in that order, each pushed when green (lint, type-check, unit, API, e2e).
+
+Tests, per the conventions:
+
+- **Unit:** the closing rule (gone closes; timeout, 429 and unreadable sources do not); fit scoring and sort order
+  (ties, no draft, an old draft without keywords); tailoring guardrails (an invented `original` dropped, a
+  keyword not in `suggested` removed, a new number or employer flagged, applying chosen edits to the text); the
+  updated Claude in Chrome prompt.
+- **API (real Postgres):** check moves a gone job to `closed` and leaves the others; the daily limit; mark
+  closed; the fit appears on queue reads and changes when the resume is replaced; tailoring with a stub model
+  (stored, replaced, 429 at the limit, not available without a key, another user gets 404).
+- **E2E:** a seeded queue with one closed job: Check they're still open removes it; Ready to apply is ordered by
+  fit and shows the missing keywords; Tailor my resume shows side-by-side edits, a flagged number, and copies the
+  tailored text (model stubbed through a test-only route).
+
 ## Planned but not built
 
 | Item                                | Status                                                                                                    |
