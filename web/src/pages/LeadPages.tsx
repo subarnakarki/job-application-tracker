@@ -28,6 +28,7 @@ import { useSlashToFocus } from '../useSlashToFocus';
 import { useToast } from '../components/Toast';
 import { Avatar } from '../components/ui/Avatar';
 import { Glow } from '../components/ui/Glow';
+import { Breadcrumbs } from '../components/Breadcrumbs';
 import { PageHeader, RevealHeading } from '../components/ui/PageHeader';
 import { Pill } from '../components/ui/Pill';
 import { SearchField } from '../components/ui/SearchField';
@@ -266,6 +267,7 @@ export function NewLeadPage() {
   const toast = useToast();
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
+      <Breadcrumbs items={[{ label: 'Leads', to: '/leads' }, { label: 'Add lead' }]} />
       <PageHeader title="Add lead" />
       <LeadForm
         initial={EMPTY_LEAD}
@@ -305,6 +307,13 @@ export function EditLeadPage() {
   if (!lead) return <p className="text-fg-2">{message}</p>;
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
+      <Breadcrumbs
+        items={[
+          { label: 'Leads', to: '/leads' },
+          { label: lead.name, to: `/leads/${id}` },
+          { label: 'Edit' },
+        ]}
+      />
       <PageHeader title={`Edit ${lead.name}`} />
       <LeadForm
         initial={toLeadValues(lead)}
@@ -480,9 +489,7 @@ export function LeadPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Link to="/leads" className="back-link">
-        ← Back to leads
-      </Link>
+      <Breadcrumbs items={[{ label: 'Leads', to: '/leads' }, { label: lead.name }]} />
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
         <div className="flex min-w-0 items-center gap-4 sm:gap-5">
           <Avatar name={lead.name} color={LEAD_COLOR} size="xl" />

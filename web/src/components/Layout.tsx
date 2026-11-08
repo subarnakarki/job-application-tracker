@@ -5,12 +5,12 @@ import { useOnline } from '../useOnline';
 import { ToastProvider } from './Toast';
 
 const NAV: readonly { to: string; label: string; owns: readonly string[]; gated?: boolean }[] = [
-  { to: '/', label: 'Applications', owns: ['/applications', '/import'] },
+  { to: '/', label: 'Applications', owns: ['/applications'] },
   { to: '/leads', label: 'Leads', owns: ['/leads'] },
   { to: '/stats', label: 'Stats', owns: ['/stats'] },
   { to: '/resume', label: 'Resume', owns: ['/resume'] },
   { to: '/job-search', label: 'Job search', owns: ['/job-search', '/apply-queue'], gated: true },
-  { to: '/account', label: 'Account', owns: ['/account'] },
+  { to: '/account', label: 'Account', owns: ['/account', '/import'] },
 ];
 
 /** Whether the current page belongs to a nav link (the Applications link also covers an application's own pages). */

@@ -19,6 +19,7 @@ import {
   FindPostingButton,
   SuggestionCard,
 } from '../components/PostingDetails';
+import { Breadcrumbs } from '../components/Breadcrumbs';
 import { PageHeader, RevealHeading } from '../components/ui/PageHeader';
 import { Pill } from '../components/ui/Pill';
 import { interviewText } from '../timeline';
@@ -48,6 +49,7 @@ export function NewApplicationPage() {
   const role = params.get('role')?.trim().slice(0, 200) ?? '';
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+      <Breadcrumbs items={[{ label: 'Applications', to: '/' }, { label: 'Add application' }]} />
       <PageHeader
         title="Add application"
         subtitle="Paste a posting link to fill the basics, then add the rest."
@@ -88,6 +90,13 @@ export function EditApplicationPage() {
   if (!application) return <p>{message}</p>;
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+      <Breadcrumbs
+        items={[
+          { label: 'Applications', to: '/' },
+          { label: application.company, to: `/applications/${id}` },
+          { label: 'Edit' },
+        ]}
+      />
       <PageHeader title={`Edit ${application.company}`} />
       <ApplicationForm
         initial={toFormValues(application)}
@@ -145,9 +154,7 @@ export function ApplicationDetailPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Link to="/" className="back-link">
-        ← Back to applications
-      </Link>
+      <Breadcrumbs items={[{ label: 'Applications', to: '/' }, { label: application.company }]} />
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
         <div className="min-w-0">
           <div className="rise mb-3.5 flex flex-wrap items-center gap-2">

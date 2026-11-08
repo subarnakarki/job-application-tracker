@@ -4,6 +4,7 @@ import { useImportAction, useImportRun, type ImportAction } from '../api/hooks';
 import { formatDay } from '../format';
 import { useToast } from '../components/Toast';
 import { Glow } from '../components/ui/Glow';
+import { Breadcrumbs } from '../components/Breadcrumbs';
 import { PageHeader } from '../components/ui/PageHeader';
 
 const CHANGED = new Set<ImportItem['outcome']>(['created', 'status_changed', 'undone']);
@@ -126,6 +127,7 @@ export function ImportResultsPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+      <Breadcrumbs items={[{ label: 'Account', to: '/account' }, { label: 'Gmail import' }]} />
       <PageHeader
         title="Gmail import"
         subtitle={`${details.emailsScanned} emails matched · ${changed.length} changed · ${review.length} to review · ${ignored.length} skipped`}
