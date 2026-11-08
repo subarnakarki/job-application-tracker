@@ -735,7 +735,7 @@ Built as planned, with these changes and findings:
   **sweeps the boards** of every company found so far (this run's first, up to 40): their own lists hold only
   open jobs with posting days, so fresh, matching jobs come from there; search results fill the remaining room.
 
-## Phase 16 plan: still-open check, fit score, tailored resume (proposed, awaiting approval)
+## Phase 16 plan: still-open check, fit score, tailored resume (approved)
 
 **Goal:** make the apply queue trustworthy and ranked, and help each application land: never send the owner (or
 Claude in Chrome) to a closed job, put the best-fitting jobs first, and suggest honest resume edits for a
