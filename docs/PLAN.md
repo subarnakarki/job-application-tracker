@@ -812,6 +812,74 @@ Built as planned (16a, 16b, 16c), with these details:
   they're still open" in e2e would reach the real boards, so e2e covers Mark closed and the API tests cover
   the check with fake boards.
 
+## Phase 17 plan: more screening answers, set once (approved: "create a plan and start implementation")
+
+**Goal:** the screening questions that keep sending jobs to **Needs you** (company history, clearance, export
+control, legal name, pronouns, W2 rate, SMS consent...) are answered once on the setup page and reused on every
+form that asks them. Every new answer is **optional**: left blank, the question waits for the owner as today.
+Found on the first queue review (2026-11-09): 19 jobs in Needs you, 46 distinct questions, most of them the
+same few facts asked in different words.
+
+### 17a. Profile and matching (shared, pure logic)
+
+| Area             | Decision                                                                                                                                                                                                                                                                                                                                                                                         |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Storage          | New keys on the `profile` jsonb, all optional with a `null` default ("not set"), so saved setups still load and **no migration** is needed                                                                                                                                                                                                                                                       |
+| Yes/No answers   | `authorizedUs`, `locatedInUs`, `usCitizen`, `workedForCompanyBefore`, `historyWithCompany`, `relativeAtCompany`, `conflictOfInterest`, `employerRestrictions`, `w2Contract`, `smsConsent`, `otherOpenings`, `canTravel`, `canPerformFunctions`, `certifyTrue`: `'yes' \| 'no' \| null`. Company questions are answered the same for **any** company ("Have you ever worked for a Sony company?") |
+| Choice answers   | `clearance` (`active`, `eligible`, `not_eligible`), `clearanceHeld` (`never`, `confidential`, `secret`, `top_secret`), `exportStatus` (`citizen`, `green_card`, `refugee`, `asylee`, `none`), `usPerson` (`yes`, `soon`, `licensable`), `startTimeline` (`immediately`, `two_weeks`, `month_plus`, `flexible`)                                                                                   |
+| Text answers     | `legalFirstName`, `legalLastName` (blank: from Full name), `birthCountry`, `citizenships`, `otherResidencies`, `w2Rate`, `pronouns`, `sexualOrientation` (blank: the existing "other demographic" answer), `funAnswer`                                                                                                                                                                           |
+| Questions        | New `ProfileAnswerKind`s with narrow patterns, placed so existing kinds keep winning where they should (for example "U.S. WORK AUTHORIZATION" with Yes/No options takes `authorizedUs`; "Legal First Name" takes the legal name). Each pattern is tested against the real wordings from the queue, and against nearby questions it must **not** take ("Do you have 3+ years of experience?")     |
+| Options          | Answers become options by meaning, never by guess: Yes/No as today (`pickOption`); choices through a per-field list of accepted phrasings ("eligible" ↔ "Yes, I am eligible for a U.S. security clearance", "two weeks" ↔ "Approx. 2 weeks", "U.S. Person" ↔ "I am currently a "U.S. Person""). No clear option: needs you                                                                       |
+| Salary questions | "Are you comfortable with a base range of $100,000–$130,000?" (Yes/No options) is answered from `salaryMin`: Yes when the top of the range reaches it, otherwise No. No range in the question: needs you                                                                                                                                                                                         |
+| Not set          | A kind whose answer is blank returns null, so a required question waits for the owner, exactly as before                                                                                                                                                                                                                                                                                         |
+
+Refinements after review (approved):
+
+- **Relatives:** "related to" counts only with a person after it (anyone, someone, an employee, a person), or
+  the words relatives / family members, so "3+ years of work experience related to QA" stays with the model.
+- **Citizen or resident:** the residencies pattern is narrowed to "countries ... of which you are a (lawful)
+  permanent resident", and the U.S. citizen pattern skips "citizen or ..." questions, so "Are you a U.S. citizen
+  or permanent resident?" stays with the model.
+- **Job functions first:** "perform the essential functions ... accommodation for a disability" is matched
+  before the self-identification patterns, so it never takes the disability answer.
+- **Listed states:** whole state names only ("Virginia" is not found in "West Virginia"); a profile state that
+  is not a recognised U.S. state (name or abbreviation) leaves the question needing you.
+- **Choices asked as Yes/No:** clearance active or eligible is Yes, not eligible is No; U.S. Person yes is Yes,
+  soon or licensable needs you.
+- **Shared refill:** the 17c fill is a pure `refillDraft(draft, questions, profile)` in `shared/`, unit tested;
+  the route only loops over the waiting jobs. Answers filled on save are not removed when an answer is later
+  cleared.
+
+### 17b. Setup page
+
+A collapsible **More answers (optional)** section under Standard answers, grouped: Work authorization and
+export control, Security clearance, Company history (any company), Logistics, Self-identification additions
+(pronouns, sexual orientation; same "optional, never used in hiring" note), Just for fun. Selects start at
+**Not set**. The review step lists only the answers that are set.
+
+### 17c. Use the new answers on jobs already waiting
+
+Saving the setup re-checks every waiting job (`ready` or `needs_you`) that has a draft and the board's
+questions: each **needs-you** answer whose question a profile answer now covers is filled by code (source
+`profile`), and a job with no required question left moves to **Ready**. No model call, no cost. Answers the
+owner typed are never overwritten. Jobs whose boards publish no questions (Ashby, Lever) are unchanged.
+
+### Order, deploys and tests
+
+1. 17a, then 17b, then 17c; each green (lint, format, type-check, unit, API, e2e) before the next, and stops for
+   review.
+2. No migration. Each step deploys safely on its own: a blank answer changes nothing.
+
+Tests, per the conventions:
+
+- **Unit:** a table of the real question wordings (Anduril, PlayStation, Neros, Keeper, Skylight, Quanata,
+  PerfectServe, Hims & Hers) mapped to their kinds; near-misses that must stay with the model; each choice
+  answer to the real options; the salary-range rule (above, below, no range); blank answers leave the question
+  needing you; old setups load with every new answer unset.
+- **API (real Postgres):** saving the setup with new answers moves a seeded needs-you job to ready and leaves a
+  typed answer alone; another user's jobs are untouched.
+- **E2E:** fill two answers in More answers (optional), save, and see a seeded job leave Needs you.
+
 ## Planned but not built
 
 | Item                                | Status                                                                                                    |
