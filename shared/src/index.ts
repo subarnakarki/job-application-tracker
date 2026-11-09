@@ -4,6 +4,7 @@ export * from './constants';
 export * from './dates';
 export * from './followUp';
 export * from './jobSearch';
+export * from './leadMessage';
 export * from './patch';
 export * from './responses';
 export * from './resume';

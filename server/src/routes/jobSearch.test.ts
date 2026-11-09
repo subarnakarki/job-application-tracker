@@ -103,6 +103,8 @@ const claude: StubClaude = {
     claude.tailorRequests.push(request);
     return Promise.resolve(claude.tailorAnswer);
   },
+  // Lead messages are tested in leadMessages.test.ts.
+  leadMessage: () => Promise.resolve(null),
   search(query: string, sources: SearchSource[]) {
     claude.searches.push({ query, sources });
     return Promise.resolve({

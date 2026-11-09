@@ -186,6 +186,22 @@ question left to Ready. Greenhouse publishes each form's questions
 (`questions=true`); Lever and Ashby do not, so their jobs carry the profile, standard answers, a cover letter
 and "why this job".
 
+## LinkedIn messages to a lead (owner only)
+
+| Method | Path                                      | Auth | Notes                                                                |
+| ------ | ----------------------------------------- | ---- | -------------------------------------------------------------------- |
+| POST   | `/api/applications/:id/lead-message`      | user | `{ leadId, kind, steer? }`: drafts a connection note (at most 200    |
+|        |                                           |      | characters) and a message (at most 1,000) from the job, the lead and |
+|        |                                           |      | their newest notes, and the resume. Stores nothing. 30 a day; 409    |
+|        |                                           |      | `no_resume`; 502 `draft_failed`                                      |
+| POST   | `/api/applications/:id/lead-message/sent` | user | `{ leadId, text }`: logs the message as a dated note on the lead,    |
+|        |                                           |      | links the lead to the application and counts as activity. The same   |
+|        |                                           |      | text twice on one day is saved once                                  |
+
+Open to the same users as the job search (`JOB_SEARCH_USER_IDS`), never the demo account. The app cannot send
+LinkedIn messages: the owner copies one, opens the lead's profile and sends it. A lead from another account, in
+the path or the body, gets 404.
+
 ## Model usage
 
 Every Claude call records one row in `model_usage` (migration 0013): the kind of call (`job_search`, `draft`,

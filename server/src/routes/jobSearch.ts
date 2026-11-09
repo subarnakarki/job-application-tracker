@@ -31,6 +31,7 @@ import { ApiError, parseInput } from '../http/errors';
 import { JOB_SEARCH_MODEL, type JobSearchClaude } from '../jobsearch/claude';
 import { readJob } from '../jobsearch/readJob';
 import { checkOpenJobs, MANUAL_CHECK_AGE_MS, SCHEDULED_CHECK_AGE_MS } from '../jobsearch/check';
+import { allowedUserIds, jobSearchAccess, NO_CLAUDE } from '../jobsearch/access';
 import { draftHit, draftPending, runJobSearch } from '../jobsearch/run';
 import type { PageFetcher } from '../postings/fetchPage';
 import { createApplication, getApplication, updateApplication } from '../repo/applications';
@@ -102,49 +103,6 @@ export interface JobSearchRouteDeps {
   openToTestUsers?: boolean;
 }
 
-/**
- * The stand-in for test users when there is no key: finds nothing and drafts nothing; tailoring
- * rewords the resume's first line to add the first missing keyword, and invents a number, so e2e
- * tests see a real answer go through the server's checks.
- */
-const NO_CLAUDE: JobSearchClaude = {
-  search: () => Promise.resolve({ links: [], searches: 0 }),
-  draft: () => Promise.resolve(null),
-  tailor: (request) => {
-    const line = request.resumeText
-      .split(/\r?\n|(?<=\.)\s+/)
-      .map((entry) => entry.trim())
-      .find((entry) => entry.split(/\s+/).length >= 3);
-    const keyword = request.missing[0];
-    return Promise.resolve({
-      edits:
-        line && keyword
-          ? [
-              {
-                original: line,
-                suggested: `${line.replace(/\.$/, '')}, including ${keyword} across 12 teams.`,
-                keywordsAdded: [keyword],
-                why: "The same work, in the posting's words.",
-              },
-            ]
-          : [],
-      notCovered: request.missing
-        .slice(1, 2)
-        .map((term) => ({ keyword: term, why: `No ${term} experience in the resume.` })),
-    });
-  },
-};
-
-/** Owner-only at first: the users listed in JOB_SEARCH_USER_IDS (comma-separated ids). */
-export function allowedUserIds(env: Record<string, string | undefined>): Set<string> {
-  return new Set(
-    (env['JOB_SEARCH_USER_IDS'] ?? '')
-      .split(',')
-      .map((id) => id.trim().toLowerCase())
-      .filter((id) => UUID.test(id)),
-  );
-}
-
 /** Constant-time comparison of the cron secret, by hash so the lengths always match. */
 export function secretMatches(given: string | undefined, expected: string | undefined): boolean {
   if (!given || !expected || expected.length < 32) return false;
@@ -152,8 +110,6 @@ export function secretMatches(given: string | undefined, expected: string | unde
   return timingSafeEqual(digest(given), digest(expected));
 }
 
-const notAvailable = () =>
-  new ApiError(404, 'not_available', 'The job search is not available for this account');
 const runNotFound = () => new ApiError(404, 'not_found', 'Run not found');
 const hitNotFound = () => new ApiError(404, 'not_found', 'Job not found');
 
@@ -167,27 +123,7 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
     if (!user) throw new ApiError(401, 'unauthenticated', 'Sign in to continue');
     return user;
   };
-  const isTestUser = async (userId: string) =>
-    deps.openToTestUsers === true &&
-    deps.db !== undefined &&
-    (
-      await deps.db.query("select 1 from identities where user_id = $1 and provider = 'test'", [
-        userId,
-      ])
-    ).rowCount > 0;
-  /** The Claude this user's job search uses, or null when it is not open to them. */
-  const claudeFor = async (user: { id: string; isDemo: boolean }) => {
-    if (user.isDemo) return null;
-    if (deps.claude && allowedUserIds(deps.env).has(user.id.toLowerCase())) return deps.claude;
-    return (await isTestUser(user.id)) ? (deps.claude ?? NO_CLAUDE) : null;
-  };
-  /** The signed-in user, when the feature is open to them; 404 otherwise (it is not theirs). */
-  const memberOf = async (request: FastifyRequest) => {
-    const user = userOf(request);
-    const claude = await claudeFor(user);
-    if (!claude) throw notAvailable();
-    return { user, claude };
-  };
+  const { claudeFor, memberOf } = jobSearchAccess(deps);
   const spend = async (db: Db, rule: RateLimitRule, subject: string, reply: FastifyReply) => {
     const result = await consumeRateLimit(
       db,

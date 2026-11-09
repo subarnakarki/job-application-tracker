@@ -1,4 +1,9 @@
-import type { ApplicationDetail, ApplicationInput, JobSearchProfile } from '@jat/shared';
+import type {
+  ApplicationDetail,
+  ApplicationInput,
+  JobSearchProfile,
+  LeadDetail,
+} from '@jat/shared';
 import { test as base, expect, type APIRequestContext } from '@playwright/test';
 import { ApplicationDetailPage } from './pages/ApplicationDetailPage';
 import { ApplicationFormPage } from './pages/ApplicationFormPage';
@@ -34,6 +39,12 @@ export class Api {
     const response = await this.request.post('/api/applications', { data: input });
     expect(response.status(), await response.text()).toBe(201);
     return (await response.json()) as ApplicationDetail;
+  }
+
+  async createLead(input: { name: string; company?: string; profileLink?: string }) {
+    const response = await this.request.post('/api/leads', { data: input });
+    expect(response.status(), await response.text()).toBe(201);
+    return (await response.json()) as LeadDetail;
   }
 
   /**

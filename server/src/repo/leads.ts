@@ -294,3 +294,62 @@ export async function listAllLeadDetails(db: Queryable, userId: string): Promise
       .map(({ id, company, role, status }) => ({ id, company, role, status })),
   }));
 }
+
+export type LeadMessageResult =
+  | { kind: 'saved'; value: LeadNote }
+  | { kind: 'not_found' }
+  | { kind: 'limit_reached'; limit: number };
+
+/**
+ * A LinkedIn message marked sent: a dated note on the lead, the lead linked to the application,
+ * and the application marked edited (activity resets the follow-up clock). The same note sent
+ * twice on one day (a double click) is saved once and changes nothing more.
+ */
+export async function recordLeadMessage(
+  db: Db,
+  userId: string,
+  applicationId: string,
+  leadId: string,
+  input: LeadNoteInput,
+  now: Date,
+): Promise<LeadMessageResult> {
+  return db.transaction(async (tx) => {
+    const lead = await tx.query('select 1 from leads where user_id = $1 and id = $2 for update', [
+      userId,
+      leadId,
+    ]);
+    const application = await tx.query(
+      'select 1 from applications where user_id = $1 and id = $2 for update',
+      [userId, applicationId],
+    );
+    if (!lead.rowCount || !application.rowCount) return { kind: 'not_found' };
+    const same = await tx.query<NoteRow>(
+      `select ${NOTE_COLUMNS} from lead_notes
+        where user_id = $1 and lead_id = $2 and held_on = $3 and body = $4 limit 1`,
+      [userId, leadId, input.heldOn, input.body],
+    );
+    const already = same.rows[0];
+    if (already) return { kind: 'saved', value: toNote(already) };
+    const counted = await tx.query<{ n: number }>(
+      'select count(*)::int as n from lead_notes where lead_id = $1',
+      [leadId],
+    );
+    if ((counted.rows[0]?.n ?? 0) >= LIMITS.notesPerLead)
+      return { kind: 'limit_reached', limit: LIMITS.notesPerLead };
+    const inserted = await tx.query<NoteRow>(
+      `insert into lead_notes (lead_id, user_id, held_on, body, created_at, updated_at)
+       values ($1, $2, $3, $4, $5, $5) returning ${NOTE_COLUMNS}`,
+      [leadId, userId, input.heldOn, input.body, now],
+    );
+    await tx.query('update leads set updated_at = $2 where id = $1', [leadId, now]);
+    await tx.query(
+      `update applications
+          set lead_id = $3, updated_at = $4, last_activity_at = $4, version = version + 1
+        where user_id = $1 and id = $2`,
+      [userId, applicationId, leadId, now],
+    );
+    const row = inserted.rows[0];
+    if (!row) throw new Error('Note was not created');
+    return { kind: 'saved', value: toNote(row) };
+  });
+}

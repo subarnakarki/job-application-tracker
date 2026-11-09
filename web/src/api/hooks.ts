@@ -16,6 +16,7 @@ import {
   ImportStatusSchema,
   InterviewSchema,
   LeadDetailSchema,
+  LeadMessageDraftSchema,
   LeadListSchema,
   LeadNoteSchema,
   PipelineSchema,
@@ -33,6 +34,8 @@ import {
   type InterviewInput,
   type InterviewPatch,
   type LeadInput,
+  type LeadMessageRequestInput,
+  type LeadMessageSent,
   type LeadNoteInput,
   type LeadNotePatch,
   type LeadPatch,
@@ -368,6 +371,32 @@ function useLeadRefresh() {
       client.invalidateQueries({ queryKey: ['applications'] }),
       client.invalidateQueries({ queryKey: ['application'] }),
     ]);
+}
+
+/** Drafts a LinkedIn connection note and message to a lead (stores nothing). */
+export function useDraftLeadMessage(applicationId: string) {
+  return useMutation({
+    mutationFn: (input: LeadMessageRequestInput) =>
+      apiRequest(
+        `/api/applications/${encodeURIComponent(applicationId)}/lead-message`,
+        LeadMessageDraftSchema,
+        { method: 'POST', body: input },
+      ),
+  });
+}
+
+/** Logs a message as sent: a note on the lead, linked to the application. */
+export function useMarkLeadMessageSent(applicationId: string) {
+  const refresh = useLeadRefresh();
+  return useMutation({
+    mutationFn: (input: LeadMessageSent) =>
+      apiRequest(
+        `/api/applications/${encodeURIComponent(applicationId)}/lead-message/sent`,
+        LeadNoteSchema,
+        { method: 'POST', body: input },
+      ),
+    onSuccess: refresh,
+  });
 }
 
 export function useCreateLead() {

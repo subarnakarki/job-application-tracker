@@ -28,6 +28,7 @@ import { gmailAuthorizerFromEnv, type GmailAuthorizer } from './import/gmailAuth
 import { registerMeRoutes } from './routes/me';
 import { registerResumeRoutes } from './routes/resume';
 import { registerJobSearchRoutes } from './routes/jobSearch';
+import { registerLeadMessageRoutes } from './routes/leadMessages';
 import { jobSearchClaudeFromEnv, type JobSearchClaude } from './jobsearch/claude';
 import { analyzerFromEnv, type ResumeAnalyzer } from './resume/analyze';
 import { registerSessionRoutes } from './routes/session';
@@ -132,16 +133,24 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       deps.resumeAnalyzer === undefined ? analyzerFromEnv(env, recordUsage) : deps.resumeAnalyzer,
     fetchPage,
   });
+  const jobSearchClaude =
+    deps.jobSearchClaude === undefined
+      ? jobSearchClaudeFromEnv(env, recordUsage)
+      : deps.jobSearchClaude;
   registerJobSearchRoutes(app, {
     db: deps.db,
     clock,
     env,
-    claude:
-      deps.jobSearchClaude === undefined
-        ? jobSearchClaudeFromEnv(env, recordUsage)
-        : deps.jobSearchClaude,
+    claude: jobSearchClaude,
     fetchPage,
     fetchBoard,
+    openToTestUsers: testRoutes !== null,
+  });
+  registerLeadMessageRoutes(app, {
+    db: deps.db,
+    clock,
+    env,
+    claude: jobSearchClaude,
     openToTestUsers: testRoutes !== null,
   });
   if (testRoutes) registerTestRoutes(app, { db: deps.db, clock });

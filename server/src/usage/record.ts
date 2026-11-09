@@ -11,6 +11,7 @@ export const MODEL_CALLS = [
   'classify_email',
   'posting_keywords',
   'resume_analysis',
+  'lead_message',
 ] as const;
 export type ModelCall = (typeof MODEL_CALLS)[number];
 
