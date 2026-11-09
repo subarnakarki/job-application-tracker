@@ -1055,6 +1055,17 @@ pay, another currency, no floor, an old setup; the pay read from each board's fi
 setup round-trip with and without a floor; a run and a still-open check that skip a job below it. E2E: the Setup
 form saves the floor.
 
+## Phase 19 outcome
+
+Built as planned, each step pushed green (CI passed on the last):
+
+- **19a** (`101745a`): `salaryFloor` on the profile; `belowSalaryFloor` in `sortJob`.
+- **19b** (`96a5148`): `readJob` returns `salary` (the board's field, else `salaryInText` on the posting's text).
+- **19c** (`1716066`): the still-open check skips waiting jobs under the floor; its result gained `belowFloor`.
+- **19d** (`f54089f`): the Setup field; the owner's live setup now has a $140,000 floor.
+- **Not covered:** a job whose pay is only in a Workday page's description (the run reads no Workday text), and a
+  range with a typo (low above high, such as P&G's "$917,000 - $116,500") is read as no pay and kept.
+
 ## Planned but not built
 
 | Item                                  | Status                                                                                                    |
