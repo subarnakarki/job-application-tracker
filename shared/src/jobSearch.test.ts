@@ -20,6 +20,7 @@ import {
   jobFit,
   DEFAULT_QUERY,
   SEARCH_SOURCES,
+  EMPTY_MORE_ANSWERS,
   googleSearchUrl,
   isRunDue,
   JobSearchProfileSchema,
@@ -30,7 +31,10 @@ import {
   parseQuery,
   pickOption,
   profileAnswer,
+  profileFill,
   profileQuestionKind,
+  salaryRangeTop,
+  type MoreAnswers,
   questionsForModel,
   sortJob,
   uniqueJobRefs,
@@ -373,6 +377,7 @@ const PROFILE: JobSearchProfile = {
   veteranStatus: 'decline',
   disabilityStatus: 'decline',
   eeoAnswer: 'Decline to self-identify',
+  more: EMPTY_MORE_ANSWERS,
 };
 
 describe('JobSearchProfileSchema', () => {
@@ -433,7 +438,8 @@ describe('screening questions answered from the profile', () => {
       'eeo_other',
       'Decline to self-identify',
     ],
-    ['What is your sexual orientation?', 'eeo_other', 'Decline to self-identify'],
+    ['What is your sexual orientation?', 'eeo_orientation', 'Decline to self-identify'],
+    ['What are your personal pronouns?', 'eeo_pronouns', 'Decline to self-identify'],
     ['Resume/CV', 'resume', null],
     ['Cover Letter', 'cover_letter', null],
   ])('"%s" is %s', (label, kind, answer) => {
@@ -448,7 +454,7 @@ describe('screening questions answered from the profile', () => {
     'Why do you want to work here?',
     'Describe a test strategy you designed.',
   ])('leaves "%s" to the draft', (label) => {
-    expect(profileQuestionKind(label)).toBeNull();
+    expect(profileQuestionKind(label, PROFILE)).toBeNull();
   });
 
   it('picks the matching option for a fixed-choice question', () => {
@@ -628,10 +634,385 @@ describe('assembleDraft', () => {
 
   it('sends the model only the questions code cannot answer', () => {
     expect(
-      questionsForModel([q('Email'), q('Why us?'), q('VeteranStatus', 'single_select')]).map(
-        (question) => question.label,
-      ),
+      questionsForModel(
+        [q('Email'), q('Why us?'), q('VeteranStatus', 'single_select')],
+        PROFILE,
+      ).map((question) => question.label),
     ).toEqual(['Why us?']);
+  });
+});
+
+describe('more screening answers, set once', () => {
+  // The owner's answers; every other test profile leaves them unset.
+  const MORE: MoreAnswers = {
+    ...EMPTY_MORE_ANSWERS,
+    authorizedUs: 'yes',
+    locatedInUs: 'yes',
+    usCitizen: 'yes',
+    workedForCompanyBefore: 'no',
+    historyWithCompany: 'no',
+    relativeAtCompany: 'no',
+    conflictOfInterest: 'no',
+    employerRestrictions: 'no',
+    w2Contract: 'yes',
+    smsConsent: 'yes',
+    otherOpenings: 'yes',
+    canTravel: 'yes',
+    canPerformFunctions: 'yes',
+    certifyTrue: 'yes',
+    clearance: 'eligible',
+    clearanceHeld: 'never',
+    exportStatus: 'citizen',
+    usPerson: 'yes',
+    startTimeline: 'two_weeks',
+    birthCountry: 'Nepal',
+    citizenships: 'United States',
+    otherResidencies: 'None',
+    w2Rate: '$85/hr',
+    pronouns: 'He/Him',
+    sexualOrientation: 'Heterosexual',
+    funAnswer: 'Chicken - Indian style butter chicken',
+  };
+  const SET: JobSearchProfile = { ...PROFILE, more: MORE };
+  const YES_NO = ['Yes', 'No'];
+  const fill = (label: string, options: string[] = [], profile = SET) => {
+    const kind = profileQuestionKind(label, profile);
+    return kind ? { kind, ...profileFill(kind, profile, label, options) } : null;
+  };
+
+  // Real wordings from the apply queue (2026-11-09), with their options.
+  it.each<[string, string, string[], string]>([
+    // Anduril
+    [
+      'CLEARANCE ELIGIBILITY - This position requires eligibility to obtain and maintain a U.S. security clearance.',
+      'clearance',
+      [
+        'Yes, I hold an active U.S. security clearance',
+        'Yes, I am eligible for a U.S. security clearance',
+        'No',
+      ],
+      'Yes, I am eligible for a U.S. security clearance',
+    ],
+    [
+      'If you have held a U.S. security clearance in the past, what clearance level have you held?',
+      'clearance_held',
+      ['N/A - have never held U.S. security clearance', 'Confidential', 'Secret', 'Top Secret'],
+      'N/A - have never held U.S. security clearance',
+    ],
+    [
+      'EXPORT CONTROLS - This position requires access to information and technology that is subject to U.S. export controls. Please indicate which of the following applies to you.',
+      'export_status',
+      [
+        'A United States citizen or national',
+        'A person lawfully admitted for permanent residence in the United States ("Green Card" holder)',
+        'A person admitted to the United States as a refugee',
+        'A person granted asylum in the United States (asylee)',
+        'None of the above',
+      ],
+      'A United States citizen or national',
+    ],
+    ['U.S. WORK AUTHORIZATION', 'work_authorization', YES_NO, 'Yes'],
+    ['HISTORY WITH ANDURIL', 'history_with', YES_NO, 'No'],
+    [
+      'Have you ever been employed by Anduril or any company that Anduril has acquired?',
+      'worked_before',
+      YES_NO,
+      'No',
+    ],
+    ['CONFLICT OF INTEREST', 'conflict', YES_NO, 'No'],
+    ['What is the country of your birth?', 'birth_country', [], 'Nepal'],
+    [
+      'Please list all countries of which you are a citizen, and, if applicable, the date you obtained citizenship.',
+      'citizenships',
+      [],
+      'United States',
+    ],
+    [
+      'Please list any additional countries of which you are a lawful permanent resident, if applicable.',
+      'residencies',
+      [],
+      'None',
+    ],
+    ['Legal First Name', 'legal_first', [], 'Pat'],
+    ['Legal Last Name', 'legal_last', [], 'Q. Example'],
+    // PlayStation
+    ['Have you ever worked for a Sony company previously?', 'worked_before', YES_NO, 'No'],
+    [
+      'Are you related to, or in a close personal relationship with, anyone who currently works for SIE or any SIE-affiliated studios?',
+      'relative',
+      YES_NO,
+      'No',
+    ],
+    [
+      'By selecting "Yes", I am certifying that, to the best of my knowledge, the information I have provided in this employment application is true and correct.',
+      'certify',
+      YES_NO,
+      'Yes',
+    ],
+    [
+      'What are your personal pronouns?',
+      'eeo_pronouns',
+      ['He/Him', 'He/They', 'She/Her', 'She/They', 'They/Them', "I don't wish to answer"],
+      'He/Him',
+    ],
+    [
+      'Sexual Orientation',
+      'eeo_orientation',
+      ['Asexual', 'Bisexual', 'Gay/Lesbian', 'Heterosexual', 'Queer', "I don't wish to answer"],
+      'Heterosexual',
+    ],
+    ['Are you able to work on a W2 contract basis?', 'w2_contract', YES_NO, 'Yes'],
+    ['What is your desired W2 hourly rate?', 'w2_rate', [], '$85/hr'],
+    ['Are you currently located in the United States?', 'located_us', YES_NO, 'Yes'],
+    // Neros
+    [
+      'What is your timeline for starting a new role?',
+      'start_timeline',
+      ['Immediately', 'Approx. 2 weeks', 'More than one month', 'Flexible, will discuss on a call'],
+      'Approx. 2 weeks',
+    ],
+    [
+      'Export Compliance: The person hired will have access to information and items controlled by the International Traffic in Arms Regulation (ITAR). The candidate must be a "U.S. Person".',
+      'us_person',
+      [
+        'I am currently a "U.S. Person"',
+        'I will soon become a "U.S. Person" (requires explanation if selected)',
+        'I am not a "U.S. Person," but I am eligible for licensing (requires explanation if selected)',
+      ],
+      'I am currently a "U.S. Person"',
+    ],
+    // True Anomaly
+    [
+      'If other, please provide details as it relates to ITAR eligibility. Answer N/A if not applicable.',
+      'itar_other',
+      [],
+      'N/A',
+    ],
+    // PerfectServe (the test profile's minimum is $150,000, above this range)
+    [
+      'Are you comfortable moving forward with this position, which has an annual base salary range of $100,000-$130,000?',
+      'salary',
+      YES_NO,
+      'No',
+    ],
+    [
+      'By selecting YES, I consent to receive recruiting SMS messages from PerfectServe at the phone number provided on my job application.',
+      'sms',
+      YES_NO,
+      'Yes',
+    ],
+    [
+      'Just for fun, please share what favorite food is and how do you like it best prepared!',
+      'fun',
+      [],
+      'Chicken - Indian style butter chicken',
+    ],
+    // Skylight
+    ['Are you a U.S. citizen?', 'us_citizen', YES_NO, 'Yes'],
+    [
+      'Are you currently subject to any federal or other restrictions (e.g., post-employment, regulatory, IP, non-compete) that could limit your ability to engage in this role?',
+      'restrictions',
+      YES_NO,
+      'No',
+    ],
+    [
+      'Would you like to be considered for other relevant openings at Skylight now or in the future?',
+      'other_openings',
+      [
+        'Yes, you may consider me for similar openings',
+        'No, only consider me for opportunities I apply for',
+      ],
+      'Yes, you may consider me for similar openings',
+    ],
+    [
+      'Are you able to meet the travel requirements for this role, as outlined in the job posting?',
+      'travel',
+      YES_NO,
+      'Yes',
+    ],
+    // Keeper
+    [
+      'Are you currently legally authorized to work in the United States for our company?',
+      'work_authorization',
+      YES_NO,
+      'Yes',
+    ],
+    [
+      'Do you live in one of the following states? Alabama, Arizona, Florida, Georgia, Massachusetts, North Carolina, Texas, Wisconsin',
+      'listed_state',
+      YES_NO,
+      'Yes',
+    ],
+    // Quanata
+    [
+      'Do you have any contractual obligations, restrictions or limitations relating to a current or former employer that would prohibit you from working at Quanata?',
+      'restrictions',
+      YES_NO,
+      'No',
+    ],
+    [
+      'After reviewing the posted job description, are you able to perform all job functions? This could be with or without an accommodation.',
+      'job_functions',
+      YES_NO,
+      'Yes',
+    ],
+    [
+      'Have you ever worked as a contractor or employee of Quanata, State Farm, and/or Gainsco?',
+      'worked_before',
+      YES_NO,
+      'No',
+    ],
+    // Hims & Hers
+    [
+      'Have you previously worked for hims & hers as an employee or contractor/consultant?',
+      'worked_before',
+      YES_NO,
+      'No',
+    ],
+  ])('"%s" is %s', (label, kind, options, expected) => {
+    const result = fill(label, options);
+    expect(result?.kind).toBe(kind);
+    expect(options.length > 0 ? result?.option : result?.answer).toBe(expected);
+  });
+
+  it.each([
+    ['Have you ever worked with Playwright?', null],
+    ['Do you have 3+ years of experience with Playwright?', null],
+    ['Do you have 3+ years of work experience related to QA?', null],
+    ['Have you ever worked at a startup before?', null],
+    ['Are you a U.S. citizen or permanent resident?', null],
+    ['Are you willing to travel up to 50% of the time?', null],
+    ['What is your desired hourly rate?', null],
+    [
+      'Are you legally authorized to work in the U.S. without restriction for any employer?',
+      'work_authorization',
+    ],
+    [
+      'Can you perform the essential functions of this job, with or without reasonable accommodation for a disability?',
+      'job_functions',
+    ],
+  ])('keeps the near miss "%s" as %s', (label, kind) => {
+    expect(profileQuestionKind(label, SET)).toBe(kind);
+  });
+
+  it('sends a question to the model, as before, when its answer is not set', () => {
+    for (const label of [
+      'Have you previously worked at or consulted for GitLab?',
+      'Are you a U.S. citizen?',
+      'What is the country of your birth?',
+      'If other, please provide details as it relates to ITAR eligibility.',
+      'What is your timeline for starting a new role?',
+    ])
+      expect(profileQuestionKind(label, PROFILE)).toBeNull();
+    // Without its own answer, work authorization stays as today: "US citizen" fits no Yes/No.
+    expect(fill('U.S. WORK AUTHORIZATION', YES_NO, PROFILE)?.option).toBeNull();
+    // Legal names fall back to Full name; pronouns to the other demographic answer.
+    expect(fill('Legal First Name', [], PROFILE)?.answer).toBe('Pat');
+    expect(fill('What are your personal pronouns?', [], PROFILE)?.answer).toBe(
+      'Decline to self-identify',
+    );
+  });
+
+  it('matches each choice to the real options by meaning, and only one', () => {
+    const CLEARANCE = [
+      'Yes, I hold an active U.S. security clearance',
+      'Yes, I am eligible for a U.S. security clearance',
+      'No',
+    ];
+    const withMore = (more: Partial<MoreAnswers>) => ({ ...SET, more: { ...MORE, ...more } });
+    const option = (label: string, options: string[], more: Partial<MoreAnswers>) =>
+      fill(label, options, withMore(more))?.option;
+    const clearance = 'Security clearance eligibility';
+    expect(option(clearance, CLEARANCE, { clearance: 'active' })).toBe(CLEARANCE[0]);
+    expect(option(clearance, CLEARANCE, { clearance: 'not_eligible' })).toBe('No');
+    // A plain Yes/No form gets the Yes/No meaning.
+    expect(option(clearance, YES_NO, { clearance: 'eligible' })).toBe('Yes');
+    expect(option(clearance, YES_NO, { clearance: 'not_eligible' })).toBe('No');
+    const held = 'What clearance level have you held?';
+    const LEVELS = ['N/A', 'Confidential', 'Secret', 'Top Secret'];
+    expect(option(held, LEVELS, { clearanceHeld: 'never' })).toBe('N/A');
+    expect(option(held, LEVELS, { clearanceHeld: 'secret' })).toBe('Secret');
+    expect(option(held, LEVELS, { clearanceHeld: 'top_secret' })).toBe('Top Secret');
+    const exportLabel = 'EXPORT CONTROLS';
+    const EXPORT = ['U.S. citizen', 'Green card holder', 'None of the above'];
+    expect(option(exportLabel, EXPORT, { exportStatus: 'green_card' })).toBe('Green card holder');
+    expect(option(exportLabel, EXPORT, { exportStatus: 'refugee' })).toBeNull();
+    const person = 'Are you a U.S. Person under ITAR?';
+    expect(option(person, YES_NO, { usPerson: 'yes' })).toBe('Yes');
+    expect(option(person, YES_NO, { usPerson: 'soon' })).toBeNull();
+    const start = 'What is your timeline for starting a new role?';
+    const TIMES = ['Immediately', 'Approx. 2 weeks', 'More than one month', 'Flexible'];
+    expect(option(start, TIMES, { startTimeline: 'month_plus' })).toBe('More than one month');
+    expect(option(start, TIMES, { startTimeline: 'flexible' })).toBe('Flexible');
+    // A text box gets a readable answer.
+    expect(fill(clearance)?.answer).toBe('Yes, I am eligible for a U.S. security clearance');
+    // Not a U.S. Person: the "If other" ITAR question needs you.
+    const notUs = withMore({ usPerson: 'licensable', exportStatus: 'none', usCitizen: 'no' });
+    expect(fill('If other, please explain your ITAR status.', [], notUs)?.answer).toBeNull();
+  });
+
+  it('answers a salary-range question from the minimum salary', () => {
+    const label = (range: string) =>
+      `Are you comfortable with this position's base salary range of ${range}?`;
+    const at = (salaryMin: number, range: string) =>
+      fill(label(range), YES_NO, { ...SET, salaryMin, salaryMax: null })?.option;
+    expect(at(120000, '$100,000-$130,000')).toBe('Yes');
+    expect(at(150000, '$100,000–$130,000')).toBe('No');
+    expect(at(120000, '$100k to $130k')).toBe('Yes');
+    expect(fill('Is the salary acceptable?', YES_NO)?.option).toBeNull();
+    expect(salaryRangeTop('$40-$50 per hour')).toBeNull();
+  });
+
+  it('answers a listed-states question from the profile state', () => {
+    const label = 'Do you live in one of the following states? Ohio, West Virginia, Texas';
+    const state = (value: string) => fill(label, YES_NO, { ...SET, state: value })?.option;
+    expect(state('TX')).toBe('Yes');
+    expect(state('virginia')).toBe('No');
+    expect(state('MA')).toBe('No');
+    expect(state('Ontario')).toBeNull();
+  });
+
+  it('matches pronouns written with other punctuation', () => {
+    const profile = { ...SET, more: { ...MORE, pronouns: 'He Him' } };
+    expect(eeoOption('eeo_pronouns', profile, ['He/Him', 'She/Her'])).toBe('He/Him');
+  });
+
+  it('loads a setup saved before these answers existed with every one unset', () => {
+    const old = Object.fromEntries(Object.entries(PROFILE).filter(([key]) => key !== 'more'));
+    expect(JobSearchProfileSchema.parse(old).more).toEqual(EMPTY_MORE_ANSWERS);
+    expect(Object.values(EMPTY_MORE_ANSWERS).every((value) => value === null || value === '')).toBe(
+      true,
+    );
+  });
+
+  it('drafts the new answers by code, never the model', () => {
+    const q = (label: string, options: string[] = []): ApplicationQuestion => ({
+      label,
+      required: true,
+      kind: options.length ? 'single_select' : 'text',
+      options,
+    });
+    const questions = [q('Are you a U.S. citizen?', YES_NO), q('Why us?')];
+    expect(questionsForModel(questions, SET).map((question) => question.label)).toEqual([
+      'Why us?',
+    ]);
+    expect(questionsForModel(questions, PROFILE)).toHaveLength(2);
+    const { draft, needsYou } = assembleDraft(questions, SET, {
+      answers: [
+        { question: 'Are you a U.S. citizen?', answer: 'No', needsCandidate: false },
+        { question: 'Why us?', answer: 'The mission.', needsCandidate: false },
+      ],
+      coverLetter: '',
+      whyInterested: '',
+      keywords: [],
+    });
+    expect(needsYou).toBe(false);
+    expect(draft.answers[0]).toEqual({
+      question: 'Are you a U.S. citizen?',
+      answer: 'Yes',
+      source: 'profile',
+      option: 'Yes',
+    });
   });
 });
 

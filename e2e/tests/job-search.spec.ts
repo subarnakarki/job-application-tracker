@@ -1,4 +1,4 @@
-import { SEARCH_SOURCES, type JobSearchProfile } from '@jat/shared';
+import { EMPTY_MORE_ANSWERS, SEARCH_SOURCES, type JobSearchProfile } from '@jat/shared';
 import { expect, test } from '../fixtures';
 import { ApplyQueuePage } from '../pages/ApplyQueuePage';
 
@@ -36,6 +36,7 @@ const PROFILE: JobSearchProfile = {
   veteranStatus: 'decline',
   disabilityStatus: 'decline',
   eeoAnswer: 'Decline to self-identify',
+  more: EMPTY_MORE_ANSWERS,
 };
 
 const QUESTIONS = [

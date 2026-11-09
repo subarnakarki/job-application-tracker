@@ -107,7 +107,7 @@ function TextField({
   hint,
   autoComplete,
 }: {
-  name: keyof SetupValues;
+  name: Exclude<keyof SetupValues, 'more'>;
   label: string;
   values: SetupValues;
   errors: Record<string, string>;

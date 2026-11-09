@@ -322,7 +322,7 @@ export async function draftHit(
     company: hit.company,
     role: hit.role,
     postingText,
-    questions: questionsForModel(questions),
+    questions: questionsForModel(questions, profile),
   });
   if (!model) {
     await saveDraft(

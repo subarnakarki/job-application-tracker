@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import {
   ApplyQueueSchema,
   SEARCH_SOURCES,
+  EMPTY_MORE_ANSWERS,
   DEFAULT_QUERY,
   JobHitSchema,
   JobSearchRunDetailSchema,
@@ -163,6 +164,7 @@ const PROFILE: JobSearchProfile = {
   veteranStatus: 'decline',
   disabilityStatus: 'decline',
   eeoAnswer: 'Decline to self-identify',
+  more: EMPTY_MORE_ANSWERS,
 };
 
 function parsed<T>(schema: { safeParse(value: unknown): { success: boolean; data?: T } }) {

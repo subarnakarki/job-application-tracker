@@ -1,6 +1,7 @@
 import {
   CADENCES,
   DEFAULT_EEO_ANSWER,
+  EMPTY_MORE_ANSWERS,
   JobSearchProfileSchema,
   PROFILE_DEFAULTS,
   searchQueries,
@@ -8,6 +9,7 @@ import {
   type Cadence,
   type SearchSource,
   type JobSearchProfile,
+  type MoreAnswers,
   type WorkMode,
 } from '@jat/shared';
 
@@ -46,6 +48,8 @@ export interface SetupValues {
   veteranStatus: JobSearchProfile['veteranStatus'];
   disabilityStatus: JobSearchProfile['disabilityStatus'];
   eeoAnswer: string;
+  /** Optional answers to more screening questions, kept as they are. */
+  more: MoreAnswers;
 }
 
 export const WEEKDAYS = [
@@ -105,6 +109,7 @@ export function emptySetup(prefill: { name?: string | null; email?: string }): S
     veteranStatus: PROFILE_DEFAULTS.veteranStatus,
     disabilityStatus: PROFILE_DEFAULTS.disabilityStatus,
     eeoAnswer: DEFAULT_EEO_ANSWER,
+    more: EMPTY_MORE_ANSWERS,
   };
 }
 

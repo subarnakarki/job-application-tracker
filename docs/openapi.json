@@ -11601,6 +11601,381 @@
                             "eeoAnswer": {
                               "type": "string",
                               "maxLength": 200
+                            },
+                            "more": {
+                              "type": "object",
+                              "properties": {
+                                "authorizedUs": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "no"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "locatedInUs": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "no"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "usCitizen": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "no"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "workedForCompanyBefore": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "no"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "historyWithCompany": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "no"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "relativeAtCompany": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "no"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "conflictOfInterest": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "no"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "employerRestrictions": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "no"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "w2Contract": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "no"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "smsConsent": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "no"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "otherOpenings": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "no"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "canTravel": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "no"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "canPerformFunctions": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "no"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "certifyTrue": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "no"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "clearance": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "active",
+                                        "eligible",
+                                        "not_eligible"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "clearanceHeld": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "never",
+                                        "confidential",
+                                        "secret",
+                                        "top_secret"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "exportStatus": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "citizen",
+                                        "green_card",
+                                        "refugee",
+                                        "asylee",
+                                        "none"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "usPerson": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "soon",
+                                        "licensable"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "startTimeline": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "immediately",
+                                        "two_weeks",
+                                        "month_plus",
+                                        "flexible"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "legalFirstName": {
+                                  "default": "",
+                                  "type": "string",
+                                  "maxLength": 100
+                                },
+                                "legalLastName": {
+                                  "default": "",
+                                  "type": "string",
+                                  "maxLength": 100
+                                },
+                                "birthCountry": {
+                                  "default": "",
+                                  "type": "string",
+                                  "maxLength": 100
+                                },
+                                "citizenships": {
+                                  "default": "",
+                                  "type": "string",
+                                  "maxLength": 200
+                                },
+                                "otherResidencies": {
+                                  "default": "",
+                                  "type": "string",
+                                  "maxLength": 200
+                                },
+                                "w2Rate": {
+                                  "default": "",
+                                  "type": "string",
+                                  "maxLength": 100
+                                },
+                                "pronouns": {
+                                  "default": "",
+                                  "type": "string",
+                                  "maxLength": 100
+                                },
+                                "sexualOrientation": {
+                                  "default": "",
+                                  "type": "string",
+                                  "maxLength": 100
+                                },
+                                "funAnswer": {
+                                  "default": "",
+                                  "type": "string",
+                                  "maxLength": 500
+                                }
+                              },
+                              "required": [
+                                "authorizedUs",
+                                "locatedInUs",
+                                "usCitizen",
+                                "workedForCompanyBefore",
+                                "historyWithCompany",
+                                "relativeAtCompany",
+                                "conflictOfInterest",
+                                "employerRestrictions",
+                                "w2Contract",
+                                "smsConsent",
+                                "otherOpenings",
+                                "canTravel",
+                                "canPerformFunctions",
+                                "certifyTrue",
+                                "clearance",
+                                "clearanceHeld",
+                                "exportStatus",
+                                "usPerson",
+                                "startTimeline",
+                                "legalFirstName",
+                                "legalLastName",
+                                "birthCountry",
+                                "citizenships",
+                                "otherResidencies",
+                                "w2Rate",
+                                "pronouns",
+                                "sexualOrientation",
+                                "funAnswer"
+                              ],
+                              "additionalProperties": false
                             }
                           },
                           "required": [
@@ -11636,7 +12011,8 @@
                             "raceEthnicity",
                             "veteranStatus",
                             "disabilityStatus",
-                            "eeoAnswer"
+                            "eeoAnswer",
+                            "more"
                           ],
                           "additionalProperties": false
                         },
@@ -11965,6 +12341,352 @@
                   "eeoAnswer": {
                     "type": "string",
                     "maxLength": 200
+                  },
+                  "more": {
+                    "default": {},
+                    "type": "object",
+                    "properties": {
+                      "authorizedUs": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "yes",
+                              "no"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "locatedInUs": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "yes",
+                              "no"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "usCitizen": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "yes",
+                              "no"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "workedForCompanyBefore": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "yes",
+                              "no"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "historyWithCompany": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "yes",
+                              "no"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "relativeAtCompany": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "yes",
+                              "no"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "conflictOfInterest": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "yes",
+                              "no"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "employerRestrictions": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "yes",
+                              "no"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "w2Contract": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "yes",
+                              "no"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "smsConsent": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "yes",
+                              "no"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "otherOpenings": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "yes",
+                              "no"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "canTravel": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "yes",
+                              "no"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "canPerformFunctions": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "yes",
+                              "no"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "certifyTrue": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "yes",
+                              "no"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "clearance": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "active",
+                              "eligible",
+                              "not_eligible"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "clearanceHeld": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "never",
+                              "confidential",
+                              "secret",
+                              "top_secret"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "exportStatus": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "citizen",
+                              "green_card",
+                              "refugee",
+                              "asylee",
+                              "none"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "usPerson": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "yes",
+                              "soon",
+                              "licensable"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "startTimeline": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "immediately",
+                              "two_weeks",
+                              "month_plus",
+                              "flexible"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "legalFirstName": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      "legalLastName": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      "birthCountry": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      "citizenships": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "otherResidencies": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "w2Rate": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      "pronouns": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      "sexualOrientation": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      "funAnswer": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 500
+                      }
+                    },
+                    "additionalProperties": false
                   }
                 },
                 "required": [
@@ -12256,6 +12978,381 @@
                             "eeoAnswer": {
                               "type": "string",
                               "maxLength": 200
+                            },
+                            "more": {
+                              "type": "object",
+                              "properties": {
+                                "authorizedUs": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "no"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "locatedInUs": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "no"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "usCitizen": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "no"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "workedForCompanyBefore": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "no"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "historyWithCompany": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "no"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "relativeAtCompany": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "no"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "conflictOfInterest": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "no"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "employerRestrictions": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "no"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "w2Contract": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "no"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "smsConsent": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "no"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "otherOpenings": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "no"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "canTravel": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "no"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "canPerformFunctions": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "no"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "certifyTrue": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "no"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "clearance": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "active",
+                                        "eligible",
+                                        "not_eligible"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "clearanceHeld": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "never",
+                                        "confidential",
+                                        "secret",
+                                        "top_secret"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "exportStatus": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "citizen",
+                                        "green_card",
+                                        "refugee",
+                                        "asylee",
+                                        "none"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "usPerson": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "yes",
+                                        "soon",
+                                        "licensable"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "startTimeline": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "immediately",
+                                        "two_weeks",
+                                        "month_plus",
+                                        "flexible"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "legalFirstName": {
+                                  "default": "",
+                                  "type": "string",
+                                  "maxLength": 100
+                                },
+                                "legalLastName": {
+                                  "default": "",
+                                  "type": "string",
+                                  "maxLength": 100
+                                },
+                                "birthCountry": {
+                                  "default": "",
+                                  "type": "string",
+                                  "maxLength": 100
+                                },
+                                "citizenships": {
+                                  "default": "",
+                                  "type": "string",
+                                  "maxLength": 200
+                                },
+                                "otherResidencies": {
+                                  "default": "",
+                                  "type": "string",
+                                  "maxLength": 200
+                                },
+                                "w2Rate": {
+                                  "default": "",
+                                  "type": "string",
+                                  "maxLength": 100
+                                },
+                                "pronouns": {
+                                  "default": "",
+                                  "type": "string",
+                                  "maxLength": 100
+                                },
+                                "sexualOrientation": {
+                                  "default": "",
+                                  "type": "string",
+                                  "maxLength": 100
+                                },
+                                "funAnswer": {
+                                  "default": "",
+                                  "type": "string",
+                                  "maxLength": 500
+                                }
+                              },
+                              "required": [
+                                "authorizedUs",
+                                "locatedInUs",
+                                "usCitizen",
+                                "workedForCompanyBefore",
+                                "historyWithCompany",
+                                "relativeAtCompany",
+                                "conflictOfInterest",
+                                "employerRestrictions",
+                                "w2Contract",
+                                "smsConsent",
+                                "otherOpenings",
+                                "canTravel",
+                                "canPerformFunctions",
+                                "certifyTrue",
+                                "clearance",
+                                "clearanceHeld",
+                                "exportStatus",
+                                "usPerson",
+                                "startTimeline",
+                                "legalFirstName",
+                                "legalLastName",
+                                "birthCountry",
+                                "citizenships",
+                                "otherResidencies",
+                                "w2Rate",
+                                "pronouns",
+                                "sexualOrientation",
+                                "funAnswer"
+                              ],
+                              "additionalProperties": false
                             }
                           },
                           "required": [
@@ -12291,7 +13388,8 @@
                             "raceEthnicity",
                             "veteranStatus",
                             "disabilityStatus",
-                            "eeoAnswer"
+                            "eeoAnswer",
+                            "more"
                           ],
                           "additionalProperties": false
                         },
@@ -20269,6 +21367,381 @@
                                 "eeoAnswer": {
                                   "type": "string",
                                   "maxLength": 200
+                                },
+                                "more": {
+                                  "type": "object",
+                                  "properties": {
+                                    "authorizedUs": {
+                                      "default": null,
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "yes",
+                                            "no"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "locatedInUs": {
+                                      "default": null,
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "yes",
+                                            "no"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "usCitizen": {
+                                      "default": null,
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "yes",
+                                            "no"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "workedForCompanyBefore": {
+                                      "default": null,
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "yes",
+                                            "no"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "historyWithCompany": {
+                                      "default": null,
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "yes",
+                                            "no"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "relativeAtCompany": {
+                                      "default": null,
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "yes",
+                                            "no"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "conflictOfInterest": {
+                                      "default": null,
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "yes",
+                                            "no"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "employerRestrictions": {
+                                      "default": null,
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "yes",
+                                            "no"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "w2Contract": {
+                                      "default": null,
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "yes",
+                                            "no"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "smsConsent": {
+                                      "default": null,
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "yes",
+                                            "no"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "otherOpenings": {
+                                      "default": null,
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "yes",
+                                            "no"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "canTravel": {
+                                      "default": null,
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "yes",
+                                            "no"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "canPerformFunctions": {
+                                      "default": null,
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "yes",
+                                            "no"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "certifyTrue": {
+                                      "default": null,
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "yes",
+                                            "no"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "clearance": {
+                                      "default": null,
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "active",
+                                            "eligible",
+                                            "not_eligible"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "clearanceHeld": {
+                                      "default": null,
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "never",
+                                            "confidential",
+                                            "secret",
+                                            "top_secret"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "exportStatus": {
+                                      "default": null,
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "citizen",
+                                            "green_card",
+                                            "refugee",
+                                            "asylee",
+                                            "none"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "usPerson": {
+                                      "default": null,
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "yes",
+                                            "soon",
+                                            "licensable"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "startTimeline": {
+                                      "default": null,
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "immediately",
+                                            "two_weeks",
+                                            "month_plus",
+                                            "flexible"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "legalFirstName": {
+                                      "default": "",
+                                      "type": "string",
+                                      "maxLength": 100
+                                    },
+                                    "legalLastName": {
+                                      "default": "",
+                                      "type": "string",
+                                      "maxLength": 100
+                                    },
+                                    "birthCountry": {
+                                      "default": "",
+                                      "type": "string",
+                                      "maxLength": 100
+                                    },
+                                    "citizenships": {
+                                      "default": "",
+                                      "type": "string",
+                                      "maxLength": 200
+                                    },
+                                    "otherResidencies": {
+                                      "default": "",
+                                      "type": "string",
+                                      "maxLength": 200
+                                    },
+                                    "w2Rate": {
+                                      "default": "",
+                                      "type": "string",
+                                      "maxLength": 100
+                                    },
+                                    "pronouns": {
+                                      "default": "",
+                                      "type": "string",
+                                      "maxLength": 100
+                                    },
+                                    "sexualOrientation": {
+                                      "default": "",
+                                      "type": "string",
+                                      "maxLength": 100
+                                    },
+                                    "funAnswer": {
+                                      "default": "",
+                                      "type": "string",
+                                      "maxLength": 500
+                                    }
+                                  },
+                                  "required": [
+                                    "authorizedUs",
+                                    "locatedInUs",
+                                    "usCitizen",
+                                    "workedForCompanyBefore",
+                                    "historyWithCompany",
+                                    "relativeAtCompany",
+                                    "conflictOfInterest",
+                                    "employerRestrictions",
+                                    "w2Contract",
+                                    "smsConsent",
+                                    "otherOpenings",
+                                    "canTravel",
+                                    "canPerformFunctions",
+                                    "certifyTrue",
+                                    "clearance",
+                                    "clearanceHeld",
+                                    "exportStatus",
+                                    "usPerson",
+                                    "startTimeline",
+                                    "legalFirstName",
+                                    "legalLastName",
+                                    "birthCountry",
+                                    "citizenships",
+                                    "otherResidencies",
+                                    "w2Rate",
+                                    "pronouns",
+                                    "sexualOrientation",
+                                    "funAnswer"
+                                  ],
+                                  "additionalProperties": false
                                 }
                               },
                               "required": [
@@ -20304,7 +21777,8 @@
                                 "raceEthnicity",
                                 "veteranStatus",
                                 "disabilityStatus",
-                                "eeoAnswer"
+                                "eeoAnswer",
+                                "more"
                               ],
                               "additionalProperties": false
                             },

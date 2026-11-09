@@ -763,6 +763,57 @@ const link = z
   .refine((value) => value === '' || isHttpUrl(value), 'Must be an http(s) link');
 const termList = z.array(required(80)).max(40);
 
+const yesNo = z.enum(['yes', 'no']).nullable().default(null);
+const choice = <const T extends readonly [string, ...string[]]>(values: T) =>
+  z.enum(values).nullable().default(null);
+const optionalText = (max: number) => line(max).default('');
+
+export const CLEARANCES = ['active', 'eligible', 'not_eligible'] as const;
+export const CLEARANCES_HELD = ['never', 'confidential', 'secret', 'top_secret'] as const;
+export const EXPORT_STATUSES = ['citizen', 'green_card', 'refugee', 'asylee', 'none'] as const;
+export const US_PERSON_STATUSES = ['yes', 'soon', 'licensable'] as const;
+export const START_TIMELINES = ['immediately', 'two_weeks', 'month_plus', 'flexible'] as const;
+
+/**
+ * More screening answers, every one optional. Unset (null or blank), the question it answers waits
+ * for the candidate or goes to the model, exactly as before these existed. Company questions are
+ * answered the same way for any company.
+ */
+export const MoreAnswersSchema = z.strictObject({
+  authorizedUs: yesNo,
+  locatedInUs: yesNo,
+  usCitizen: yesNo,
+  workedForCompanyBefore: yesNo,
+  historyWithCompany: yesNo,
+  relativeAtCompany: yesNo,
+  conflictOfInterest: yesNo,
+  employerRestrictions: yesNo,
+  w2Contract: yesNo,
+  smsConsent: yesNo,
+  otherOpenings: yesNo,
+  canTravel: yesNo,
+  canPerformFunctions: yesNo,
+  certifyTrue: yesNo,
+  clearance: choice(CLEARANCES),
+  clearanceHeld: choice(CLEARANCES_HELD),
+  exportStatus: choice(EXPORT_STATUSES),
+  usPerson: choice(US_PERSON_STATUSES),
+  startTimeline: choice(START_TIMELINES),
+  /** Blank: from Full name. */
+  legalFirstName: optionalText(100),
+  legalLastName: optionalText(100),
+  birthCountry: optionalText(100),
+  citizenships: optionalText(200),
+  otherResidencies: optionalText(200),
+  w2Rate: optionalText(100),
+  /** Blank: the "other demographic" answer. */
+  pronouns: optionalText(100),
+  sexualOrientation: optionalText(100),
+  funAnswer: optionalText(500),
+});
+export type MoreAnswers = z.infer<typeof MoreAnswersSchema>;
+export const EMPTY_MORE_ANSWERS: MoreAnswers = MoreAnswersSchema.parse({});
+
 export const JobSearchProfileSchema = z
   .strictObject({
     fullName: required(200),
@@ -821,6 +872,8 @@ export const JobSearchProfileSchema = z
     disabilityStatus: z.enum(['decline', 'no', 'yes']).default('decline'),
     /** Any other demographic question (sexual orientation, LGBTQ+, pronouns...). */
     eeoAnswer: required(200),
+    /** Optional answers to more screening questions; setups saved before them load as unset. */
+    more: MoreAnswersSchema.prefault({}),
   })
   .refine((profile) => profile.salaryMax === null || profile.salaryMax >= profile.salaryMin, {
     path: ['salaryMax'],
@@ -853,6 +906,7 @@ export const PROFILE_DEFAULTS = {
   veteranStatus: 'decline' as const,
   disabilityStatus: 'decline' as const,
   eeoAnswer: DECLINE,
+  more: EMPTY_MORE_ANSWERS,
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -880,22 +934,114 @@ export type ProfileAnswerKind =
   | 'eeo_race'
   | 'eeo_veteran'
   | 'eeo_disability'
+  | 'eeo_pronouns'
+  | 'eeo_orientation'
   | 'eeo_other'
   | 'resume'
-  | 'cover_letter';
+  | 'cover_letter'
+  // From the optional "more answers" (blank: the question is handled as if these did not exist)
+  | 'legal_first'
+  | 'legal_last'
+  | 'itar_other'
+  | 'clearance_held'
+  | 'clearance'
+  | 'export_status'
+  | 'us_person'
+  | 'birth_country'
+  | 'citizenships'
+  | 'residencies'
+  | 'us_citizen'
+  | 'located_us'
+  | 'listed_state'
+  | 'worked_before'
+  | 'history_with'
+  | 'relative'
+  | 'conflict'
+  | 'restrictions'
+  | 'w2_rate'
+  | 'w2_contract'
+  | 'sms'
+  | 'other_openings'
+  | 'travel'
+  | 'job_functions'
+  | 'certify'
+  | 'start_timeline'
+  | 'fun';
+
+type QuestionTest = RegExp | ((text: string) => boolean);
+
+/** "Have you ever worked for X?" but not "Have you ever worked with Playwright?" or "at a startup?". */
+const workedBefore = (text: string) =>
+  /\b(ever|previously)\b.*\b(employed|worked|consulted)\b|\b(employed|worked)\b.*\b(previously|before)\b/i.test(
+    text,
+  ) &&
+  /\b(employed|worked|consulted) (by|for|at)\b|\b(employee|contractor|consultant)s?\b/i.test(
+    text,
+  ) &&
+  !/\b(start-?ups?|agenc(y|ies)|industry|environment)\b/i.test(text);
+
+/** A relative or close relationship at the company, not "experience related to QA". */
+const relative = (text: string) =>
+  (/\b(related to|close personal relationship with)\b[^?]*\b(anyone|someone|an? (current )?employee|any (current )?employees?|a person|persons)\b/i.test(
+    text,
+  ) ||
+    /\b(relatives?|family members?)\b/i.test(text)) &&
+  /\b(work|employ)/i.test(text);
+
+/** "Are you able to travel?", but not a question about how much ("up to 50%", overnight). */
+const travel = (text: string) =>
+  /\btravel requirements?\b|\b(able|willing) to travel\b/i.test(text) &&
+  !/%|\bpercent|\bovernight|\binternational/i.test(text);
 
 /** Most specific first: "sponsorship" questions also mention authorization. */
-const PROFILE_QUESTIONS: [RegExp, ProfileAnswerKind][] = [
-  // Self-identification first. Race before Hispanic/Latino: "Race and Ethnicity" lists Hispanic as
+const PROFILE_QUESTIONS: [QuestionTest, ProfileAnswerKind][] = [
+  // Before self-identification: these often add "with or without accommodation for a disability".
+  [/\bperform (all |the essential )?(job )?functions\b|\bessential functions\b/i, 'job_functions'],
+  // Self-identification. Race before Hispanic/Latino: "Race and Ethnicity" lists Hispanic as
   // an option, while the separate question is "Are you Hispanic/Latino?".
   [/veteran/i, 'eeo_veteran'],
   [/disabilit/i, 'eeo_disability'],
   [/\brace\b|ethnicit/i, 'eeo_race'],
   [/hispanic|latin[aoxe]/i, 'eeo_hispanic'],
+  [/pronoun/i, 'eeo_pronouns'],
+  [/sexual orientation/i, 'eeo_orientation'],
   [/sexual orientation|transgender|pronoun|lgbt|demographic|\beeo\b/i, 'eeo_other'],
   [/gender|\bsex\b/i, 'eeo_gender'],
   [/\b(resume|cv)\b/i, 'resume'],
   [/\bcover letter\b/i, 'cover_letter'],
+  // The optional answers, before the broader patterns below.
+  [/^legal first name\b/i, 'legal_first'],
+  [/^legal last name\b/i, 'legal_last'],
+  [/^if other\b.*\bitar\b/i, 'itar_other'],
+  [/clearance.*\b(held|level)\b|\bheld\b.*clearance/i, 'clearance_held'],
+  [/security clearance|clearance eligib/i, 'clearance'],
+  [/\bexport controls?\b/i, 'export_status'],
+  [/\bu\.?\s?s\.? person\b|\bitar\b/i, 'us_person'],
+  [/\bcountry of (your )?birth\b|\bplace of birth\b/i, 'birth_country'],
+  [/\bcountries of which you are a citizen\b/i, 'citizenships'],
+  [/\bcountr(y|ies) of which you are an? (lawful )?permanent resident/i, 'residencies'],
+  [/^are you an? (u\.?\s?s\.?|united states) citizen\b(?!.*\bor\b)/i, 'us_citizen'],
+  [/\b(located|living|based|residing) in the (united states|u\.?\s?s\b)/i, 'located_us'],
+  [/\blive in one of the following states\b/i, 'listed_state'],
+  [workedBefore, 'worked_before'],
+  [/^history with\b/i, 'history_with'],
+  [relative, 'relative'],
+  [/\bconflicts? of interest\b/i, 'conflict'],
+  [
+    /\bnon-?competes?\b|\bcontractual obligations\b|\bpost-employment\b|\brestrictive covenants?\b/i,
+    'restrictions',
+  ],
+  [/\bw-?2\b.*\b(rate|hourly|pay)\b/i, 'w2_rate'],
+  [/\bw-?2\b/i, 'w2_contract'],
+  [/\bsms\b|\btext messages?\b/i, 'sms'],
+  [
+    /\bconsider(ed)? (me )?for (other|similar|future)\b|\bother (relevant )?openings\b|\bfuture (opportunities|openings)\b/i,
+    'other_openings',
+  ],
+  [travel, 'travel'],
+  [/\bcertify\w*\b.*\b(true|accurate|correct|complete)\b/i, 'certify'],
+  [/\btimeline for starting\b|\bhow soon (can|could) you start\b/i, 'start_timeline'],
+  [/\bjust for fun\b|\bfavou?rite food\b|\bfun fact\b/i, 'fun'],
   [/\b(sponsor|visa|h-?1b)/i, 'sponsorship'],
   [
     /\b(authori[sz]ed|authori[sz]ation|eligib\w* to work|legally (able|permitted))/i,
@@ -920,11 +1066,188 @@ const PROFILE_QUESTIONS: [RegExp, ProfileAnswerKind][] = [
   [/\b(city|location|where are you (based|located)|current address)\b/i, 'location'],
 ];
 
-/** Which profile answer a question takes, if any. Such questions never go to the model. */
-export function profileQuestionKind(label: string): ProfileAnswerKind | null {
+/** The optional answer each optional kind takes. */
+const OPTIONAL_FIELDS: Partial<Record<ProfileAnswerKind, keyof MoreAnswers>> = {
+  clearance_held: 'clearanceHeld',
+  clearance: 'clearance',
+  export_status: 'exportStatus',
+  us_person: 'usPerson',
+  birth_country: 'birthCountry',
+  citizenships: 'citizenships',
+  residencies: 'otherResidencies',
+  us_citizen: 'usCitizen',
+  located_us: 'locatedInUs',
+  worked_before: 'workedForCompanyBefore',
+  history_with: 'historyWithCompany',
+  relative: 'relativeAtCompany',
+  conflict: 'conflictOfInterest',
+  restrictions: 'employerRestrictions',
+  w2_rate: 'w2Rate',
+  w2_contract: 'w2Contract',
+  sms: 'smsConsent',
+  other_openings: 'otherOpenings',
+  travel: 'canTravel',
+  job_functions: 'canPerformFunctions',
+  certify: 'certifyTrue',
+  start_timeline: 'startTimeline',
+  fun: 'funAnswer',
+};
+
+const isSet = (value: string | null) => value !== null && value !== '';
+
+/** Whether the profile has the answer an optional kind needs (other kinds always do). */
+function hasAnswer(kind: ProfileAnswerKind, profile: JobSearchProfile): boolean {
+  const { more } = profile;
+  if (kind === 'itar_other')
+    return isSet(more.usPerson) || isSet(more.exportStatus) || isSet(more.usCitizen);
+  const field = OPTIONAL_FIELDS[kind];
+  return field === undefined || isSet(more[field]);
+}
+
+/**
+ * Which profile answer a question takes, if any. Such questions never go to the model. With the
+ * profile, a question for an optional answer left blank takes none: it goes to the model as before.
+ */
+export function profileQuestionKind(
+  label: string,
+  profile?: JobSearchProfile,
+): ProfileAnswerKind | null {
   const text = label.trim();
-  for (const [pattern, kind] of PROFILE_QUESTIONS) if (pattern.test(text)) return kind;
+  for (const [test, kind] of PROFILE_QUESTIONS) {
+    if (typeof test === 'function' ? !test(text) : !test.test(text)) continue;
+    return profile && !hasAnswer(kind, profile) ? null : kind;
+  }
   return null;
+}
+
+/** The full name of the profile's U.S. state ("MA" or "massachusetts"), or null. */
+function stateName(state: string): string | null {
+  const value = state.trim();
+  const found = US_STATES.find(
+    ([code, name]) => code === value.toUpperCase() || name.toLowerCase() === value.toLowerCase(),
+  );
+  return found ? found[1] : null;
+}
+
+/** Whether a state's name appears whole ("Virginia" is not in "West Virginia"). */
+function namesState(text: string, name: string): boolean {
+  return new RegExp(`(?<!west )\\b${name}\\b`, 'i').test(text);
+}
+
+/** "Do you live in one of the following states? Alabama, ...": Yes or No, if the list is there. */
+function listedStateAnswer(label: string, profile: JobSearchProfile): string | null {
+  const name = stateName(profile.state);
+  if (!name) return null;
+  const listsStates = US_STATES.some(([, state]) => namesState(label, state));
+  if (!listsStates) return null;
+  return namesState(label, name) ? 'Yes' : 'No';
+}
+
+const yesNoText = (value: 'yes' | 'no' | null) =>
+  value === null ? null : value === 'yes' ? 'Yes' : 'No';
+
+/** How a choice answer reads in a text box, and the options that mean it. */
+const CHOICES = {
+  clearance: {
+    active: ['Yes, I hold an active U.S. security clearance', /\bactive\b/i],
+    eligible: ['Yes, I am eligible for a U.S. security clearance', /(?<!not )\beligible\b/i],
+    not_eligible: [
+      'No, I am not eligible for a U.S. security clearance',
+      /\bnot eligible\b|^no\b/i,
+    ],
+  },
+  clearanceHeld: {
+    never: ['I have never held a U.S. security clearance', /\bnever\b|^n\/?a\b|^none\b/i],
+    confidential: ['Confidential', /\bconfidential\b/i],
+    secret: ['Secret', /(?<!top )\bsecret\b/i],
+    top_secret: ['Top Secret', /\btop secret\b/i],
+  },
+  exportStatus: {
+    citizen: [
+      'A U.S. citizen or national',
+      /\bcitizen or national\b|^(a )?(united states|u\.?\s?s\.?) citizen\b/i,
+    ],
+    green_card: [
+      'A U.S. lawful permanent resident (green card holder)',
+      /\bpermanent residen|\bgreen card\b/i,
+    ],
+    refugee: ['A refugee admitted to the U.S.', /\brefugee\b/i],
+    asylee: ['A person granted asylum in the U.S.', /\basylee\b|\basylum\b/i],
+    none: ['None of the above', /\bnone of the above\b|^none\b/i],
+  },
+  usPerson: {
+    yes: ['I am currently a U.S. Person', /\b(currently|am) a\b.*\bu\.?\s?s\.? person/i],
+    soon: ['I will soon become a U.S. Person', /\bsoon\b|\bwill (soon )?become\b/i],
+    licensable: [
+      'I am not a U.S. Person, but I am eligible for licensing',
+      /\beligible for licens|\blicensing\b/i,
+    ],
+  },
+  startTimeline: {
+    immediately: ['Immediately', /\bimmediate(ly)?\b|\basap\b/i],
+    two_weeks: ['About 2 weeks', /\b(2|two)\s*weeks?\b/i],
+    month_plus: ['More than one month', /\bmore than (one|a|1) month\b|\bmonth or more\b/i],
+    flexible: ['Flexible', /\bflexible\b/i],
+  },
+} as const satisfies {
+  [K in 'clearance' | 'clearanceHeld' | 'exportStatus' | 'usPerson' | 'startTimeline']: Record<
+    NonNullable<MoreAnswers[K]>,
+    readonly [string, RegExp]
+  >;
+};
+
+type ChoiceField = keyof typeof CHOICES;
+
+const CHOICE_KINDS: Partial<Record<ProfileAnswerKind, ChoiceField>> = {
+  clearance: 'clearance',
+  clearance_held: 'clearanceHeld',
+  export_status: 'exportStatus',
+  us_person: 'usPerson',
+  start_timeline: 'startTimeline',
+};
+
+function choiceEntry(
+  field: ChoiceField,
+  profile: JobSearchProfile,
+): readonly [string, RegExp] | null {
+  const value = profile.more[field];
+  if (value === null) return null;
+  return (CHOICES[field] as Record<string, readonly [string, RegExp]>)[value] ?? null;
+}
+
+/** Yes/No meaning of a choice, for forms that ask it as a plain Yes/No. */
+function choiceYesNo(field: ChoiceField, profile: JobSearchProfile): 'Yes' | 'No' | null {
+  const { more } = profile;
+  if (field === 'clearance' && more.clearance !== null)
+    return more.clearance === 'not_eligible' ? 'No' : 'Yes';
+  if (field === 'usPerson' && more.usPerson === 'yes') return 'Yes';
+  return null;
+}
+
+const isPlainYesNo = (options: string[]) =>
+  options.length > 0 && options.every((option) => /^(yes|no)\.?$/i.test(option.trim()));
+
+/** "N/A" for "If other, ... ITAR" when the candidate is a U.S. citizen, national or resident. */
+function itarOtherAnswer(profile: JobSearchProfile): string | null {
+  const { more } = profile;
+  const usPerson =
+    more.usPerson === 'yes' ||
+    more.exportStatus === 'citizen' ||
+    more.exportStatus === 'green_card' ||
+    more.usCitizen === 'yes';
+  return usPerson ? 'N/A' : null;
+}
+
+/** The top of a salary range written in a question ("$100,000-$130,000", "$100k to $130k"). */
+export function salaryRangeTop(label: string): number | null {
+  const match =
+    /\$\s?(\d[\d,]*(?:\.\d+)?)\s*(k)?\s*(?:-|–|—|to)\s*\$?\s?(\d[\d,]*(?:\.\d+)?)\s*(k)?/i.exec(
+      label,
+    );
+  if (!match) return null;
+  const top = Number((match[3] ?? '').replace(/,/g, '')) * (match[4] ? 1000 : 1);
+  // An hourly range ("$40-$50/hr") is not a yearly salary: the candidate decides.
+  return Number.isFinite(top) && top >= 1000 ? top : null;
 }
 
 function salaryText(profile: JobSearchProfile): string {
@@ -995,10 +1318,93 @@ export function profileAnswer(kind: ProfileAnswerKind, profile: JobSearchProfile
       }[profile.disabilityStatus];
     case 'eeo_other':
       return profile.eeoAnswer;
+    case 'eeo_pronouns':
+      return profile.more.pronouns || profile.eeoAnswer;
+    case 'eeo_orientation':
+      return profile.more.sexualOrientation || profile.eeoAnswer;
     case 'resume':
     case 'cover_letter':
       return null;
+    case 'legal_first':
+      return profile.more.legalFirstName || (first ?? profile.fullName);
+    case 'legal_last':
+      return profile.more.legalLastName || rest.join(' ') || null;
+    case 'itar_other':
+      return itarOtherAnswer(profile);
+    case 'listed_state':
+      // Needs the question's wording: answered by profileFill.
+      return null;
+    case 'birth_country':
+    case 'citizenships':
+    case 'residencies':
+    case 'w2_rate':
+    case 'fun':
+      return blankToNull(profile.more[OPTIONAL_FIELDS[kind] as 'birthCountry']);
+    case 'clearance':
+    case 'clearance_held':
+    case 'export_status':
+    case 'us_person':
+    case 'start_timeline':
+      return choiceEntry(CHOICE_KINDS[kind] as ChoiceField, profile)?.[0] ?? null;
+    case 'us_citizen':
+    case 'located_us':
+    case 'worked_before':
+    case 'history_with':
+    case 'relative':
+    case 'conflict':
+    case 'restrictions':
+    case 'w2_contract':
+    case 'sms':
+    case 'other_openings':
+    case 'travel':
+    case 'job_functions':
+    case 'certify':
+      return yesNoText(profile.more[OPTIONAL_FIELDS[kind] as 'usCitizen']);
   }
+}
+
+/**
+ * A profile question's answer and, for a fixed-choice question, the option to pick. The option is
+ * chosen by meaning, never by guess: with no clear option it is null and the question needs you.
+ */
+export function profileFill(
+  kind: ProfileAnswerKind,
+  profile: JobSearchProfile,
+  label: string,
+  options: string[],
+): { answer: string | null; option: string | null } {
+  if (kind === 'listed_state') {
+    const answer = listedStateAnswer(label, profile);
+    return { answer, option: answer === null ? null : pickOption(answer, options) };
+  }
+  const answer = profileAnswer(kind, profile);
+  if (options.length === 0 || answer === null) return { answer, option: null };
+  if (kind.startsWith('eeo_')) return { answer, option: eeoOption(kind, profile, options) };
+
+  const field = CHOICE_KINDS[kind];
+  if (field) {
+    const entry = choiceEntry(field, profile);
+    const matches = entry ? options.filter((option) => entry[1].test(option.trim())) : [];
+    if (matches.length === 1) return { answer, option: matches[0] ?? null };
+    const yesNo = isPlainYesNo(options) ? choiceYesNo(field, profile) : null;
+    return yesNo ? { answer: yesNo, option: pickOption(yesNo, options) } : { answer, option: null };
+  }
+
+  if (kind === 'work_authorization') {
+    const direct = pickOption(answer, options);
+    const fallback = yesNoText(profile.more.authorizedUs);
+    if (direct !== null || fallback === null) return { answer, option: direct };
+    return { answer: fallback, option: pickOption(fallback, options) };
+  }
+
+  if (kind === 'salary' && isPlainYesNo(options)) {
+    const top = salaryRangeTop(label);
+    if (top === null) return { answer, option: null };
+    const fits = top >= profile.salaryMin ? 'Yes' : 'No';
+    return { answer: fits, option: pickOption(fits, options) };
+  }
+
+  return { answer, option: pickOption(answer, options) };
 }
 
 /** For a yes/no question with fixed options: the option matching a Yes or No answer, if any. */
@@ -1044,6 +1450,12 @@ export function eeoOption(
   const direct = pickOption(answer, options);
   if (direct !== null || DECLINE_OPTION.test(answer)) return direct;
   const unique = (matches: string[]) => (matches.length === 1 ? (matches[0] ?? null) : null);
+  // "He Him" and "He/Him" are the same answer.
+  const letters = (value: string) => value.toLowerCase().replace(/[^a-z]/g, '');
+  const sameLetters = unique(
+    options.filter((option) => letters(answer) !== '' && letters(option) === letters(answer)),
+  );
+  if (sameLetters !== null) return sameLetters;
   if (kind === 'eeo_veteran')
     return unique(
       options.filter((option) =>
@@ -1143,8 +1555,11 @@ export const ModelDraftSchema = z.strictObject({
 export type ModelDraft = z.infer<typeof ModelDraftSchema>;
 
 /** The questions the model is asked: those code cannot answer from the profile. */
-export function questionsForModel(questions: ApplicationQuestion[]): ApplicationQuestion[] {
-  return questions.filter((question) => profileQuestionKind(question.label) === null);
+export function questionsForModel(
+  questions: ApplicationQuestion[],
+  profile: JobSearchProfile,
+): ApplicationQuestion[] {
+  return questions.filter((question) => profileQuestionKind(question.label, profile) === null);
 }
 
 const RESUME_ANSWER = 'Attach the resume file from the queue';
@@ -1164,10 +1579,11 @@ export function assembleDraft(
   let needsYou = false;
 
   const answers: DraftAnswer[] = questions.map((question) => {
-    const kind = profileQuestionKind(question.label);
+    const kind = profileQuestionKind(question.label, profile);
     const choices = question.kind.endsWith('select') ? question.options : [];
     let answer: string | null;
     let source: DraftAnswer['source'];
+    let option: string | null = null;
     if (kind === 'resume') {
       answer = RESUME_ANSWER;
       source = 'profile';
@@ -1175,19 +1591,15 @@ export function assembleDraft(
       answer = clip(model.coverLetter, 4000) || null;
       source = 'draft';
     } else if (kind) {
-      answer = profileAnswer(kind, profile);
+      ({ answer, option } = profileFill(kind, profile, question.label, choices));
       source = 'profile';
     } else {
       const drafted = fromModel.get(question.label.trim());
       answer = drafted && !drafted.needsCandidate ? clip(drafted.answer, 4000) || null : null;
       source = 'draft';
     }
-    const option =
-      answer === null || choices.length === 0
-        ? null
-        : kind?.startsWith('eeo_')
-          ? eeoOption(kind, profile, choices)
-          : pickOption(answer, choices);
+    if (source === 'draft' && answer !== null && choices.length > 0)
+      option = pickOption(answer, choices);
     const usable = answer !== null && (choices.length === 0 || option !== null);
     if (!usable) {
       // An optional question can stay empty; a required one waits for the candidate.
