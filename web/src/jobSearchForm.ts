@@ -24,6 +24,8 @@ export interface SetupValues {
   needsSponsorship: boolean;
   salaryMin: string;
   salaryMax: string;
+  /** The lowest pay worth a job; blank for none. */
+  salaryFloor: string;
   linkedin: string;
   portfolio: string;
   website: string;
@@ -85,6 +87,7 @@ export function emptySetup(prefill: { name?: string | null; email?: string }): S
     needsSponsorship: false,
     salaryMin: '',
     salaryMax: '',
+    salaryFloor: '',
     linkedin: '',
     portfolio: '',
     website: '',
@@ -118,6 +121,7 @@ export function toSetupValues(profile: JobSearchProfile): SetupValues {
     ...profile,
     salaryMin: String(profile.salaryMin),
     salaryMax: profile.salaryMax === null ? '' : String(profile.salaryMax),
+    salaryFloor: profile.salaryFloor === null ? '' : String(profile.salaryFloor),
     queries: profile.queries.join('\n'),
     includeTitles: profile.includeTitles.join('\n'),
     skipTitles: profile.skipTitles.join('\n'),
@@ -142,6 +146,7 @@ export function fromSetupValues(
     ...values,
     salaryMin: amount(values.salaryMin) ?? NaN,
     salaryMax: amount(values.salaryMax),
+    salaryFloor: amount(values.salaryFloor),
     queries: lines(values.queries),
     includeTitles: lines(values.includeTitles),
     skipTitles: lines(values.skipTitles),
@@ -156,7 +161,9 @@ export function fromSetupValues(
     const field =
       first === 'more' && second !== undefined ? `more.${String(second)}` : String(first ?? 'form');
     errors[field] ??=
-      field === 'salaryMin' || field === 'salaryMax' ? 'Enter a number' : issue.message;
+      field === 'salaryMin' || field === 'salaryMax' || field === 'salaryFloor'
+        ? 'Enter a number'
+        : issue.message;
   }
   // The schema checks this only once every field is valid; the form says it at once.
   if (lines(values.includeTitles).length === 0 && lines(values.queries).length === 0)

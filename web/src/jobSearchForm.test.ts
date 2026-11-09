@@ -41,6 +41,17 @@ describe('job search setup form', () => {
     );
   });
 
+  it('reads the salary floor as an amount, blank as none, and keeps it on the way back', () => {
+    const blank = fromSetupValues(filled);
+    expect(blank.ok && blank.profile.salaryFloor).toBeNull();
+    const set = fromSetupValues({ ...filled, salaryFloor: '$140,000' });
+    if (!set.ok) throw new Error('invalid');
+    expect(set.profile.salaryFloor).toBe(140000);
+    expect(toSetupValues(set.profile).salaryFloor).toBe('140000');
+    const bad = fromSetupValues({ ...filled, salaryFloor: 'plenty' });
+    expect(!bad.ok && bad.errors).toEqual({ salaryFloor: 'Enter a number' });
+  });
+
   it('names the field with each problem', () => {
     const result = fromSetupValues({
       ...filled,

@@ -385,6 +385,10 @@ function Summary({ profile }: { profile: JobSearchProfile }) {
         ? `$${profile.salaryMin.toLocaleString()}`
         : `$${profile.salaryMin.toLocaleString()} to $${profile.salaryMax.toLocaleString()}`,
     ],
+    [
+      'Lowest pay accepted',
+      profile.salaryFloor === null ? 'No floor' : `$${profile.salaryFloor.toLocaleString()}`,
+    ],
     ['LinkedIn', profile.linkedin || '—'],
     ['Portfolio', profile.portfolio || '—'],
     ['Website', profile.website || '—'],
@@ -682,6 +686,12 @@ function SetupForm({ initial, onSaved }: { initial: SetupValues; onSaved: () => 
             {...field}
           />
           <TextField name="salaryMax" label="Salary (maximum, optional)" {...field} />
+          <TextField
+            name="salaryFloor"
+            label="Lowest pay I'll accept (optional)"
+            hint="Per year, USD. A job whose posted pay tops out below this is skipped"
+            {...field}
+          />
           <TextField name="linkedin" label="LinkedIn (optional)" type="url" {...field} />
           <TextField
             name="portfolio"

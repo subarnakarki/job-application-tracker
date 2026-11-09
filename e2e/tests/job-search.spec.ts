@@ -192,6 +192,7 @@ test('first run: the setup asks once, confirms everything, then opens the overvi
   await page.getByLabel('State', { exact: true }).fill('MA');
   await page.getByLabel('Work authorization').fill('US citizen');
   await page.getByLabel('Salary (minimum)').fill('150000');
+  await page.getByLabel("Lowest pay I'll accept").fill('$140,000');
   await page.getByLabel('Full name').fill('Pat Example');
   await page.getByLabel('Email').fill('pat@example.com');
   await page.getByLabel('How often').selectOption('weekly');
@@ -218,6 +219,7 @@ test('first run: the setup asks once, confirms everything, then opens the overvi
   await expect(confirm).toContainText('I am not a protected veteran');
   await expect(confirm).toContainText('Disability');
   await expect(confirm).toContainText('United States onlyYes');
+  await expect(confirm).toContainText('Lowest pay accepted$140,000');
   await expect(confirm).toContainText('Job sitesGreenhouse, Ashby');
   await expect(confirm).toContainText('site:jobs.ashbyhq.com "QA automation engineer"');
   await page.getByRole('button', { name: 'Confirm and save' }).click();
