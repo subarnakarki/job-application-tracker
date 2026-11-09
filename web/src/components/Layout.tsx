@@ -60,7 +60,7 @@ export function Layout() {
   return (
     <ToastProvider>
       <div className="min-h-dvh pb-[env(safe-area-inset-bottom)]">
-        <header className="sticky top-0 z-30 border-b border-line bg-black/60 pt-[env(safe-area-inset-top)] backdrop-blur-xl backdrop-saturate-150">
+        <header className="sticky top-0 z-30 print:hidden border-b border-line bg-black/60 pt-[env(safe-area-inset-top)] backdrop-blur-xl backdrop-saturate-150">
           <div
             className={`mx-auto flex flex-wrap items-center gap-x-7 px-4 md:flex-nowrap md:px-6 ${width}`}
           >
@@ -114,7 +114,7 @@ export function Layout() {
             </p>
           )}
         </header>
-        <main className={`mx-auto px-4 py-6 md:px-6 md:py-8 ${width}`}>
+        <main className={`mx-auto px-4 py-6 md:px-6 md:py-8 print:max-w-none print:p-0 ${width}`}>
           <Outlet />
         </main>
       </div>

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router';
 import { ApiRequestError } from './api/client';
 import { Layout } from './components/Layout';
+import { TailoredResumePage } from './pages/TailoredResumePage';
 import {
   ApplicationDetailPage,
   EditApplicationPage,
@@ -34,6 +35,7 @@ export function AppRoutes() {
         <Route path="applications/new" element={<NewApplicationPage />} />
         <Route path="applications/:id" element={<ApplicationDetailPage />} />
         <Route path="applications/:id/edit" element={<EditApplicationPage />} />
+        <Route path="applications/:id/resume" element={<TailoredResumePage />} />
         <Route path="leads" element={<LeadsPage />} />
         <Route path="leads/new" element={<NewLeadPage />} />
         <Route path="leads/:id" element={<LeadPage />} />

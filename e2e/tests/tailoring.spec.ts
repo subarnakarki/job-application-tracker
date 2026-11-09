@@ -58,3 +58,44 @@ test("tailor an application's resume: paste the posting, pick, edit by hand, sav
     /- Built Docker images for the test grid\.$/,
   );
 });
+
+test("this job's resume as a printable page, saved as a PDF from the browser", async ({
+  page,
+  api,
+}) => {
+  await api.uploadResumeText(RESUME);
+  const application = await api.createApplication({ company: 'Acme', role: 'Senior SDET' });
+  const saved = await page.request.put(`/api/applications/${application.id}/tailored-resume`, {
+    data: { text: `${RESUME}\n\nSKILLS\n- Playwright\n- TypeScript` },
+  });
+  expect(saved.status(), await saved.text()).toBe(200);
+
+  await page.goto(`/applications/${application.id}`);
+  await page
+    .getByRole('region', { name: 'Tailored resume' })
+    .getByRole('link', { name: 'Print or save as PDF' })
+    .click();
+
+  await expect(page).toHaveURL(`/applications/${application.id}/resume`);
+  // The title becomes the PDF's file name.
+  await expect(page).toHaveTitle('Resume - Acme - Senior SDET');
+  const sheet = page.getByRole('article', { name: "This job's resume" });
+  await expect(sheet.getByRole('heading', { level: 1 })).toHaveText('Pat Example');
+  await expect(sheet.getByRole('heading', { level: 2 })).toHaveText('SKILLS');
+  await expect(sheet.getByRole('listitem')).toHaveText([
+    'Ran SQL reports for the growth team.',
+    'Kept flaky tests under one percent by fixing them each week.',
+    'Paired with developers on contract tests for the payments service.',
+    'Playwright',
+    'TypeScript',
+  ]);
+  const print = page.getByRole('button', { name: 'Print or save as PDF' });
+  await expect(print).toBeVisible();
+
+  // In print: only the sheet, without the app's header or these controls.
+  await page.emulateMedia({ media: 'print' });
+  await expect(print).toBeHidden();
+  await expect(page.getByRole('navigation', { name: 'Main' })).toBeHidden();
+  await expect(sheet).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('print.png'), fullPage: true });
+});

@@ -44,6 +44,11 @@
   --color-red: #ff3b4f;
   --color-red-solid: #dc2640; /* button fill: white text on it is 4.8:1 */
 
+  /* Paper: a printable document (this job's resume), dark ink on white on screen and in print. */
+  --color-paper: #fff;
+  --color-ink: #111;
+  --color-ink-2: #333;
+
   /* Stage colours: dots, bars and avatar tints. Always shown next to the stage name. */
   --color-st-saved: #7c7c85;
   --color-st-applied: #0a8bff;
@@ -853,5 +858,18 @@
   to {
     transform: none;
     opacity: 1;
+  }
+}
+
+/* Print: only the page content, on white, without the app chrome. */
+@media print {
+  @page {
+    margin: 16mm;
+  }
+
+  html,
+  body {
+    background: var(--color-paper);
+    color: var(--color-ink);
   }
 }

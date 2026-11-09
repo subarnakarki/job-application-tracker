@@ -942,14 +942,17 @@ does not change.
 | From a queue  | The queue's tailoring (16c) gains the same editor. **Save** there first asks to **Track it** (it uses up an application), then saves on that application, with the job's keywords                                                                                                                                                                                     |
 | Routes        | `POST /api/applications/:id/tailor` (optional `postingText`), `PUT` and `DELETE /api/applications/:id/tailored-resume`; `auth: 'user'`, in `ISOLATION_COVERAGE`                                                                                                                                                                                                       |
 
-### 18d. Download as .docx and .pdf, clean layout
+### 18d. A PDF through the browser (revised, smaller: owner's choice, 2026-11-09)
 
-| Area   | Decision                                                                                                                                                                                                                                                                                                                             |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Layout | Both files from the saved text in one clean one-column layout: name, section headings and bullets recognised from the text                                                                                                                                                                                                           |
-| .docx  | Written by our own code: a small zip writer (`node:zlib`, `zlib.crc32`) used with the existing reader. Text is XML-escaped, characters XML 1.0 does not allow are removed, `xml:space="preserve"`                                                                                                                                    |
-| .pdf   | `pdf-lib` (pinned exact version) with the built-in Helvetica, so no font file and nothing large in the API bundle. Helvetica prints Western European characters only: any other character is listed when saving ("these will not print in the PDF; the .docx keeps them"). A custom font is left for later, with a bundle-size check |
-| Routes | `GET /api/applications/:id/tailored-resume.docx` and `.pdf` (`auth: 'user'`, in `ISOLATION_COVERAGE`), file-download responses as in Phase 14. File name `Resume - <Company> - <Role>`, through one shared, tested `Content-Disposition` helper (also used by `/api/resume/file`)                                                    |
+The server-made .docx and .pdf were replaced by the browser's own Save as PDF: no new library, no server code,
+and every character prints (the browser's fonts).
+
+| Area     | Decision                                                                                                                                                         |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Page     | `/applications/:id/resume`: this job's saved resume on a white sheet, in one clean layout (name, section headings and bullets recognised from the text, by code) |
+| PDF      | **Print or save as PDF** opens the print dialog; the page title (`Resume - <Company> - <Role>`) becomes the file's name. In print only the sheet shows           |
+| Tokens   | `--color-paper`, `--color-ink`, `--color-ink-2` in `@theme`; print styles in `index.css`                                                                         |
+| Not done | A .docx download, a PDF made by the server (`pdf-lib`), and the zip writer: left for later if an editable file is needed                                         |
 
 ### 18e. Keep the original DOCX's formatting (last, can be cut)
 

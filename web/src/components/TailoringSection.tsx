@@ -227,6 +227,9 @@ function SavedVersion({
         </p>
       )}
       <div className="flex flex-wrap gap-2">
+        <Link to={`/applications/${applicationId}/resume`} className="btn-w">
+          Print or save as PDF
+        </Link>
         <button type="button" className="btn-d" onClick={() => onEdit(saved.text)}>
           Edit
         </button>
