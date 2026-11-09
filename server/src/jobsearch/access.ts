@@ -37,6 +37,37 @@ export const NO_CLAUDE: JobSearchClaude = {
         .map((term) => ({ keyword: term, why: `No ${term} experience in the resume.` })),
     });
   },
+  tailorPosting: (request) => {
+    // The posting's capitalised terms are its keywords; the first one the resume lacks is added to
+    // the resume's first line.
+    const terms = [
+      ...new Set(request.postingText.match(/\b[A-Z][A-Za-z0-9+#./-]{2,}/g) ?? []),
+    ].slice(0, 8);
+    const resume = request.resumeText.toLowerCase();
+    const missing = terms.filter((term) => !resume.includes(term.toLowerCase()));
+    const line = request.resumeText
+      .split(/\r?\n|(?<=\.)\s+/)
+      .map((entry) => entry.trim())
+      .find((entry) => entry.split(/\s+/).length >= 3);
+    const keyword = missing[0];
+    return Promise.resolve({
+      keywords: terms.map((term) => ({ term, group: 'tool' as const })),
+      edits:
+        line && keyword
+          ? [
+              {
+                original: line,
+                suggested: `${line.replace(/\.$/, '')}, using ${keyword}.`,
+                keywordsAdded: [keyword],
+                why: "The same work, in the posting's words.",
+              },
+            ]
+          : [],
+      notCovered: missing
+        .slice(1, 2)
+        .map((term) => ({ keyword: term, why: `No ${term} experience in the resume.` })),
+    });
+  },
   leadMessage: (request) => {
     const first = request.lead.name.split(/\s+/)[0] ?? request.lead.name;
     const job = `the ${request.role} role at ${request.company}`;

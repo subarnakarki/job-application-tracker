@@ -105,6 +105,7 @@ const claude: StubClaude = {
   },
   // Lead messages are tested in leadMessages.test.ts.
   leadMessage: () => Promise.resolve(null),
+  tailorPosting: () => Promise.resolve(null),
   search(query: string, sources: SearchSource[]) {
     claude.searches.push({ query, sources });
     return Promise.resolve({

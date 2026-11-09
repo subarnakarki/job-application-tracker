@@ -4818,6 +4818,1215 @@
         }
       }
     },
+    "/api/applications/{id}/tailor": {
+      "post": {
+        "summary": "Tailor my resume for this application: suggested edits and the posting keywords",
+        "operationId": "postApplicationsByIdTailor",
+        "tags": [
+          "applications"
+        ],
+        "x-auth": "user",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "postingText": {
+                    "type": "string",
+                    "minLength": 200,
+                    "maxLength": 20000
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tailoring": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "edits": {
+                              "maxItems": 12,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "original": {
+                                    "type": "string",
+                                    "maxLength": 600
+                                  },
+                                  "suggested": {
+                                    "type": "string",
+                                    "maxLength": 600
+                                  },
+                                  "keywordsAdded": {
+                                    "maxItems": 20,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 100
+                                    }
+                                  },
+                                  "why": {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  "unverified": {
+                                    "maxItems": 10,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 100
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "original",
+                                  "suggested",
+                                  "keywordsAdded",
+                                  "why",
+                                  "unverified"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "notCovered": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "keyword": {
+                                    "type": "string",
+                                    "maxLength": 100
+                                  },
+                                  "why": {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  }
+                                },
+                                "required": [
+                                  "keyword",
+                                  "why"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "model": {
+                              "type": "string",
+                              "maxLength": 100
+                            },
+                            "createdAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            }
+                          },
+                          "required": [
+                            "edits",
+                            "notCovered",
+                            "model",
+                            "createdAt"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "keywords": {
+                      "maxItems": 30,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "term": {
+                            "type": "string",
+                            "maxLength": 100
+                          },
+                          "group": {
+                            "type": "string",
+                            "enum": [
+                              "hard_skill",
+                              "tool",
+                              "certification",
+                              "soft_skill"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "term",
+                          "group"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "hasPostingText": {
+                      "type": "boolean"
+                    },
+                    "saved": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "text": {
+                              "type": "string"
+                            },
+                            "edits": {
+                              "maxItems": 200,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "original": {
+                                    "type": "string",
+                                    "maxLength": 2400
+                                  },
+                                  "replacement": {
+                                    "type": "string",
+                                    "maxLength": 2400
+                                  }
+                                },
+                                "required": [
+                                  "original",
+                                  "replacement"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "savedAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            },
+                            "resumeChanged": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "text",
+                            "edits",
+                            "savedAt",
+                            "resumeChanged"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "tailoring",
+                    "keywords",
+                    "hasPostingText",
+                    "saved"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cross-site request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such application (or not yours), or not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No resume uploaded yet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The body is not JSON",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "No job link, or the posting could not be read: paste it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many tailorings today, or too many links read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The suggestions did not finish",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Anthropic key was rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error, always in the shared error shape",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/applications/{id}/tailored-resume": {
+      "delete": {
+        "summary": "Remove this job's saved resume (the suggestions stay)",
+        "operationId": "deleteApplicationsByIdTailored-resume",
+        "tags": [
+          "applications"
+        ],
+        "x-auth": "user",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tailoring": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "edits": {
+                              "maxItems": 12,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "original": {
+                                    "type": "string",
+                                    "maxLength": 600
+                                  },
+                                  "suggested": {
+                                    "type": "string",
+                                    "maxLength": 600
+                                  },
+                                  "keywordsAdded": {
+                                    "maxItems": 20,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 100
+                                    }
+                                  },
+                                  "why": {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  "unverified": {
+                                    "maxItems": 10,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 100
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "original",
+                                  "suggested",
+                                  "keywordsAdded",
+                                  "why",
+                                  "unverified"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "notCovered": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "keyword": {
+                                    "type": "string",
+                                    "maxLength": 100
+                                  },
+                                  "why": {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  }
+                                },
+                                "required": [
+                                  "keyword",
+                                  "why"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "model": {
+                              "type": "string",
+                              "maxLength": 100
+                            },
+                            "createdAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            }
+                          },
+                          "required": [
+                            "edits",
+                            "notCovered",
+                            "model",
+                            "createdAt"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "keywords": {
+                      "maxItems": 30,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "term": {
+                            "type": "string",
+                            "maxLength": 100
+                          },
+                          "group": {
+                            "type": "string",
+                            "enum": [
+                              "hard_skill",
+                              "tool",
+                              "certification",
+                              "soft_skill"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "term",
+                          "group"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "hasPostingText": {
+                      "type": "boolean"
+                    },
+                    "saved": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "text": {
+                              "type": "string"
+                            },
+                            "edits": {
+                              "maxItems": 200,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "original": {
+                                    "type": "string",
+                                    "maxLength": 2400
+                                  },
+                                  "replacement": {
+                                    "type": "string",
+                                    "maxLength": 2400
+                                  }
+                                },
+                                "required": [
+                                  "original",
+                                  "replacement"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "savedAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            },
+                            "resumeChanged": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "text",
+                            "edits",
+                            "savedAt",
+                            "resumeChanged"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "tailoring",
+                    "keywords",
+                    "hasPostingText",
+                    "saved"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cross-site request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such application (or not yours), or not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The body is not JSON",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error, always in the shared error shape",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Save this job's resume: the edited text, with its changes from the resume",
+        "operationId": "putApplicationsByIdTailored-resume",
+        "tags": [
+          "applications"
+        ],
+        "x-auth": "user",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60000
+                  }
+                },
+                "required": [
+                  "text"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tailoring": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "edits": {
+                              "maxItems": 12,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "original": {
+                                    "type": "string",
+                                    "maxLength": 600
+                                  },
+                                  "suggested": {
+                                    "type": "string",
+                                    "maxLength": 600
+                                  },
+                                  "keywordsAdded": {
+                                    "maxItems": 20,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 100
+                                    }
+                                  },
+                                  "why": {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  "unverified": {
+                                    "maxItems": 10,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 100
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "original",
+                                  "suggested",
+                                  "keywordsAdded",
+                                  "why",
+                                  "unverified"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "notCovered": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "keyword": {
+                                    "type": "string",
+                                    "maxLength": 100
+                                  },
+                                  "why": {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  }
+                                },
+                                "required": [
+                                  "keyword",
+                                  "why"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "model": {
+                              "type": "string",
+                              "maxLength": 100
+                            },
+                            "createdAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            }
+                          },
+                          "required": [
+                            "edits",
+                            "notCovered",
+                            "model",
+                            "createdAt"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "keywords": {
+                      "maxItems": 30,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "term": {
+                            "type": "string",
+                            "maxLength": 100
+                          },
+                          "group": {
+                            "type": "string",
+                            "enum": [
+                              "hard_skill",
+                              "tool",
+                              "certification",
+                              "soft_skill"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "term",
+                          "group"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "hasPostingText": {
+                      "type": "boolean"
+                    },
+                    "saved": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "text": {
+                              "type": "string"
+                            },
+                            "edits": {
+                              "maxItems": 200,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "original": {
+                                    "type": "string",
+                                    "maxLength": 2400
+                                  },
+                                  "replacement": {
+                                    "type": "string",
+                                    "maxLength": 2400
+                                  }
+                                },
+                                "required": [
+                                  "original",
+                                  "replacement"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "savedAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            },
+                            "resumeChanged": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "text",
+                            "edits",
+                            "savedAt",
+                            "resumeChanged"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "tailoring",
+                    "keywords",
+                    "hasPostingText",
+                    "saved"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cross-site request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such application (or not yours), or not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No resume uploaded yet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The body is not JSON",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error, always in the shared error shape",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/applications/{id}/tailoring": {
+      "get": {
+        "summary": "The application's tailoring: the last suggestions and the saved version",
+        "operationId": "getApplicationsByIdTailoring",
+        "tags": [
+          "applications"
+        ],
+        "x-auth": "user",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tailoring": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "edits": {
+                              "maxItems": 12,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "original": {
+                                    "type": "string",
+                                    "maxLength": 600
+                                  },
+                                  "suggested": {
+                                    "type": "string",
+                                    "maxLength": 600
+                                  },
+                                  "keywordsAdded": {
+                                    "maxItems": 20,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 100
+                                    }
+                                  },
+                                  "why": {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  "unverified": {
+                                    "maxItems": 10,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 100
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "original",
+                                  "suggested",
+                                  "keywordsAdded",
+                                  "why",
+                                  "unverified"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "notCovered": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "keyword": {
+                                    "type": "string",
+                                    "maxLength": 100
+                                  },
+                                  "why": {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  }
+                                },
+                                "required": [
+                                  "keyword",
+                                  "why"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "model": {
+                              "type": "string",
+                              "maxLength": 100
+                            },
+                            "createdAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            }
+                          },
+                          "required": [
+                            "edits",
+                            "notCovered",
+                            "model",
+                            "createdAt"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "keywords": {
+                      "maxItems": 30,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "term": {
+                            "type": "string",
+                            "maxLength": 100
+                          },
+                          "group": {
+                            "type": "string",
+                            "enum": [
+                              "hard_skill",
+                              "tool",
+                              "certification",
+                              "soft_skill"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "term",
+                          "group"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "hasPostingText": {
+                      "type": "boolean"
+                    },
+                    "saved": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "text": {
+                              "type": "string"
+                            },
+                            "edits": {
+                              "maxItems": 200,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "original": {
+                                    "type": "string",
+                                    "maxLength": 2400
+                                  },
+                                  "replacement": {
+                                    "type": "string",
+                                    "maxLength": 2400
+                                  }
+                                },
+                                "required": [
+                                  "original",
+                                  "replacement"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "savedAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            },
+                            "resumeChanged": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "text",
+                            "edits",
+                            "savedAt",
+                            "resumeChanged"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "tailoring",
+                    "keywords",
+                    "hasPostingText",
+                    "saved"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such application (or not yours), or not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error, always in the shared error shape",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/applications/export.csv": {
       "get": {
         "summary": "Download the listed applications as CSV (same filters as the list)",
@@ -23439,6 +24648,220 @@
                         "hits"
                       ],
                       "additionalProperties": false
+                    },
+                    "applicationTailorings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "applicationId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "postingText": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "tailoring": {
+                            "type": "object",
+                            "properties": {
+                              "tailoring": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "edits": {
+                                        "maxItems": 12,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "original": {
+                                              "type": "string",
+                                              "maxLength": 600
+                                            },
+                                            "suggested": {
+                                              "type": "string",
+                                              "maxLength": 600
+                                            },
+                                            "keywordsAdded": {
+                                              "maxItems": 20,
+                                              "type": "array",
+                                              "items": {
+                                                "type": "string",
+                                                "maxLength": 100
+                                              }
+                                            },
+                                            "why": {
+                                              "type": "string",
+                                              "maxLength": 300
+                                            },
+                                            "unverified": {
+                                              "maxItems": 10,
+                                              "type": "array",
+                                              "items": {
+                                                "type": "string",
+                                                "maxLength": 100
+                                              }
+                                            }
+                                          },
+                                          "required": [
+                                            "original",
+                                            "suggested",
+                                            "keywordsAdded",
+                                            "why",
+                                            "unverified"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "notCovered": {
+                                        "maxItems": 20,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "keyword": {
+                                              "type": "string",
+                                              "maxLength": 100
+                                            },
+                                            "why": {
+                                              "type": "string",
+                                              "maxLength": 300
+                                            }
+                                          },
+                                          "required": [
+                                            "keyword",
+                                            "why"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "model": {
+                                        "type": "string",
+                                        "maxLength": 100
+                                      },
+                                      "createdAt": {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                                      }
+                                    },
+                                    "required": [
+                                      "edits",
+                                      "notCovered",
+                                      "model",
+                                      "createdAt"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "keywords": {
+                                "maxItems": 30,
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "term": {
+                                      "type": "string",
+                                      "maxLength": 100
+                                    },
+                                    "group": {
+                                      "type": "string",
+                                      "enum": [
+                                        "hard_skill",
+                                        "tool",
+                                        "certification",
+                                        "soft_skill"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "term",
+                                    "group"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "hasPostingText": {
+                                "type": "boolean"
+                              },
+                              "saved": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "text": {
+                                        "type": "string"
+                                      },
+                                      "edits": {
+                                        "maxItems": 200,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "original": {
+                                              "type": "string",
+                                              "maxLength": 2400
+                                            },
+                                            "replacement": {
+                                              "type": "string",
+                                              "maxLength": 2400
+                                            }
+                                          },
+                                          "required": [
+                                            "original",
+                                            "replacement"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "savedAt": {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                                      },
+                                      "resumeChanged": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "text",
+                                      "edits",
+                                      "savedAt",
+                                      "resumeChanged"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "tailoring",
+                              "keywords",
+                              "hasPostingText",
+                              "saved"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "applicationId",
+                          "postingText",
+                          "tailoring"
+                        ],
+                        "additionalProperties": false
+                      }
                     }
                   },
                   "required": [
@@ -23449,7 +24872,8 @@
                     "imports",
                     "resume",
                     "resumeAnalyses",
-                    "jobSearch"
+                    "jobSearch",
+                    "applicationTailorings"
                   ],
                   "additionalProperties": false
                 }

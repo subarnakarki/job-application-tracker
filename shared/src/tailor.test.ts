@@ -5,6 +5,7 @@ import {
   findInResume,
   unverifiedIn,
   type TailorAnswer,
+  lineEdits,
 } from './tailor';
 
 const RESUME = `Pat Example, Senior SDET
@@ -167,5 +168,38 @@ describe('applyEdits', () => {
     expect(text).toBe(
       RESUME.replace('Mentored new SDETs and ran testing workshops', 'Coached new SDETs'),
     );
+  });
+});
+
+describe('lineEdits: what changed from the resume, line by line', () => {
+  const RESUME =
+    'Pat Example\n\nSDET\n- Built Playwright suites.\n- Ran SQL reports.\n- Wrote docs.';
+
+  it('pairs a changed line with its replacement and ignores unchanged and blank lines', () => {
+    const edited = RESUME.replace('- Ran SQL reports.', '- Ran SQL reports in CI/CD.');
+    expect(lineEdits(RESUME, `${edited}\n\n`)).toEqual([
+      { original: '- Ran SQL reports.', replacement: '- Ran SQL reports in CI/CD.' },
+    ]);
+  });
+
+  it('marks a line only added or only removed', () => {
+    expect(lineEdits(RESUME, `${RESUME}\n- Led the guild.`)).toEqual([
+      { original: '', replacement: '- Led the guild.' },
+    ]);
+    expect(lineEdits(RESUME, RESUME.replace('\n- Wrote docs.', ''))).toEqual([
+      { original: '- Wrote docs.', replacement: '' },
+    ]);
+  });
+
+  it('pairs a run of changed lines in order', () => {
+    const edited = RESUME.replace('- Built Playwright suites.\n- Ran SQL reports.', '- A.\n- B.');
+    expect(lineEdits(RESUME, edited)).toEqual([
+      { original: '- Built Playwright suites.', replacement: '- A.' },
+      { original: '- Ran SQL reports.', replacement: '- B.' },
+    ]);
+  });
+
+  it('finds nothing when the text is the resume, whatever the spacing', () => {
+    expect(lineEdits(RESUME, RESUME.replace(/\n/g, '\r\n  '))).toEqual([]);
   });
 });

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { SOURCES, STATUSES, WORK_MODES } from './constants';
 import { JobHitSchema, JobSearchProfileSchema, JobSearchRunSchema } from './jobSearch';
 import { ResumeAnalysisSchema, ResumeSchema } from './resume';
+import { ApplicationTailoringSchema } from './tailor';
 
 /**
  * What the API returns. These are strict: an unexpected field (a leaked
@@ -288,6 +289,14 @@ export const DataExportSchema = z.strictObject({
     runs: z.array(JobSearchRunSchema),
     hits: z.array(JobHitSchema),
   }),
+  /** Resumes tailored to an application: suggestions, posting text and the saved version. */
+  applicationTailorings: z.array(
+    z.strictObject({
+      applicationId: z.uuid(),
+      postingText: z.string().nullable(),
+      tailoring: ApplicationTailoringSchema,
+    }),
+  ),
 });
 export type DataExport = z.infer<typeof DataExportSchema>;
 

@@ -29,6 +29,7 @@ import { registerMeRoutes } from './routes/me';
 import { registerResumeRoutes } from './routes/resume';
 import { registerJobSearchRoutes } from './routes/jobSearch';
 import { registerLeadMessageRoutes } from './routes/leadMessages';
+import { registerTailoringRoutes } from './routes/tailoring';
 import { jobSearchClaudeFromEnv, type JobSearchClaude } from './jobsearch/claude';
 import { analyzerFromEnv, type ResumeAnalyzer } from './resume/analyze';
 import { registerSessionRoutes } from './routes/session';
@@ -151,6 +152,14 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     clock,
     env,
     claude: jobSearchClaude,
+    openToTestUsers: testRoutes !== null,
+  });
+  registerTailoringRoutes(app, {
+    db: deps.db,
+    clock,
+    env,
+    claude: jobSearchClaude,
+    fetchPage,
     openToTestUsers: testRoutes !== null,
   });
   if (testRoutes) registerTestRoutes(app, { db: deps.db, clock });

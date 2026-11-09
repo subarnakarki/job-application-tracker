@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { indexText, type KeywordGroup } from './resume';
+import { indexText, KEYWORD_GROUPS, POSTING_KEYWORDS_MAX, type KeywordGroup } from './resume';
 
 /**
  * Tailoring a resume for one job (Phase 16c): the model suggests rewording lines the resume already
@@ -168,3 +168,138 @@ export function applyEdits(
   }
   return text;
 }
+
+// ---------------------------------------------------------------------------------------------
+// A resume tailored to one application (Phase 18c)
+
+export const APPLICATION_TAILOR_LIMITS = {
+  /** A pasted posting. */
+  postingText: 20_000,
+  /** The saved version, as long as a stored resume may be. */
+  tailoredText: 60_000,
+  /** Edits kept with a saved version (chosen suggestions and lines changed by hand). */
+  savedEdits: 200,
+} as const;
+
+const PostingKeywordSchema = z.strictObject({
+  term: z.string().max(100),
+  group: z.enum(KEYWORD_GROUPS),
+});
+
+/**
+ * What the model returns when tailoring for an application: the posting's keywords (there is no
+ * draft to take them from) with the same suggestions as Phase 16, in one call.
+ */
+export const ApplicationTailorAnswerSchema = TailorAnswerSchema.extend({
+  keywords: z
+    .array(z.strictObject({ term: z.string(), group: z.enum(KEYWORD_GROUPS) }))
+    .describe(
+      'The 10 to 20 terms this posting asks for (skills, tools, certifications), as written in it, most important first',
+    ),
+});
+export type ApplicationTailorAnswer = z.infer<typeof ApplicationTailorAnswerSchema>;
+
+/** One change in a saved version: a resume line and what replaced it ('' when removed). */
+export const LineEditSchema = z.strictObject({
+  original: z.string().max(TAILOR_LIMITS.line * 4),
+  replacement: z.string().max(TAILOR_LIMITS.line * 4),
+});
+export type LineEdit = z.infer<typeof LineEditSchema>;
+
+/**
+ * The changes from the resume to an edited version, line by line (longest common subsequence of
+ * lines, ignoring blank lines and surrounding spaces). A run of changed lines is paired in order;
+ * a line only added has an empty original, a line only removed an empty replacement. Used to place
+ * the edits in the original document (18e) and to show what changed.
+ */
+export function lineEdits(resumeText: string, editedText: string): LineEdit[] {
+  const lines = (text: string) =>
+    text
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+  const before = lines(resumeText);
+  const after = lines(editedText);
+  // LCS table, from the end.
+  const table: number[][] = Array.from({ length: before.length + 1 }, () =>
+    new Array<number>(after.length + 1).fill(0),
+  );
+  for (let i = before.length - 1; i >= 0; i -= 1)
+    for (let j = after.length - 1; j >= 0; j -= 1)
+      (table[i] as number[])[j] =
+        before[i] === after[j]
+          ? ((table[i + 1] as number[])[j + 1] ?? 0) + 1
+          : Math.max((table[i + 1] as number[])[j] ?? 0, (table[i] as number[])[j + 1] ?? 0);
+
+  const edits: LineEdit[] = [];
+  let removed: string[] = [];
+  let added: string[] = [];
+  const flush = () => {
+    const pairs = Math.max(removed.length, added.length);
+    for (let k = 0; k < pairs; k += 1)
+      edits.push({ original: removed[k] ?? '', replacement: added[k] ?? '' });
+    removed = [];
+    added = [];
+  };
+  let i = 0;
+  let j = 0;
+  while (i < before.length || j < after.length) {
+    if (i < before.length && j < after.length && before[i] === after[j]) {
+      flush();
+      i += 1;
+      j += 1;
+    } else if (
+      j >= after.length ||
+      (i < before.length &&
+        ((table[i + 1] as number[])[j] ?? 0) >= ((table[i] as number[])[j + 1] ?? 0))
+    ) {
+      removed.push(before[i] as string);
+      i += 1;
+    } else {
+      added.push(after[j] as string);
+      j += 1;
+    }
+  }
+  flush();
+  return edits;
+}
+
+/** `POST /api/applications/:id/tailor`: the posting pasted when its link cannot be read. */
+export const TailorApplicationSchema = z.strictObject({
+  postingText: z
+    .string()
+    .trim()
+    .min(200, 'Paste the whole posting')
+    .max(APPLICATION_TAILOR_LIMITS.postingText)
+    .optional(),
+});
+export type TailorApplicationInput = z.output<typeof TailorApplicationSchema>;
+
+/** `PUT /api/applications/:id/tailored-resume`: the version to keep for this job. */
+export const SaveTailoredResumeSchema = z.strictObject({
+  text: z
+    .string()
+    .trim()
+    .min(1, 'Required')
+    .max(APPLICATION_TAILOR_LIMITS.tailoredText)
+    .refine((value) => !value.includes('\u0000'), 'Must not contain NUL characters'),
+});
+
+/** An application's tailoring: the last suggestions and the saved version, if any. */
+export const ApplicationTailoringSchema = z.strictObject({
+  tailoring: TailoringSchema.nullable(),
+  /** The posting's keywords, for the fit as the text is edited. */
+  keywords: z.array(PostingKeywordSchema).max(POSTING_KEYWORDS_MAX),
+  /** Whether the posting's text is stored (tailoring again needs no link or paste). */
+  hasPostingText: z.boolean(),
+  saved: z
+    .strictObject({
+      text: z.string(),
+      edits: z.array(LineEditSchema).max(APPLICATION_TAILOR_LIMITS.savedEdits),
+      savedAt: z.iso.datetime({ offset: true }),
+      /** The resume was replaced since this version was saved. */
+      resumeChanged: z.boolean(),
+    })
+    .nullable(),
+});
+export type ApplicationTailoring = z.infer<typeof ApplicationTailoringSchema>;

@@ -70,7 +70,8 @@ function stringArbitrary(schema: JsonSchema): fc.Arbitrary<string> {
   if (schema.format === 'date-time') return instant;
   if (schema.format === 'uuid') return fc.uuid();
   const minLength = schema.minLength ?? 0;
-  const maxLength = Math.min(schema.maxLength ?? 60, 60);
+  // Short strings keep runs fast, but never shorter than the schema's own minimum.
+  const maxLength = Math.max(minLength, Math.min(schema.maxLength ?? 60, 60));
   return fc.oneof(
     {
       weight: 6,
