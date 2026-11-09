@@ -41,7 +41,11 @@ export const NO_CLAUDE: JobSearchClaude = {
     // The posting's capitalised terms are its keywords; the first one the resume lacks is added to
     // the resume's first line.
     const terms = [
-      ...new Set(request.postingText.match(/\b[A-Z][A-Za-z0-9+#./-]{2,}/g) ?? []),
+      ...new Set(
+        (request.postingText.match(/\b[A-Z][A-Za-z0-9+#./-]{2,}/g) ?? []).map((term) =>
+          term.replace(/[./-]+$/, ''),
+        ),
+      ),
     ].slice(0, 8);
     const resume = request.resumeText.toLowerCase();
     const missing = terms.filter((term) => !resume.includes(term.toLowerCase()));

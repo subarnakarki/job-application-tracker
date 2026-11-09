@@ -48,6 +48,7 @@ import { Glow } from '../components/ui/Glow';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Pill } from '../components/ui/Pill';
 import { formatDateTime } from '../format';
+import { TailorSuggestions, useChosenEdits } from '../components/TailorSuggestions';
 import { FIT_LABELS } from '../resume';
 import {
   CADENCE_LABELS,
@@ -1488,18 +1489,11 @@ function TailorPanel({ hit }: { hit: JobHit }) {
   const tailor = useTailorResume();
   const toast = useToast();
   const tailoring = hit.tailoring;
-  const [skipped, setSkipped] = useState<Set<number> | null>(null);
   const resume = useResumeText(tailoring !== null);
+  const { off, chosen, toggle } = useChosenEdits(tailoring);
   const fit = hit.fit;
   if (!fit || (fit.missing.length === 0 && !tailoring)) return null;
   const job = `${hit.company}, ${hit.role}`;
-  // Suggestions with something to check start unticked; the rest start ticked.
-  const off =
-    skipped ??
-    new Set(
-      (tailoring?.edits ?? []).flatMap((edit, index) => (edit.unverified.length ? [index] : [])),
-    );
-  const chosen = (tailoring?.edits ?? []).filter((_, index) => !off.has(index));
   const tailoredText = resume.data ? applyEdits(resume.data.text, chosen) : null;
   const after = tailoredText ? jobFit(hit.draft, tailoredText) : null;
   const copy = (text: string, done: string) =>
@@ -1516,7 +1510,6 @@ function TailorPanel({ hit }: { hit: JobHit }) {
       onClick={() =>
         tailor.mutate(hit.id, {
           onSuccess: () => {
-            setSkipped(null);
             toast(`Suggestions ready for ${hit.company}`);
           },
         })
@@ -1555,63 +1548,7 @@ function TailorPanel({ hit }: { hit: JobHit }) {
               Fit {String(fit.percent)}%
               {after ? ` → ${String(after.percent)}% with the ticked edits` : ''}
             </p>
-            {tailoring.edits.length === 0 && (
-              <p className="text-sm text-fg-3">
-                No honest rewording adds the missing keywords; see below for why.
-              </p>
-            )}
-            <ol className="flex flex-col gap-3">
-              {tailoring.edits.map((edit, index) => (
-                <li key={edit.original} className="flex flex-col gap-2 rounded-tile bg-s3 p-3">
-                  <label className="flex items-center gap-2 text-sm font-medium">
-                    <input
-                      type="checkbox"
-                      checked={!off.has(index)}
-                      onChange={(event) => {
-                        const next = new Set(off);
-                        if (event.target.checked) next.delete(index);
-                        else next.add(index);
-                        setSkipped(next);
-                      }}
-                    />
-                    Use suggestion {String(index + 1)}
-                    {edit.keywordsAdded.length > 0 && (
-                      <span className="font-normal text-fg-3">
-                        (adds {edit.keywordsAdded.join(', ')})
-                      </span>
-                    )}
-                  </label>
-                  <dl className="grid gap-2 text-sm sm:grid-cols-2">
-                    <div>
-                      <dt className="text-fg-3">Your line</dt>
-                      <dd>{edit.original}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-fg-3">Suggested</dt>
-                      <dd>{edit.suggested}</dd>
-                    </div>
-                  </dl>
-                  {edit.unverified.length > 0 && (
-                    <p className="text-sm text-amber" role="note">
-                      Check this: not in your resume: {edit.unverified.join(', ')}
-                    </p>
-                  )}
-                  <p className="text-xs text-fg-3">{edit.why}</p>
-                </li>
-              ))}
-            </ol>
-            {tailoring.notCovered.length > 0 && (
-              <div className="flex flex-col gap-1 text-sm">
-                <p className="font-medium">Not added</p>
-                <ul className="flex flex-col gap-1 text-fg-3">
-                  {tailoring.notCovered.map((entry) => (
-                    <li key={entry.keyword}>
-                      {entry.keyword}: {entry.why}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            <TailorSuggestions tailoring={tailoring} off={off} onToggle={toggle} />
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"

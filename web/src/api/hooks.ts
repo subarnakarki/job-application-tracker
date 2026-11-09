@@ -1,5 +1,6 @@
 import {
   ApplicationDetailSchema,
+  ApplicationTailoringSchema,
   ApplyQueueSchema,
   JobHitSchema,
   JobSearchRunDetailSchema,
@@ -717,6 +718,63 @@ export function useEditDraft() {
       }),
     onSuccess: refresh,
   });
+}
+
+/** An application's tailoring: the last suggestions and the saved version. */
+export function useApplicationTailoring(applicationId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['tailoring', applicationId],
+    queryFn: () =>
+      apiRequest(
+        `/api/applications/${encodeURIComponent(applicationId)}/tailoring`,
+        ApplicationTailoringSchema,
+      ),
+    enabled,
+  });
+}
+
+function useTailoringMutation<Input>(
+  applicationId: string,
+  request: (input: Input) => { path: string; method: 'POST' | 'PUT' | 'DELETE'; body?: unknown },
+) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Input) => {
+      const { path, method, body } = request(input);
+      return apiRequest(
+        `/api/applications/${encodeURIComponent(applicationId)}/${path}`,
+        ApplicationTailoringSchema,
+        { method, ...(body === undefined ? {} : { body }) },
+      );
+    },
+    onSuccess: (tailoring) => client.setQueryData(['tailoring', applicationId], tailoring),
+  });
+}
+
+/** Tailor my resume for an application (optionally from a pasted posting). */
+export function useTailorApplication(applicationId: string) {
+  return useTailoringMutation(applicationId, (postingText: string | null) => ({
+    path: 'tailor',
+    method: 'POST',
+    body: postingText ? { postingText } : {},
+  }));
+}
+
+/** Saves the version kept for this job. */
+export function useSaveTailoredResume(applicationId: string) {
+  return useTailoringMutation(applicationId, (text: string) => ({
+    path: 'tailored-resume',
+    method: 'PUT',
+    body: { text },
+  }));
+}
+
+/** Removes the saved version (the suggestions stay). */
+export function useRemoveTailoredResume(applicationId: string) {
+  return useTailoringMutation(applicationId, () => ({
+    path: 'tailored-resume',
+    method: 'DELETE',
+  }));
 }
 
 export function useResumeText(enabled: boolean) {
