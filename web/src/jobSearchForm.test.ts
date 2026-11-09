@@ -1,8 +1,11 @@
-import { SEARCH_SOURCES } from '@jat/shared';
+import { EMPTY_MORE_ANSWERS, SEARCH_SOURCES } from '@jat/shared';
 import { describe, expect, it } from 'vitest';
 import {
   emptySetup,
   fromSetupValues,
+  MORE_GROUPS,
+  moreAnswerRows,
+  setMoreAnswer,
   previewSearches,
   scheduleText,
   toSetupValues,
@@ -78,5 +81,47 @@ describe('search preview', () => {
     expect(
       previewSearches({ queries: '', includeTitles: 'SDET\nQA lead', sites: ['lever'] }),
     ).toEqual(['site:jobs.lever.co "SDET"', 'site:jobs.lever.co "QA lead"']);
+  });
+});
+
+describe('more answers (optional)', () => {
+  const field = (key: string) => {
+    const found = MORE_GROUPS.flatMap((group) => group.fields).find((entry) => entry.key === key);
+    if (!found) throw new Error(key);
+    return found;
+  };
+
+  it('starts every answer at Not set, and the review lists none of them', () => {
+    expect(emptySetup({}).more).toEqual(EMPTY_MORE_ANSWERS);
+    expect(moreAnswerRows(EMPTY_MORE_ANSWERS)).toEqual([]);
+  });
+
+  it('offers every optional answer exactly once', () => {
+    const keys = MORE_GROUPS.flatMap((group) => group.fields.map((entry) => entry.key));
+    expect([...keys].sort()).toEqual(Object.keys(EMPTY_MORE_ANSWERS).sort());
+  });
+
+  it('sets and clears answers from the form controls, and lists only those set', () => {
+    let more = setMoreAnswer(EMPTY_MORE_ANSWERS, field('usCitizen'), 'yes');
+    more = setMoreAnswer(more, field('clearance'), 'eligible');
+    more = setMoreAnswer(more, field('birthCountry'), 'Nepal');
+    expect(moreAnswerRows(more)).toEqual([
+      ['U.S. citizen?', 'Yes'],
+      ['Country of birth', 'Nepal'],
+      ['Security clearance', 'I am eligible for one'],
+    ]);
+    more = setMoreAnswer(more, field('usCitizen'), '');
+    expect(more.usCitizen).toBeNull();
+  });
+
+  it('keeps the answers through the form and names the field with a problem', () => {
+    const more = { ...EMPTY_MORE_ANSWERS, usPerson: 'yes' as const, w2Rate: '$85/hr' };
+    const result = fromSetupValues({ ...filled, more });
+    if (!result.ok) throw new Error('invalid');
+    expect(result.profile.more).toEqual(more);
+    expect(toSetupValues(result.profile).more).toEqual(more);
+    const bad = fromSetupValues({ ...filled, more: { ...more, pronouns: 'He\nHim' } });
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.errors).toEqual({ 'more.pronouns': 'Must be a single line' });
   });
 });

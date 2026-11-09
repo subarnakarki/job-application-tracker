@@ -484,3 +484,43 @@ test('tailor my resume: checked suggestions, the fit after, and the tailored tex
       `Senior product manager with eight years of roadmaps and launches, including stakeholder management across 12 teams.${rest}`,
     );
 });
+
+test('more answers: set a few optional answers once, review only those, keep them', async ({
+  page,
+  api,
+}) => {
+  await api.seedJobSearch({ profile: PROFILE, jobs: [], answers: {} });
+  await page.goto('/job-search/setup');
+
+  const section = page.getByRole('region', { name: 'More answers (optional)' });
+  // Folded away while nothing is set.
+  await expect(section.getByRole('combobox', { name: 'U.S. citizen?' })).toBeHidden();
+  await section.getByText('More answers (optional)').click();
+  const citizen = section.getByRole('combobox', { name: 'U.S. citizen?' });
+  await expect(citizen).toHaveValue('');
+  await citizen.selectOption('Yes');
+  await section
+    .getByRole('combobox', { name: 'Security clearance', exact: true })
+    .selectOption('I am eligible for one');
+  await section.getByLabel('Pronouns').fill('He/Him');
+  await page.getByRole('button', { name: 'Review' }).click();
+
+  const confirm = page.getByRole('region', { name: 'Check everything before it is saved' });
+  await expect(confirm).toContainText('U.S. citizen?Yes');
+  await expect(confirm).toContainText('Security clearanceI am eligible for one');
+  await expect(confirm).toContainText('PronounsHe/Him');
+  // Answers left at Not set are not listed.
+  await expect(confirm).not.toContainText('Country of birth');
+  await expect(confirm).not.toContainText('W2 hourly rate');
+  await page.getByRole('button', { name: 'Confirm and save' }).click();
+  await expect(page).toHaveURL('/job-search');
+
+  // Saved: the section opens with the answers in place.
+  await page.goto('/job-search/setup');
+  await expect(section.getByRole('combobox', { name: 'U.S. citizen?' })).toHaveValue('yes');
+  await expect(
+    section.getByRole('combobox', { name: 'Security clearance', exact: true }),
+  ).toHaveValue('eligible');
+  await expect(section.getByLabel('Pronouns')).toHaveValue('He/Him');
+  await expect(section.getByRole('combobox', { name: 'Open to a W2 contract?' })).toHaveValue('');
+});

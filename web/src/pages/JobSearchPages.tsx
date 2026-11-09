@@ -20,6 +20,7 @@ import {
   type JobHit,
   type JobSearchProfile,
   type JobSearchRun,
+  type MoreAnswers,
 } from '@jat/shared';
 import { useId, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -62,6 +63,10 @@ import {
   DISABILITY_LABELS,
   HISPANIC_LABELS,
   VETERAN_LABELS,
+  MORE_GROUPS,
+  moreAnswerRows,
+  setMoreAnswer,
+  type MoreField,
   type SetupValues,
 } from '../jobSearchForm';
 
@@ -250,6 +255,118 @@ function Fieldset({ legend, children }: { legend: string; children: ReactNode })
   );
 }
 
+/** One optional answer: a Yes/No or choice select starting at Not set, or a text box. */
+function MoreAnswerField({
+  field,
+  values,
+  error,
+  onChange,
+}: {
+  field: MoreField;
+  values: SetupValues;
+  error: string | undefined;
+  onChange: (more: MoreAnswers) => void;
+}) {
+  const id = useId();
+  const value = values.more[field.key] ?? '';
+  const update = (next: string) => onChange(setMoreAnswer(values.more, field, next));
+  if (field.kind !== 'text') {
+    const options =
+      field.kind === 'yes_no'
+        ? [
+            { value: 'yes', label: 'Yes' },
+            { value: 'no', label: 'No' },
+          ]
+        : field.options;
+    return (
+      <Select
+        label={field.label}
+        value={value}
+        options={[{ value: '', label: 'Not set' }, ...options]}
+        onChange={update}
+      />
+    );
+  }
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className={labelClass}>
+        {field.label}
+      </label>
+      <input
+        id={id}
+        type="text"
+        className="inp"
+        value={value}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-error` : field.hint ? `${id}-hint` : undefined}
+        onChange={(event) => update(event.target.value)}
+      />
+      {field.hint && !error && (
+        <p id={`${id}-hint`} className="text-xs text-fg-3">
+          {field.hint}
+        </p>
+      )}
+      {error && (
+        <p id={`${id}-error`} className="text-sm text-red">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** The optional answers, folded away until wanted; open when any is set or needs fixing. */
+function MoreAnswersSection({
+  values,
+  errors,
+  onChange,
+}: {
+  values: SetupValues;
+  errors: Record<string, string>;
+  onChange: (more: MoreAnswers) => void;
+}) {
+  const hasErrors = Object.keys(errors).some((key) => key.startsWith('more.'));
+  const [open, setOpen] = useState(() => moreAnswerRows(values.more).length > 0);
+  return (
+    <Glow as="section" aria-labelledby="more-answers-heading" className="p-5">
+      <details
+        open={open || hasErrors}
+        onToggle={(event) => setOpen(event.currentTarget.open)}
+        className="group"
+      >
+        <summary className="cursor-pointer">
+          <h2 id="more-answers-heading" className="inline text-lg font-semibold tracking-[-0.02em]">
+            More answers (optional)
+          </h2>
+          <span className="mt-1 block text-sm text-fg-3">
+            Questions some forms ask: clearance, export control, company history and more. Set once
+            and used on every form that asks. Left at Not set, a question waits for you as before.
+          </span>
+        </summary>
+        <div className="mt-4 flex flex-col gap-6">
+          {MORE_GROUPS.map((group) => (
+            <fieldset key={group.title} className="flex flex-col gap-4">
+              <legend className="mb-1 font-semibold">{group.title}</legend>
+              {group.note && <p className="text-sm text-fg-3">{group.note}</p>}
+              <div className="grid gap-4 sm:grid-cols-2">
+                {group.fields.map((field) => (
+                  <MoreAnswerField
+                    key={field.key}
+                    field={field}
+                    values={values}
+                    error={errors[`more.${field.key}`]}
+                    onChange={onChange}
+                  />
+                ))}
+              </div>
+            </fieldset>
+          ))}
+        </div>
+      </details>
+    </Glow>
+  );
+}
+
 /** The confirm step: everything back in plain words before it is saved. */
 function Summary({ profile }: { profile: JobSearchProfile }) {
   const rows: [string, string][] = [
@@ -289,6 +406,8 @@ function Summary({ profile }: { profile: JobSearchProfile }) {
     ['How you heard', profile.howHeard],
     ['18 or older', profile.over18 ? 'Yes' : 'No'],
     ...selfIdentification(profile),
+    // Only the optional answers that are set.
+    ...moreAnswerRows(profile.more),
   ];
   return (
     <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-[12rem_1fr]">
@@ -716,6 +835,12 @@ function SetupForm({ initial, onSaved }: { initial: SetupValues; onSaved: () => 
           onChange={(checked) => setValues((current) => ({ ...current, over18: checked }))}
         />
       </Fieldset>
+
+      <MoreAnswersSection
+        values={values}
+        errors={errors}
+        onChange={(more) => setValues((current) => ({ ...current, more }))}
+      />
 
       <Fieldset legend="Voluntary self-identification (EEO)">
         <p className="text-sm text-fg-3">
@@ -1655,6 +1780,8 @@ function StandardAnswers({ profile }: { profile: JobSearchProfile }) {
     ['How did you hear about us', profile.howHeard],
     ['18 or older', profile.over18 ? 'Yes' : 'No'],
     ...selfIdentification(profile),
+    // Only the optional answers that are set.
+    ...moreAnswerRows(profile.more),
   ];
   return (
     <Glow as="section" aria-labelledby="standard-heading" className="flex flex-col gap-3 p-5">

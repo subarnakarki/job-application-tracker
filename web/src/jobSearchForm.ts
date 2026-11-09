@@ -152,7 +152,9 @@ export function fromSetupValues(
   if (result.success) return { ok: true, profile: result.data };
   const errors: Record<string, string> = {};
   for (const issue of result.error.issues) {
-    const field = String(issue.path[0] ?? 'form');
+    const [first, second] = issue.path;
+    const field =
+      first === 'more' && second !== undefined ? `more.${String(second)}` : String(first ?? 'form');
     errors[field] ??=
       field === 'salaryMin' || field === 'salaryMax' ? 'Enter a number' : issue.message;
   }
@@ -199,4 +201,161 @@ export function previewSearches(values: Pick<SetupValues, 'queries' | 'includeTi
     includeTitles: lines(values.includeTitles),
     sites: values.sites,
   });
+}
+
+// ---------------------------------------------------------------------------------------------
+// More answers (optional)
+
+type YesNoKey = {
+  [K in keyof MoreAnswers]: MoreAnswers[K] extends 'yes' | 'no' | null
+    ? 'yes' | 'no' extends MoreAnswers[K]
+      ? K
+      : never
+    : never;
+}[keyof MoreAnswers];
+type TextKey = {
+  [K in keyof MoreAnswers]: MoreAnswers[K] extends string ? K : never;
+}[keyof MoreAnswers];
+type ChoiceKey = Exclude<keyof MoreAnswers, YesNoKey | TextKey>;
+
+export type MoreField =
+  | { kind: 'yes_no'; key: YesNoKey; label: string }
+  | {
+      kind: 'choice';
+      key: ChoiceKey;
+      label: string;
+      options: { value: string; label: string }[];
+    }
+  | { kind: 'text'; key: TextKey; label: string; hint?: string };
+
+export interface MoreGroup {
+  title: string;
+  note?: string;
+  fields: MoreField[];
+}
+
+const yesNo = (key: YesNoKey, label: string): MoreField => ({ kind: 'yes_no', key, label });
+const text = (key: TextKey, label: string, hint?: string): MoreField =>
+  hint === undefined ? { kind: 'text', key, label } : { kind: 'text', key, label, hint };
+const choice = <K extends ChoiceKey>(
+  key: K,
+  label: string,
+  labels: Record<NonNullable<MoreAnswers[K]>, string>,
+): MoreField => ({
+  kind: 'choice',
+  key,
+  label,
+  options: Object.entries<string>(labels).map(([value, optionLabel]) => ({
+    value,
+    label: optionLabel,
+  })),
+});
+
+/** The optional answers on the setup page, in their groups. Every one starts as Not set. */
+export const MORE_GROUPS: MoreGroup[] = [
+  {
+    title: 'Work authorization and export control',
+    fields: [
+      yesNo('authorizedUs', 'Authorized to work in the U.S.?'),
+      yesNo('locatedInUs', 'Currently located in the U.S.?'),
+      yesNo('usCitizen', 'U.S. citizen?'),
+      choice('exportStatus', 'Export control status', {
+        citizen: 'U.S. citizen or national',
+        green_card: 'Green card holder (permanent resident)',
+        refugee: 'Refugee',
+        asylee: 'Asylee',
+        none: 'None of these',
+      }),
+      choice('usPerson', '"U.S. Person" (ITAR)', {
+        yes: 'Yes, I am a U.S. Person',
+        soon: 'I will soon become one',
+        licensable: 'No, but I am eligible for licensing',
+      }),
+      text('legalFirstName', 'Legal first name', 'Blank: from your full name'),
+      text('legalLastName', 'Legal last name', 'Blank: from your full name'),
+      text('birthCountry', 'Country of birth'),
+      text('citizenships', 'Countries of citizenship', 'e.g. United States'),
+      text('otherResidencies', 'Other countries of permanent residence', 'e.g. None'),
+    ],
+  },
+  {
+    title: 'Security clearance',
+    fields: [
+      choice('clearance', 'Security clearance', {
+        active: 'I hold an active U.S. clearance',
+        eligible: 'I am eligible for one',
+        not_eligible: 'I am not eligible',
+      }),
+      choice('clearanceHeld', 'Highest clearance held', {
+        never: 'Never held one',
+        confidential: 'Confidential',
+        secret: 'Secret',
+        top_secret: 'Top Secret',
+      }),
+    ],
+  },
+  {
+    title: 'Company history (applies to any company)',
+    note: 'Answered the same way for every company that asks.',
+    fields: [
+      yesNo('workedForCompanyBefore', 'Worked for the company before (employee or contractor)?'),
+      yesNo('historyWithCompany', 'Any other history with the company?'),
+      yesNo('relativeAtCompany', 'Relative or close relationship at the company?'),
+      yesNo('conflictOfInterest', 'Any conflict of interest?'),
+      yesNo('employerRestrictions', 'Non-compete or other employer restrictions?'),
+    ],
+  },
+  {
+    title: 'Logistics',
+    fields: [
+      choice('startTimeline', 'Timeline for starting', {
+        immediately: 'Immediately',
+        two_weeks: 'About 2 weeks',
+        month_plus: 'More than a month',
+        flexible: 'Flexible',
+      }),
+      yesNo('w2Contract', 'Open to a W2 contract?'),
+      text('w2Rate', 'W2 hourly rate', 'e.g. $85/hr'),
+      yesNo('canTravel', 'Able to meet the travel requirements?'),
+      yesNo('canPerformFunctions', 'Able to perform the job functions?'),
+      yesNo('smsConsent', 'Agree to recruiting text messages (SMS)?'),
+      yesNo('otherOpenings', 'Consider me for other openings?'),
+      yesNo('certifyTrue', 'Certify my application is true and complete?'),
+    ],
+  },
+  {
+    title: 'Self-identification additions',
+    note: 'Optional, and employers must keep them out of hiring decisions. Blank: your "other demographic questions" answer.',
+    fields: [
+      text('pronouns', 'Pronouns', 'As forms list them, e.g. She/Her'),
+      text('sexualOrientation', 'Sexual orientation'),
+    ],
+  },
+  {
+    title: 'Just for fun',
+    fields: [text('funAnswer', '"Just for fun" answer', 'e.g. your favorite food')],
+  },
+];
+
+/** How a set answer reads; null when it is not set. */
+export function moreAnswerText(field: MoreField, more: MoreAnswers): string | null {
+  const value = more[field.key];
+  if (value === null || value === '') return null;
+  if (field.kind === 'yes_no') return value === 'yes' ? 'Yes' : 'No';
+  if (field.kind === 'choice')
+    return field.options.find((option) => option.value === value)?.label ?? value;
+  return value;
+}
+
+/** The answers that are set, for the confirm step. */
+export function moreAnswerRows(more: MoreAnswers): [string, string][] {
+  return MORE_GROUPS.flatMap((group) => group.fields).flatMap((field) => {
+    const answer = moreAnswerText(field, more);
+    return answer === null ? [] : [[field.label, answer] as [string, string]];
+  });
+}
+
+/** Sets one optional answer from a form control: an empty value means Not set. */
+export function setMoreAnswer(more: MoreAnswers, field: MoreField, value: string): MoreAnswers {
+  return { ...more, [field.key]: field.kind === 'text' ? value : value || null };
 }
