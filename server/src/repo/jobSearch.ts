@@ -601,6 +601,23 @@ export async function markChecked(
   return result.rowCount > 0;
 }
 
+/** Records a check that found the job's pay under the floor: skipped (only while still waiting). */
+export async function markBelowFloor(
+  db: Queryable,
+  userId: string,
+  id: string,
+  reason: string,
+  now: Date,
+): Promise<boolean> {
+  const result = await db.query(
+    `update job_search_hits set checked_at = $3, state = 'skipped', kind = 'skipped', reason = $4,
+        updated_at = $3
+      where user_id = $1 and id = $2 and state in ${WAITING}`,
+    [userId, id, now, reason],
+  );
+  return result.rowCount > 0;
+}
+
 /** For the queue: the latest check of any job, and jobs closed in the past week. */
 export async function checkSummary(
   db: Queryable,

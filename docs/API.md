@@ -142,7 +142,8 @@ Open to the users in `JOB_SEARCH_USER_IDS` when `ANTHROPIC_API_KEY` is set; ever
 |        |                                    |        | `fit` is `{ percent, found, missing }` against the current resume,    |
 |        |                                    |        | from the posting keywords its draft kept (null before that)           |
 | POST   | `/api/job-search/queue/check`      | user   | Reads each waiting job again (up to 60); a board that says it is gone |
-|        |                                    |        | closes it. `{ checked, closed, unknown }`. 6 a day; the hourly        |
+|        |                                    |        | closes it; one whose pay tops out under the salary floor is skipped.  |
+|        |                                    |        | `{ checked, closed, unknown, belowFloor }`. 6 a day; the hourly       |
 |        |                                    |        | schedule also checks each job about once a day                        |
 | POST   | `/api/job-search/hits/:id/track`   | user   | Saves a queue job in the tracker as Saved (or links the match)        |
 | POST   | `/api/job-search/hits/:id/applied` | user   | Moves its Saved application to Applied, or creates one (once)         |

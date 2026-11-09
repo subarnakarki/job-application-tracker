@@ -1903,6 +1903,8 @@ export const QueueCheckResultSchema = z.strictObject({
   closed: z.number().int().min(0),
   /** Could not be read this time (timed out, rate-limited): left as they were. */
   unknown: z.number().int().min(0),
+  /** Open, but paying less than the salary floor: skipped. */
+  belowFloor: z.number().int().min(0),
 });
 export type QueueCheckResult = z.infer<typeof QueueCheckResultSchema>;
 

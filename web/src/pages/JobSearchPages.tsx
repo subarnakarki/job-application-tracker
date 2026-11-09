@@ -1896,7 +1896,7 @@ function StillOpenCheck({ checks }: { checks: ApplyQueue['checks'] }) {
               toast(
                 `Checked ${String(result.checked)} job${result.checked === 1 ? '' : 's'}: ${String(
                   result.closed,
-                )} closed${result.unknown > 0 ? `, ${String(result.unknown)} could not be read (left as they were)` : ''}`,
+                )} closed${result.belowFloor > 0 ? `, ${String(result.belowFloor)} skipped for pay under your floor` : ''}${result.unknown > 0 ? `, ${String(result.unknown)} could not be read (left as they were)` : ''}`,
               ),
           })
         }

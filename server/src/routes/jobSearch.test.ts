@@ -715,7 +715,7 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
 
       const result = await check(login.cookie);
       expect(result.statusCode).toBe(200);
-      expect(result.json()).toEqual({ checked: 1, closed: 1, unknown: 1 });
+      expect(result.json()).toEqual({ checked: 1, closed: 1, unknown: 1, belowFloor: 0 });
 
       const queue = queueOf(await send('GET', '/api/job-search/queue', login.cookie));
       expect(queue.needsYou).toEqual([]);
@@ -736,10 +736,54 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
 
       // Once the board answers again, the job it could not read is checked and stays open.
       TIMING_OUT.clear();
-      expect((await check(login.cookie)).json()).toEqual({ checked: 1, closed: 0, unknown: 0 });
+      expect((await check(login.cookie)).json()).toEqual({
+        checked: 1,
+        closed: 0,
+        unknown: 0,
+        belowFloor: 0,
+      });
       const after = queueOf(await send('GET', '/api/job-search/queue', login.cookie));
       expect(after.keywordOnly[0]).toMatchObject({ state: 'new' });
       expect(after.checks.lastCheckedAt).toBe(new Date(T0.getTime() + HOUR).toISOString());
+    });
+
+    it('skips a waiting job whose pay is under a floor set after it was found', async () => {
+      const login = await member();
+      PAGES[apiUrl(106)] = greenhouseJob(
+        'Product Manager, Billing',
+        2,
+        `${'Own billing. '.repeat(20)} Salary range: $100,000 - $130,000 per year.`,
+      );
+      claude.links = [101, 106].map(jobLink);
+      try {
+        const { hits } = runOf(await run(login.cookie));
+        const lowPay = byRole(hits, 'Product Manager, Billing');
+        expect(lowPay.kind).toBe('target');
+        await send('PUT', '/api/job-search/profile', login.cookie, {
+          ...PROFILE,
+          salaryFloor: 140000,
+        });
+        t.clock.set(new Date(T0.getTime() + HOUR));
+
+        expect((await check(login.cookie)).json()).toEqual({
+          checked: 2,
+          closed: 0,
+          unknown: 0,
+          belowFloor: 1,
+        });
+        const detail = runOf(
+          await send('GET', `/api/job-search/runs/${lowPay.runId}`, login.cookie),
+        );
+        expect(byRole(detail.hits, 'Product Manager, Billing')).toMatchObject({
+          kind: 'skipped',
+          state: 'skipped',
+          reason: 'Pays up to $130,000, under your $140,000 floor',
+        });
+        // The job with no pay posted stays in the queue.
+        expect(byRole(detail.hits, 'Senior Product Manager').state).not.toBe('skipped');
+      } finally {
+        delete PAGES[apiUrl(106)];
+      }
     });
 
     it('never closes a job that is already applied to', async () => {

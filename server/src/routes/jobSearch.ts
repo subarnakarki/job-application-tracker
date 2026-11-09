@@ -363,9 +363,11 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
       const db = requireDb();
       const { user } = await memberOf(request);
       await spend(db, CHECK_RULE, user.id, reply);
+      const saved = await getProfile(db, user.id);
       return checkOpenJobs(searchDeps(db, NO_CLAUDE), user.id, {
         maxAgeMs: MANUAL_CHECK_AGE_MS,
         deadline: Date.now() + CHECK_BUDGET_MS,
+        salaryFloor: saved?.profile.salaryFloor ?? null,
       });
     },
   );
@@ -743,6 +745,7 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
         await checkOpenJobs(searchDeps(db, claude), userId, {
           maxAgeMs: SCHEDULED_CHECK_AGE_MS,
           deadline: Math.min(deadline, Date.now() + CHECK_BUDGET_MS),
+          salaryFloor: profile.salaryFloor,
         });
         const due =
           profile.scheduleOn &&

@@ -1,8 +1,8 @@
-import { CHECKABLE_SOURCES, jobRefOf, type QueueCheckResult } from '@jat/shared';
+import { belowSalaryFloor, CHECKABLE_SOURCES, jobRefOf, type QueueCheckResult } from '@jat/shared';
 import type { Clock } from '../clock';
 import type { Queryable } from '../db/types';
 import type { PageFetcher } from '../postings/fetchPage';
-import { listToCheck, markChecked } from '../repo/jobSearch';
+import { listToCheck, markBelowFloor, markChecked } from '../repo/jobSearch';
 import { JobReadError, readJob } from './readJob';
 import { pool } from './run';
 
@@ -33,13 +33,14 @@ export function verdictOf(error: unknown): CheckVerdict {
 }
 
 /**
- * Reads waiting jobs again on their boards and closes the ones that are gone. A job that could not
- * be read is left as it was and not marked checked, so the next check tries it again.
+ * Reads waiting jobs again on their boards and closes the ones that are gone, and skips the open
+ * ones whose posted pay is under the salary floor (so raising the floor cleans the queue). A job
+ * that could not be read is left as it was and not marked checked, so the next check tries it again.
  */
 export async function checkOpenJobs(
   deps: CheckDeps,
   userId: string,
-  options: { maxAgeMs: number; deadline: number; limit?: number },
+  options: { maxAgeMs: number; deadline: number; limit?: number; salaryFloor: number | null },
 ): Promise<QueueCheckResult> {
   const now = deps.clock.now();
   const hits = await listToCheck(
@@ -49,7 +50,7 @@ export async function checkOpenJobs(
     new Date(now.getTime() - options.maxAgeMs),
     options.limit ?? MAX_CHECKS_PER_CALL,
   );
-  const result: QueueCheckResult = { checked: 0, closed: 0, unknown: 0 };
+  const result: QueueCheckResult = { checked: 0, closed: 0, unknown: 0, belowFloor: 0 };
   await pool(
     hits,
     CHECK_CONCURRENCY,
@@ -57,10 +58,12 @@ export async function checkOpenJobs(
     async (hit) => {
       const ref = jobRefOf(hit.jobLink);
       let verdict: CheckVerdict = 'unknown';
+      let underFloor: string | null = null;
       if (ref) {
         try {
-          await readJob(ref, deps.fetchPage, deps.fetchBoard);
+          const job = await readJob(ref, deps.fetchPage, deps.fetchBoard);
           verdict = verdictOf(null);
+          underFloor = belowSalaryFloor(job.salary, options.salaryFloor);
         } catch (error) {
           verdict = verdictOf(error);
         }
@@ -69,8 +72,13 @@ export async function checkOpenJobs(
         result.unknown += 1;
         return;
       }
-      await markChecked(deps.db, userId, hit.id, verdict === 'closed', deps.clock.now());
       result.checked += 1;
+      if (underFloor) {
+        await markBelowFloor(deps.db, userId, hit.id, underFloor, deps.clock.now());
+        result.belowFloor += 1;
+        return;
+      }
+      await markChecked(deps.db, userId, hit.id, verdict === 'closed', deps.clock.now());
       if (verdict === 'closed') result.closed += 1;
     },
   );
