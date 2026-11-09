@@ -482,6 +482,21 @@ export async function setHitState(
   return result.rowCount > 0;
 }
 
+/** Links a job to its application in the tracker, without changing its state. */
+export async function linkHitApplication(
+  db: Queryable,
+  userId: string,
+  id: string,
+  applicationId: string,
+  now: Date,
+): Promise<void> {
+  await db.query(
+    `update job_search_hits set application_id = $3, updated_at = $4
+      where user_id = $1 and id = $2`,
+    [userId, id, applicationId, now],
+  );
+}
+
 /** Everything, for the data export. */
 export async function exportJobSearch(
   db: Queryable,

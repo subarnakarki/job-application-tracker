@@ -524,3 +524,37 @@ test('more answers: set a few optional answers once, review only those, keep the
   await expect(section.getByLabel('Pronouns')).toHaveValue('He/Him');
   await expect(section.getByRole('combobox', { name: 'Open to a W2 contract?' })).toHaveValue('');
 });
+
+test('track it: a queue job is saved in the tracker before applying', async ({ page, api }) => {
+  await api.uploadResumeText('Pat Example. Senior product manager. '.repeat(10));
+  await api.seedJobSearch({
+    profile: PROFILE,
+    jobs: [
+      {
+        board: 'hooli',
+        company: 'Hooli',
+        title: 'Senior Product Manager',
+        location: 'Remote, US',
+        hoursAgo: 3,
+        content: 'Own the roadmap. '.repeat(20),
+        questions: QUESTIONS.filter((question) => !/clearance/.test(question.label)),
+      },
+    ],
+    answers: { 'Why do you want to work here?': 'Your roadmap work matches my launches.' },
+  });
+  const queue = new ApplyQueuePage(page);
+  await queue.goto();
+  const job = queue.job('Hooli: Senior Product Manager');
+
+  await job
+    .getByRole('button', { name: 'Track it in your applications: Hooli, Senior Product Manager' })
+    .click();
+
+  // Still in the queue, now linked to its Saved application.
+  const saved = job.getByRole('link', { name: /Saved/ });
+  await expect(saved).toBeVisible();
+  await expect(job.getByRole('button', { name: /^Track it in your applications/ })).toHaveCount(0);
+  await saved.click();
+  await expect(page.getByRole('heading', { name: 'Hooli', level: 1 })).toBeVisible();
+  await expect(page.getByText('Saved from the job search (Greenhouse).')).toBeVisible();
+});

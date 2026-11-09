@@ -1315,6 +1315,17 @@ function HitActions({ hit }: { hit: JobHit }) {
         >
           Mark applied
         </button>
+        {!hit.tracked && (
+          <button
+            type="button"
+            className="btn-d"
+            disabled={action.isPending}
+            aria-label={`Track it in your applications: ${job}`}
+            onClick={() => act('track', `Saved ${hit.company} in your applications`)}
+          >
+            Track it
+          </button>
+        )}
         <button
           type="button"
           className="btn-d"

@@ -144,7 +144,8 @@ Open to the users in `JOB_SEARCH_USER_IDS` when `ANTHROPIC_API_KEY` is set; ever
 | POST   | `/api/job-search/queue/check`      | user   | Reads each waiting job again (up to 60); a board that says it is gone |
 |        |                                    |        | closes it. `{ checked, closed, unknown }`. 6 a day; the hourly        |
 |        |                                    |        | schedule also checks each job about once a day                        |
-| POST   | `/api/job-search/hits/:id/applied` | user   | Creates the application (Applied, Company site, job link) once        |
+| POST   | `/api/job-search/hits/:id/track`   | user   | Saves a queue job in the tracker as Saved (or links the match)        |
+| POST   | `/api/job-search/hits/:id/applied` | user   | Moves its Saved application to Applied, or creates one (once)         |
 | POST   | `/api/job-search/hits/:id/blocked` | user   | `{ reason }`                                                          |
 | POST   | `/api/job-search/hits/:id/skip`    | user   |                                                                       |
 | POST   | `/api/job-search/hits/:id/closed`  | user   | The job's page says it is closed (only while it is waiting)           |

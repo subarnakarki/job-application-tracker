@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import {
+  ApplicationDetailSchema,
   ApplyQueueSchema,
   SEARCH_SOURCES,
   EMPTY_MORE_ANSWERS,
@@ -925,6 +926,110 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
     });
   });
 
+  describe('track a queue job before applying', () => {
+    /** A user whose run left the GitLab job waiting in the queue. */
+    async function queued() {
+      const login = await member();
+      const { hits } = runOf(await run(login.cookie));
+      return { ...login, hit: byRole(hits, 'Senior Product Manager') };
+    }
+    const track = (cookie: string, id: string) =>
+      send('POST', `/api/job-search/hits/${id}/track`, cookie);
+    const applied = (cookie: string, id: string) =>
+      send('POST', `/api/job-search/hits/${id}/applied`, cookie);
+    const application = async (cookie: string, id: string) =>
+      parsed(ApplicationDetailSchema)(await send('GET', `/api/applications/${id}`, cookie));
+    const count = async (userId: string) =>
+      (
+        await t.db.query<{ n: number }>(
+          'select count(*)::int as n from applications where user_id = $1',
+          [userId],
+        )
+      ).rows[0]?.n;
+
+    it('saves the job in the tracker as Saved, linked, and keeps it in the queue', async () => {
+      const owner = await queued();
+
+      const tracked = hitOf(await track(owner.cookie, owner.hit.id));
+
+      expect(tracked.state).toBe('needs_you');
+      expect(tracked.tracked?.status).toBe('Saved');
+      expect(tracked.applicationId).toBe(tracked.tracked?.applicationId);
+      const saved = await application(owner.cookie, tracked.applicationId ?? '');
+      expect(saved).toMatchObject({
+        company: 'GitLab',
+        role: 'Senior Product Manager',
+        status: 'Saved',
+        dateApplied: null,
+        jobLink: jobLink(101),
+      });
+      // Tracking again changes nothing.
+      expect(hitOf(await track(owner.cookie, owner.hit.id)).applicationId).toBe(
+        tracked.applicationId,
+      );
+      expect(await count(owner.user.id)).toBe(1);
+    });
+
+    it('links the application already in the tracker instead of making a second', async () => {
+      const owner = await queued();
+      const mine = await send('POST', '/api/applications', owner.cookie, {
+        company: 'Gitlab, Inc.',
+        role: 'Sr. Product Manager',
+        status: 'Saved',
+      });
+      const id = mine.json<{ id: string }>().id;
+
+      expect(hitOf(await track(owner.cookie, owner.hit.id)).applicationId).toBe(id);
+      expect(await count(owner.user.id)).toBe(1);
+    });
+
+    it('Mark applied moves the Saved application to Applied, in its history', async () => {
+      const owner = await queued();
+      const id = hitOf(await track(owner.cookie, owner.hit.id)).applicationId ?? '';
+
+      const done = hitOf(await applied(owner.cookie, owner.hit.id));
+
+      expect(done).toMatchObject({ state: 'applied', applicationId: id });
+      const record = await application(owner.cookie, id);
+      expect(record.status).toBe('Applied');
+      expect(record.dateApplied).not.toBeNull();
+      expect(record.history.map((entry) => [entry.fromStatus, entry.toStatus])).toEqual([
+        [null, 'Saved'],
+        ['Saved', 'Applied'],
+      ]);
+      expect(await count(owner.user.id)).toBe(1);
+    });
+
+    it('Mark applied never moves an application further along back to Applied', async () => {
+      const owner = await queued();
+      const mine = await send('POST', '/api/applications', owner.cookie, {
+        company: 'GitLab',
+        role: 'Senior Product Manager',
+        status: 'Interviewing',
+      });
+      const id = mine.json<{ id: string }>().id;
+
+      expect(hitOf(await applied(owner.cookie, owner.hit.id)).applicationId).toBe(id);
+      expect((await application(owner.cookie, id)).status).toBe('Interviewing');
+      expect(await count(owner.user.id)).toBe(1);
+    });
+
+    it('Mark applied on an untracked job creates the application, as before', async () => {
+      const owner = await queued();
+      const done = hitOf(await applied(owner.cookie, owner.hit.id));
+      expect((await application(owner.cookie, done.applicationId ?? '')).status).toBe('Applied');
+    });
+
+    it('refuses a job that has left the queue', async () => {
+      const owner = await queued();
+      await send('POST', `/api/job-search/hits/${owner.hit.id}/skip`, owner.cookie);
+      const response = await track(owner.cookie, owner.hit.id);
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({ error: 'not_in_queue' });
+      expect(await count(owner.user.id)).toBe(0);
+    });
+  });
+
   describe('isolation between users', () => {
     it("answers 404 for someone else's run or job, and changes nothing", async () => {
       const owner = await member();
@@ -934,6 +1039,7 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
 
       const probes: [string, string, object | undefined][] = [
         ['GET', `/api/job-search/runs/{id}`, undefined],
+        ['POST', `/api/job-search/hits/{id}/track`, undefined],
         ['POST', `/api/job-search/hits/{id}/applied`, undefined],
         ['POST', `/api/job-search/hits/{id}/blocked`, { reason: 'x' }],
         ['POST', `/api/job-search/hits/{id}/skip`, undefined],

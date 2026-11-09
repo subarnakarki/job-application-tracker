@@ -33,7 +33,7 @@ import { readJob } from '../jobsearch/readJob';
 import { checkOpenJobs, MANUAL_CHECK_AGE_MS, SCHEDULED_CHECK_AGE_MS } from '../jobsearch/check';
 import { draftHit, draftPending, runJobSearch } from '../jobsearch/run';
 import type { PageFetcher } from '../postings/fetchPage';
-import { createApplication } from '../repo/applications';
+import { createApplication, getApplication, updateApplication } from '../repo/applications';
 import {
   checkSummary,
   getHit,
@@ -41,6 +41,7 @@ import {
   getRun,
   lastScheduledRunDay,
   listAgeSkipped,
+  linkHitApplication,
   listDraftedWaiting,
   listOpenHits,
   listRunHits,
@@ -470,38 +471,86 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
       },
     });
 
+  /** A queue job's application in the tracker: from the job itself, or a tracker match. */
+  const createFromHit = async (
+    db: Db,
+    user: { id: string; isDemo: boolean; timeZone: string },
+    hit: JobHit,
+    status: 'Saved' | 'Applied',
+    now: Date,
+  ): Promise<string> => {
+    const created = await createApplication(
+      db,
+      { userId: user.id, isDemo: user.isDemo, timeZone: user.timeZone },
+      ApplicationInputSchema.parse({
+        company: hit.company,
+        role: hit.role,
+        status,
+        dateApplied: status === 'Applied' ? localDateIn(now, user.timeZone) : null,
+        source: 'Company site',
+        jobLink: hit.jobLink,
+        location: hit.location,
+        workMode: hit.workMode,
+        postedOn: hit.postedAt?.slice(0, 10) ?? null,
+        notes:
+          status === 'Applied'
+            ? `Applied through the job search (${SOURCE_LABELS[hit.source]}).`
+            : `Saved from the job search (${SOURCE_LABELS[hit.source]}).`,
+      }),
+      now,
+    );
+    if (created.kind !== 'created')
+      throw new ApiError(409, 'limit_reached', 'The application limit is reached');
+    return created.value.record.id;
+  };
+
+  hitRoute(
+    'track',
+    'Track a queue job in the tracker as Saved (or link the application already there)',
+    undefined,
+    { 409: 'The job is no longer in the queue, or the application limit is reached' },
+    async ({ db, user, hit }) => {
+      if (!['new', 'ready', 'needs_you'].includes(hit.state))
+        throw new ApiError(409, 'not_in_queue', 'This job is no longer in the queue');
+      const now = deps.clock.now();
+      // `tracked` is the job's own application while it exists, else the tracker's match.
+      const applicationId =
+        hit.tracked?.applicationId ?? (await createFromHit(db, user, hit, 'Saved', now));
+      if (applicationId !== hit.applicationId)
+        await linkHitApplication(db, user.id, hit.id, applicationId, now);
+    },
+  );
+
   hitRoute(
     'applied',
-    'Mark a job applied: creates the application in the tracker (once)',
+    'Mark a job applied: moves its Saved application to Applied, or creates one (once)',
     undefined,
     { 409: 'The application limit is reached' },
     async ({ db, user, hit }) => {
       if (hit.state === 'applied') return;
       const now = deps.clock.now();
-      const created = await createApplication(
-        db,
-        { userId: user.id, isDemo: user.isDemo, timeZone: user.timeZone },
-        ApplicationInputSchema.parse({
-          company: hit.company,
-          role: hit.role,
-          status: 'Applied',
-          dateApplied: localDateIn(now, user.timeZone),
-          source: 'Company site',
-          jobLink: hit.jobLink,
-          location: hit.location,
-          workMode: hit.workMode,
-          postedOn: hit.postedAt?.slice(0, 10) ?? null,
-          notes: `Applied through the job search (${SOURCE_LABELS[hit.source]}).`,
-        }),
-        now,
-      );
-      if (created.kind !== 'created')
-        throw new ApiError(409, 'limit_reached', 'The application limit is reached');
+      const owner = { userId: user.id, isDemo: user.isDemo, timeZone: user.timeZone };
+      let applicationId = hit.tracked?.applicationId ?? null;
+      const existing = applicationId ? await getApplication(db, user.id, applicationId) : null;
+      if (existing?.record.status === 'Saved') {
+        // Saved to Applied through the normal update: today's date and a history row. A
+        // concurrent edit (version conflict) leaves it to the user rather than overwriting.
+        await updateApplication(
+          db,
+          owner,
+          existing.record.id,
+          existing.record.version,
+          { status: 'Applied' },
+          now,
+        );
+      }
+      // Already Applied or further along: left as it is, never moved back.
+      if (!existing) applicationId = await createFromHit(db, user, hit, 'Applied', now);
       await setHitState(
         db,
         user.id,
         hit.id,
-        { state: 'applied', applicationId: created.value.record.id },
+        { state: 'applied', applicationId: applicationId ?? undefined },
         now,
       );
     },

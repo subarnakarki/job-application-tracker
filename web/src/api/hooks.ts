@@ -629,7 +629,7 @@ export function useApplyQueue(enabled = true) {
   });
 }
 
-export type HitAction = 'applied' | 'blocked' | 'skip' | 'queue' | 'redraft' | 'closed';
+export type HitAction = 'applied' | 'track' | 'blocked' | 'skip' | 'queue' | 'redraft' | 'closed';
 
 /** "Tailor my resume": suggested edits for one job, stored on it. */
 export function useTailorResume() {
@@ -668,7 +668,7 @@ export function useHitAction() {
       }),
     onSuccess: async (_hit, { action }) => {
       await refresh();
-      if (action === 'applied')
+      if (action === 'applied' || action === 'track')
         await Promise.all([
           client.invalidateQueries({ queryKey: ['applications'] }),
           client.invalidateQueries({ queryKey: ['pipeline'] }),

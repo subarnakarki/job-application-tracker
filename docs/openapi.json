@@ -6595,7 +6595,7 @@
     },
     "/api/job-search/hits/{id}/applied": {
       "post": {
-        "summary": "Mark a job applied: creates the application in the tracker (once)",
+        "summary": "Mark a job applied: moves its Saved application to Applied, or creates one (once)",
         "operationId": "postJob-searchHitsByIdApplied",
         "tags": [
           "job-search"
@@ -11309,6 +11309,589 @@
           },
           "502": {
             "description": "The suggestions did not finish",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error, always in the shared error shape",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/job-search/hits/{id}/track": {
+      "post": {
+        "summary": "Track a queue job in the tracker as Saved (or link the application already there)",
+        "operationId": "postJob-searchHitsByIdTrack",
+        "tags": [
+          "job-search"
+        ],
+        "x-auth": "user",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "runId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "greenhouse",
+                        "lever",
+                        "ashby",
+                        "rippling",
+                        "smartrecruiters",
+                        "breezy",
+                        "recruitee",
+                        "teamtailor",
+                        "personio",
+                        "workable",
+                        "jobvite",
+                        "workday",
+                        "icims",
+                        "taleo",
+                        "successfactors"
+                      ]
+                    },
+                    "company": {
+                      "type": "string"
+                    },
+                    "role": {
+                      "type": "string"
+                    },
+                    "location": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "workMode": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "Remote",
+                            "Hybrid",
+                            "On-site"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "postedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "jobLink": {
+                      "type": "string"
+                    },
+                    "applyLink": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "target",
+                        "keyword_only",
+                        "finish_yourself",
+                        "skipped"
+                      ]
+                    },
+                    "reason": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "new",
+                        "ready",
+                        "needs_you",
+                        "applied",
+                        "blocked",
+                        "skipped",
+                        "closed"
+                      ]
+                    },
+                    "questions": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "label": {
+                                "type": "string",
+                                "maxLength": 1000
+                              },
+                              "required": {
+                                "type": "boolean"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "text",
+                                  "long_text",
+                                  "single_select",
+                                  "multi_select",
+                                  "file",
+                                  "checkbox"
+                                ]
+                              },
+                              "options": {
+                                "maxItems": 300,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "maxLength": 300
+                                }
+                              }
+                            },
+                            "required": [
+                              "label",
+                              "required",
+                              "kind",
+                              "options"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "draft": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "answers": {
+                              "maxItems": 100,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "question": {
+                                    "type": "string",
+                                    "maxLength": 1000
+                                  },
+                                  "answer": {
+                                    "type": "string",
+                                    "maxLength": 4000
+                                  },
+                                  "source": {
+                                    "type": "string",
+                                    "enum": [
+                                      "profile",
+                                      "draft",
+                                      "needs_you"
+                                    ]
+                                  },
+                                  "option": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 300
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "question",
+                                  "answer",
+                                  "source",
+                                  "option"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "coverLetter": {
+                              "type": "string",
+                              "maxLength": 5000
+                            },
+                            "whyInterested": {
+                              "type": "string",
+                              "maxLength": 2000
+                            },
+                            "keywords": {
+                              "maxItems": 30,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "term": {
+                                    "type": "string",
+                                    "maxLength": 100
+                                  },
+                                  "group": {
+                                    "type": "string",
+                                    "enum": [
+                                      "hard_skill",
+                                      "tool",
+                                      "certification",
+                                      "soft_skill"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "term",
+                                  "group"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "answers",
+                            "coverLetter",
+                            "whyInterested"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "draftError": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "blockReason": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "applicationId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "checkedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "fit": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "percent": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100
+                            },
+                            "found": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "missing": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "percent",
+                            "found",
+                            "missing"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "tailoring": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "edits": {
+                              "maxItems": 12,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "original": {
+                                    "type": "string",
+                                    "maxLength": 600
+                                  },
+                                  "suggested": {
+                                    "type": "string",
+                                    "maxLength": 600
+                                  },
+                                  "keywordsAdded": {
+                                    "maxItems": 20,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 100
+                                    }
+                                  },
+                                  "why": {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  "unverified": {
+                                    "maxItems": 10,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 100
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "original",
+                                  "suggested",
+                                  "keywordsAdded",
+                                  "why",
+                                  "unverified"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "notCovered": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "keyword": {
+                                    "type": "string",
+                                    "maxLength": 100
+                                  },
+                                  "why": {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  }
+                                },
+                                "required": [
+                                  "keyword",
+                                  "why"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "model": {
+                              "type": "string",
+                              "maxLength": 100
+                            },
+                            "createdAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            }
+                          },
+                          "required": [
+                            "edits",
+                            "notCovered",
+                            "model",
+                            "createdAt"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "tracked": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "applicationId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "Saved",
+                                "Applied",
+                                "Screening",
+                                "Interviewing",
+                                "Offer",
+                                "Rejected",
+                                "Withdrawn"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "applicationId",
+                            "status"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "runId",
+                    "source",
+                    "company",
+                    "role",
+                    "location",
+                    "workMode",
+                    "postedAt",
+                    "jobLink",
+                    "applyLink",
+                    "kind",
+                    "reason",
+                    "state",
+                    "questions",
+                    "draft",
+                    "draftError",
+                    "blockReason",
+                    "applicationId",
+                    "createdAt",
+                    "checkedAt",
+                    "fit",
+                    "tailoring",
+                    "tracked"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cross-site request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such job (or not yours), or not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The job is no longer in the queue, or the application limit is reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The body is not JSON",
             "content": {
               "application/json": {
                 "schema": {
