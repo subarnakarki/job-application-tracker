@@ -880,6 +880,21 @@ Tests, per the conventions:
   typed answer alone; another user's jobs are untouched.
 - **E2E:** fill two answers in More answers (optional), save, and see a seeded job leave Needs you.
 
+## Phase 17 outcome
+
+Built as planned (17a, 17b, 17c), with the review refinements above and these details:
+
+- **Owner's choices (2026-11-09):** "Can travel" answers only plain travel questions (one with a percentage,
+  overnight or international travel waits for the owner); the W2 rate answers only questions that mention W2;
+  company history is one answer for every company; the owner enters their own answers on the setup page.
+- **Setup page:** the section opens by itself when an answer is set or needs fixing. Its labels and groups
+  live in `web/src/jobSearchForm.ts` (`MORE_GROUPS`), and a test checks each answer is offered once. The set
+  answers are also listed in the queue's Standard answers panel.
+- **Filling waiting jobs** runs on every setup save, over drafted `ready` and `needs_you` jobs; a job is
+  saved only when something was filled. Answers filled this way stay if an answer is later cleared.
+- **Local e2e on Windows:** "tailor my resume" fails on trailing spaces in the copied text, on `main` too; it
+  passes in CI (Linux). Not changed here.
+
 ## Planned but not built
 
 | Item                                | Status                                                                                                    |

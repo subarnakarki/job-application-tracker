@@ -1623,6 +1623,36 @@ export function assembleDraft(
   };
 }
 
+/**
+ * A saved draft with the current profile applied: each needs-you answer whose question a profile
+ * answer now covers is filled by code. Answers the candidate typed, or the model drafted, are never
+ * touched. `needsYou` is recomputed from the required questions, as when answers are edited.
+ */
+export function refillDraft(
+  draft: ApplicationDraft,
+  questions: ApplicationQuestion[],
+  profile: JobSearchProfile,
+): { draft: ApplicationDraft; needsYou: boolean; filled: number } {
+  const byLabel = new Map(questions.map((question) => [question.label, question]));
+  let filled = 0;
+  const answers = draft.answers.map((entry) => {
+    const question = byLabel.get(entry.question);
+    if (entry.source !== 'needs_you' || !question) return entry;
+    const kind = profileQuestionKind(question.label, profile);
+    if (!kind || kind === 'resume' || kind === 'cover_letter') return entry;
+    const choices = question.kind.endsWith('select') ? question.options : [];
+    const { answer, option } = profileFill(kind, profile, question.label, choices);
+    if (answer === null || (choices.length > 0 && option === null)) return entry;
+    filled += 1;
+    return { question: entry.question, answer, source: 'profile' as const, option };
+  });
+  const required = new Set(questions.filter((q) => q.required).map((q) => q.label));
+  const needsYou = answers.some(
+    (entry) => entry.source === 'needs_you' && required.has(entry.question),
+  );
+  return { draft: { ...draft, answers }, needsYou, filled };
+}
+
 export const JobFitSchema = z.strictObject({
   /** Share of the posting's keywords already in the resume, rounded. */
   percent: z.number().int().min(0).max(100),

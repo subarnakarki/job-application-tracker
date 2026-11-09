@@ -130,7 +130,7 @@ Open to the users in `JOB_SEARCH_USER_IDS` when `ANTHROPIC_API_KEY` is set; ever
 | Method | Path                               | Auth   | Notes                                                                 |
 | ------ | ---------------------------------- | ------ | --------------------------------------------------------------------- |
 | GET    | `/api/job-search/profile`          | user   | `{ available, profile, confirmedAt, hasResume }`                      |
-| PUT    | `/api/job-search/profile`          | user   | The confirmed setup (`JobSearchProfileSchema`)                        |
+| PUT    | `/api/job-search/profile`          | user   | The confirmed setup (`JobSearchProfileSchema`); fills waiting jobs    |
 | POST   | `/api/job-search/runs`             | user   | Runs now: search, read, sort, draft for up to 240 s; 201 with the run |
 |        |                                    |        | and its jobs. 409 `not_set_up`, `no_resume` or `run_in_progress`.     |
 |        |                                    |        | 10 a day by hand; 50 runs a day in total                              |
@@ -174,7 +174,14 @@ that only says "Remote" is kept with a note to check it. The search itself is al
 **Who answers what.** Contact details, work authorization, sponsorship, salary, relocation, start date, how you
 heard, age and every demographic or EEO question are answered from the profile by code
 (`profileQuestionKind` in `shared/`); the model never sees them. The model drafts the rest from the resume
-only, and anything it cannot support is marked `needs_you`. Greenhouse publishes each form's questions
+only, and anything it cannot support is marked `needs_you`.
+
+**More answers (optional).** The profile's `more` answers (company history, clearance, export control,
+"U.S. Person", legal name, W2, SMS consent, travel, pronouns and others) answer their questions the same way,
+with the option picked by meaning (`profileFill`); one left blank leaves its question to the model, as before.
+Saving the setup fills the needs-you answers those answers now cover on every drafted job still in the queue
+(`refillDraft`, no model call), never touching answers the user typed, and moves a job with no required
+question left to Ready. Greenhouse publishes each form's questions
 (`questions=true`); Lever and Ashby do not, so their jobs carry the profile, standard answers, a cover letter
 and "why this job".
 

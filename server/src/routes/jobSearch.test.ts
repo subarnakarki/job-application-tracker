@@ -7,9 +7,12 @@ import {
   JobHitSchema,
   JobSearchRunDetailSchema,
   JobSearchSetupSchema,
+  type ApplicationDraft,
+  type ApplicationQuestion,
   type JobHit,
   type JobSearchProfile,
   type ModelDraft,
+  type MoreAnswers,
   type SearchSource,
   type TailorAnswer,
 } from '@jat/shared';
@@ -19,6 +22,7 @@ import type { JobSearchClaude, TailorRequest } from '../jobsearch/claude';
 import { FetchError, type PageFetcher } from '../postings/fetchPage';
 import { createTestApp, SAME_ORIGIN, T0, type TestApp } from '../test/app';
 import { TEST_DATABASE_URL } from '../test/testDb';
+import { getHit } from '../repo/jobSearch';
 import { CHECK_RULE, MANUAL_RUN_RULE, TAILOR_RULE } from './jobSearch';
 
 const MISSING_ID = '00000000-0000-4000-8000-000000000000';
@@ -825,6 +829,99 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
       expect(jobSearch.profile).toEqual(PROFILE);
       expect(jobSearch.runs).toHaveLength(1);
       expect(jobSearch.hits).toHaveLength(4);
+    });
+  });
+
+  describe('new setup answers fill jobs already waiting', () => {
+    const QUESTIONS: ApplicationQuestion[] = [
+      {
+        label: 'Are you a U.S. citizen?',
+        required: true,
+        kind: 'single_select',
+        options: ['Yes', 'No'],
+      },
+      { label: 'What is the country of your birth?', required: true, kind: 'text', options: [] },
+      { label: 'Why us?', required: true, kind: 'long_text', options: [] },
+    ];
+    const DRAFT: ApplicationDraft = {
+      answers: [
+        { question: 'Are you a U.S. citizen?', answer: '', source: 'needs_you', option: null },
+        // Typed by the user on the queue: never overwritten.
+        {
+          question: 'What is the country of your birth?',
+          answer: 'Typed by me',
+          source: 'draft',
+          option: null,
+        },
+        { question: 'Why us?', answer: 'The mission.', source: 'draft', option: null },
+      ],
+      coverLetter: 'Dear team',
+      whyInterested: '',
+    };
+    const MORE: MoreAnswers = { ...EMPTY_MORE_ANSWERS, usCitizen: 'yes', birthCountry: 'Nepal' };
+
+    /** A user whose run left one job needing them, on the questions above. */
+    async function waiting() {
+      const login = await member();
+      const { hits } = runOf(await run(login.cookie));
+      const target = byRole(hits, 'Senior Product Manager');
+      await t.db.query(
+        `update job_search_hits set questions = $2, draft = $3, state = 'needs_you' where id = $1`,
+        [target.id, JSON.stringify(QUESTIONS), JSON.stringify(DRAFT)],
+      );
+      return { ...login, hitId: target.id };
+    }
+    const saveSetup = (cookie: string, more = MORE) =>
+      send('PUT', '/api/job-search/profile', cookie, { ...PROFILE, more });
+    const hitNow = async (userId: string, id: string) => {
+      const hit = await getHit(t.db, userId, id);
+      if (!hit) throw new Error('hit gone');
+      return hit;
+    };
+
+    it('moves a needs-you job to ready, by code, leaving typed answers alone', async () => {
+      const owner = await waiting();
+      const draftsBefore = claude.drafts;
+
+      expect((await saveSetup(owner.cookie)).statusCode).toBe(200);
+
+      const hit = await hitNow(owner.user.id, owner.hitId);
+      expect(hit.state).toBe('ready');
+      expect(hit.draft?.answers).toEqual([
+        { question: 'Are you a U.S. citizen?', answer: 'Yes', source: 'profile', option: 'Yes' },
+        DRAFT.answers[1],
+        DRAFT.answers[2],
+      ]);
+      expect(hit.draft?.coverLetter).toBe('Dear team');
+      // No model call.
+      expect(claude.drafts).toBe(draftsBefore);
+      // The saved setup has the answers.
+      expect(
+        parsed(JobSearchSetupSchema)(await send('GET', '/api/job-search/profile', owner.cookie))
+          .profile?.more,
+      ).toEqual(MORE);
+    });
+
+    it('changes nothing while the answers are not set', async () => {
+      const owner = await waiting();
+
+      expect((await saveSetup(owner.cookie, EMPTY_MORE_ANSWERS)).statusCode).toBe(200);
+
+      const hit = await hitNow(owner.user.id, owner.hitId);
+      expect(hit.state).toBe('needs_you');
+      expect(hit.draft).toEqual(DRAFT);
+    });
+
+    it("leaves another user's waiting jobs untouched", async () => {
+      const owner = await waiting();
+      const other = await waiting();
+
+      await saveSetup(owner.cookie);
+
+      expect((await hitNow(owner.user.id, owner.hitId)).state).toBe('ready');
+      const theirs = await hitNow(other.user.id, other.hitId);
+      expect(theirs.state).toBe('needs_you');
+      expect(theirs.draft).toEqual(DRAFT);
     });
   });
 

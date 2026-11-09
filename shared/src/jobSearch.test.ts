@@ -33,6 +33,7 @@ import {
   profileAnswer,
   profileFill,
   profileQuestionKind,
+  refillDraft,
   salaryRangeTop,
   type MoreAnswers,
   questionsForModel,
@@ -1012,6 +1013,80 @@ describe('more screening answers, set once', () => {
       answer: 'Yes',
       source: 'profile',
       option: 'Yes',
+    });
+  });
+});
+
+describe('refillDraft: new answers fill jobs already waiting', () => {
+  const q = (label: string, options: string[] = [], required = true): ApplicationQuestion => ({
+    label,
+    required,
+    kind: options.length ? 'single_select' : 'text',
+    options,
+  });
+  const QUESTIONS = [
+    q('Are you a U.S. citizen?', ['Yes', 'No']),
+    q('What is the country of your birth?'),
+    q('Why us?'),
+    q('What is your clearance level?', ['Confidential', 'Secret'], false),
+  ];
+  const DRAFT: ApplicationDraft = {
+    answers: [
+      { question: 'Are you a U.S. citizen?', answer: '', source: 'needs_you', option: null },
+      // Typed by the candidate: never overwritten.
+      {
+        question: 'What is the country of your birth?',
+        answer: 'Typed by me',
+        source: 'draft',
+        option: null,
+      },
+      { question: 'Why us?', answer: '', source: 'needs_you', option: null },
+      { question: 'What is your clearance level?', answer: '', source: 'needs_you', option: null },
+    ],
+    coverLetter: 'Dear team',
+    whyInterested: '',
+  };
+  const withMore = (more: Partial<MoreAnswers>): JobSearchProfile => ({
+    ...PROFILE,
+    more: { ...EMPTY_MORE_ANSWERS, ...more },
+  });
+
+  it('fills what the profile now answers and leaves typed answers alone', () => {
+    const result = refillDraft(
+      DRAFT,
+      QUESTIONS,
+      withMore({ usCitizen: 'yes', birthCountry: 'Nepal', clearanceHeld: 'never' }),
+    );
+    expect(result.filled).toBe(1);
+    expect(result.draft.answers).toEqual([
+      { question: 'Are you a U.S. citizen?', answer: 'Yes', source: 'profile', option: 'Yes' },
+      DRAFT.answers[1],
+      DRAFT.answers[2],
+      // "Never held" matches neither option: it still needs you (optional, so no hold-up).
+      DRAFT.answers[3],
+    ]);
+    expect(result.draft.coverLetter).toBe('Dear team');
+    // "Why us?" is still required and empty.
+    expect(result.needsYou).toBe(true);
+  });
+
+  it('moves the job to ready once no required question is left', () => {
+    const questions = QUESTIONS.filter((question) => question.label !== 'Why us?');
+    const draft = {
+      ...DRAFT,
+      answers: DRAFT.answers.filter((answer) => answer.question !== 'Why us?'),
+    };
+    expect(refillDraft(draft, questions, withMore({ usCitizen: 'no' }))).toMatchObject({
+      needsYou: false,
+      filled: 1,
+    });
+  });
+
+  it('changes nothing when the answers are not set', () => {
+    expect(refillDraft(DRAFT, QUESTIONS, PROFILE)).toEqual({
+      draft: DRAFT,
+      needsYou: true,
+      filled: 0,
     });
   });
 });

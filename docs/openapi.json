@@ -12081,7 +12081,7 @@
         }
       },
       "put": {
-        "summary": "Save the confirmed setup (the first save ends the first-run setup)",
+        "summary": "Save the confirmed setup (the first save ends the first-run setup); waiting jobs take any answers it now covers",
         "operationId": "putJob-searchProfile",
         "tags": [
           "job-search"

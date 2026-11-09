@@ -16,6 +16,7 @@ import {
   QueueCheckResultSchema,
   localDateIn,
   olderMatchKind,
+  refillDraft,
   SOURCE_LABELS,
   type DraftAnswer,
   type JobHit,
@@ -40,6 +41,7 @@ import {
   getRun,
   lastScheduledRunDay,
   listAgeSkipped,
+  listDraftedWaiting,
   listOpenHits,
   listRunHits,
   listRuns,
@@ -255,7 +257,8 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
       config: {
         auth: 'user',
         contract: {
-          summary: 'Save the confirmed setup (the first save ends the first-run setup)',
+          summary:
+            'Save the confirmed setup (the first save ends the first-run setup); waiting jobs take any answers it now covers',
           errors: { 404: 'Not available to this account' },
           body: JobSearchProfileSchema,
           responses: { 200: JobSearchSetupSchema },
@@ -267,6 +270,13 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
       const { user } = await memberOf(request);
       const profile = parseInput(JobSearchProfileSchema, request.body);
       const confirmedAt = await saveProfile(db, user.id, profile, deps.clock.now());
+      // Jobs already waiting take the new answers now: by code, no model call. A job with no
+      // required question left moves to Ready; answers the user typed are never touched.
+      for (const hit of await listDraftedWaiting(db, user.id)) {
+        if (!hit.draft || !hit.questions) continue;
+        const { filled, ...outcome } = refillDraft(hit.draft, hit.questions, profile);
+        if (filled > 0) await saveDraft(db, user.id, hit.id, outcome, deps.clock.now());
+      }
       return {
         available: true,
         profile,

@@ -401,6 +401,18 @@ export async function listOpenHits(db: Queryable, userId: string): Promise<JobHi
   return withTracked(db, userId, result.rows.map(toHit));
 }
 
+/** Drafted jobs still waiting in the queue whose board published the questions. */
+export async function listDraftedWaiting(db: Queryable, userId: string): Promise<JobHit[]> {
+  const result = await db.query<HitRow>(
+    `select ${HIT_COLUMNS} from job_search_hits
+      where user_id = $1 and state in ('ready', 'needs_you')
+        and draft is not null and questions is not null
+      order by created_at, id`,
+    [userId],
+  );
+  return result.rows.map(toHit);
+}
+
 /** Targets (and finish-yourself jobs) still waiting for a draft, oldest first. */
 export async function listUndrafted(
   db: Queryable,
