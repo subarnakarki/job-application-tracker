@@ -14172,6 +14172,19 @@
                                 }
                               ]
                             },
+                            "salaryFloor": {
+                              "default": null,
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 100000000
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
                             "linkedin": {
                               "type": "string",
                               "maxLength": 2000
@@ -14754,6 +14767,7 @@
                             "needsSponsorship",
                             "salaryMin",
                             "salaryMax",
+                            "salaryFloor",
                             "linkedin",
                             "portfolio",
                             "website",
@@ -14905,6 +14919,19 @@
                       {
                         "type": "integer",
                         "minimum": 0,
+                        "maximum": 100000000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "salaryFloor": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
                         "maximum": 100000000
                       },
                       {
@@ -15549,6 +15576,19 @@
                                 }
                               ]
                             },
+                            "salaryFloor": {
+                              "default": null,
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 100000000
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
                             "linkedin": {
                               "type": "string",
                               "maxLength": 2000
@@ -16131,6 +16171,7 @@
                             "needsSponsorship",
                             "salaryMin",
                             "salaryMax",
+                            "salaryFloor",
                             "linkedin",
                             "portfolio",
                             "website",
@@ -23938,6 +23979,19 @@
                                     }
                                   ]
                                 },
+                                "salaryFloor": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 100000000
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
                                 "linkedin": {
                                   "type": "string",
                                   "maxLength": 2000
@@ -24520,6 +24574,7 @@
                                 "needsSponsorship",
                                 "salaryMin",
                                 "salaryMax",
+                                "salaryFloor",
                                 "linkedin",
                                 "portfolio",
                                 "website",

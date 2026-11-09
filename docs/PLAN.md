@@ -1019,6 +1019,42 @@ Built as revised after review (18a to 18d; 18e dropped), each step pushed green 
   report waits for a few days of runs.
 - **Not checked live:** real model drafts of lead messages and application tailorings (the tests use stand-ins).
 
+## Phase 19 plan: a hard salary floor (approved)
+
+The owner's rule: no job whose posted pay is under $140,000. A range counts as under only when its **top** is below
+the floor ($100k to $130k goes, $120k to $170k stays). A job that posts no pay is kept. The floor is a setting, not
+a constant.
+
+### 19a. Profile and sorting (shared, pure logic)
+
+- `salaryFloor: number | null` on the job search profile (yearly, USD; at most `LIMITS.salaryMax`). Setups saved
+  before it load as unset, so no migration (the profile is JSON).
+- `sortJob` gets the posting's pay. With a floor set and a known yearly USD pay whose top is below it, the job is
+  `skipped`: "Pays up to $130,000, under your $140,000 floor". Unknown pay, another currency or no floor: sorted
+  as before.
+
+### 19b. Read the pay during a run
+
+- `readJob` returns `salary`, from the same parsers the posting preview uses (Greenhouse, Lever and Ashby fields,
+  JSON-LD), falling back to a labelled pay range in the posting's text (`salaryInText`).
+- `run.ts` passes the pay and the floor to `sortJob`.
+
+### 19c. Jobs already waiting
+
+"Check they're still open" already reads each queued job again; a job it finds below the floor leaves the queue as
+skipped, so raising the floor cleans the queue without waiting for a run.
+
+### 19d. Setup page
+
+An optional "Lowest pay I'll accept" field under the salary expectation; then set to 140,000 on the live setup.
+
+### Order and tests
+
+19a, then 19b and 19c, then 19d; each a small commit, green and pushed. Unit: below, at and above the floor, no
+pay, another currency, no floor, an old setup; the pay read from each board's fixture and from text. API: the
+setup round-trip with and without a floor; a run and a still-open check that skip a job below it. E2E: the Setup
+form saves the floor.
+
 ## Planned but not built
 
 | Item                                  | Status                                                                                                    |

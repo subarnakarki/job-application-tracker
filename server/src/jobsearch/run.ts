@@ -186,6 +186,7 @@ export async function runJobSearch(
       workModes: profile.workModes,
       timeframeDays: profile.timeframeDays,
       usOnly: profile.usOnly,
+      salaryFloor: profile.salaryFloor,
       now,
     };
     const toRead = refs.slice(0, MAX_NEW_JOBS_PER_RUN);

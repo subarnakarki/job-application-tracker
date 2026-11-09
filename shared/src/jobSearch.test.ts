@@ -157,6 +157,7 @@ describe('sortJob', () => {
     workModes: ['Remote', 'Hybrid'],
     timeframeDays: 1,
     usOnly: true,
+    salaryFloor: null,
     now: NOW,
   };
   const job = (overrides: Partial<JobFacts> = {}): JobFacts => ({
@@ -286,6 +287,62 @@ describe('sortJob', () => {
       'target',
       'Matches your titles',
     ],
+    [
+      'pay that tops out below the floor',
+      { salary: { min: 100_000, max: 130_000, currency: 'USD' } },
+      { salaryFloor: 140_000 },
+      'skipped',
+      'Pays up to $130,000, under your $140,000 floor',
+    ],
+    [
+      'pay that tops out one dollar below the floor',
+      { salary: { min: 139_999, max: 139_999, currency: 'USD' } },
+      { salaryFloor: 140_000 },
+      'skipped',
+      'Pays up to $139,999, under your $140,000 floor',
+    ],
+    [
+      'pay that tops out at the floor',
+      { salary: { min: 120_000, max: 140_000, currency: 'USD' } },
+      { salaryFloor: 140_000 },
+      'target',
+      'Matches your titles',
+    ],
+    [
+      'a range that starts below the floor but tops out above it',
+      { salary: { min: 120_000, max: 170_000, currency: 'USD' } },
+      { salaryFloor: 140_000 },
+      'target',
+      'Matches your titles',
+    ],
+    [
+      'no posted pay, with a floor',
+      { salary: null },
+      { salaryFloor: 140_000 },
+      'target',
+      'Matches your titles',
+    ],
+    [
+      'pay in another currency',
+      { salary: { min: 60_000, max: 80_000, currency: 'EUR' } },
+      { salaryFloor: 140_000 },
+      'target',
+      'Matches your titles',
+    ],
+    [
+      'low pay with no floor set',
+      { salary: { min: 50_000, max: 60_000, currency: 'USD' } },
+      {},
+      'target',
+      'Matches your titles',
+    ],
+    [
+      'low pay on a keyword-only job',
+      { title: 'Account Executive', salary: { min: 50_000, max: 60_000, currency: 'USD' } },
+      { salaryFloor: 140_000 },
+      'skipped',
+      'Pays up to $60,000, under your $140,000 floor',
+    ],
   ])('%s', (_label, overrides, ruleOverrides, kind, reason) => {
     expect(sortJob(job(overrides), { ...rules, ...ruleOverrides })).toEqual({ kind, reason });
   });
@@ -354,6 +411,7 @@ const PROFILE: JobSearchProfile = {
   needsSponsorship: false,
   salaryMin: 150000,
   salaryMax: 180000,
+  salaryFloor: null,
   linkedin: 'https://www.linkedin.com/in/pat',
   portfolio: '',
   website: 'https://pat.example.com',
@@ -386,6 +444,15 @@ describe('JobSearchProfileSchema', () => {
     expect(JobSearchProfileSchema.parse(PROFILE)).toEqual(PROFILE);
   });
 
+  it('keeps a salary floor, and loads a setup saved before floors existed without one', () => {
+    expect(JobSearchProfileSchema.parse({ ...PROFILE, salaryFloor: 140000 }).salaryFloor).toBe(
+      140000,
+    );
+    const older: Partial<JobSearchProfile> = { ...PROFILE };
+    delete older.salaryFloor;
+    expect(JobSearchProfileSchema.parse(older).salaryFloor).toBeNull();
+  });
+
   it.each([
     ['a maximum below the minimum', { salaryMax: 100 }, 'salaryMax'],
     ['a link that is not http(s)', { linkedin: 'javascript:alert(1)' }, 'linkedin'],
@@ -393,6 +460,8 @@ describe('JobSearchProfileSchema', () => {
     ['an odd timeframe', { timeframeDays: 2 }, 'timeframeDays'],
     ['a two-line name', { fullName: 'Pat\nExample' }, 'fullName'],
     ['no work mode', { workModes: [] }, 'workModes'],
+    ['a zero salary floor', { salaryFloor: 0 }, 'salaryFloor'],
+    ['a fractional salary floor', { salaryFloor: 140000.5 }, 'salaryFloor'],
   ])('refuses %s', (_label, overrides, path) => {
     const result = JobSearchProfileSchema.safeParse({ ...PROFILE, ...overrides });
     expect(result.success).toBe(false);

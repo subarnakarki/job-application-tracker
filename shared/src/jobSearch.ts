@@ -621,6 +621,16 @@ export interface JobFacts {
   location: string | null;
   /** The country the board gives, when it does (a name or a code). */
   country: string | null;
+  /** The yearly pay the posting gives, when it does. */
+  salary?: PostedPay | null;
+}
+
+/** A yearly pay range as a posting states it (a single figure has min equal to max). */
+export interface PostedPay {
+  min: number;
+  max: number;
+  /** ISO code, such as USD. */
+  currency: string;
 }
 
 export interface SortRules {
@@ -632,6 +642,8 @@ export interface SortRules {
   timeframeDays: number;
   /** Skip jobs clearly outside the United States. */
   usOnly: boolean;
+  /** Skip jobs whose posted yearly pay (USD) tops out below this. Null: no floor. */
+  salaryFloor: number | null;
   now: Date;
 }
 
@@ -646,8 +658,21 @@ const anyIn = (terms: string[], text: string): string | undefined => {
   return terms.find((term) => term.trim() && index.has(term));
 };
 
+const dollars = (value: number) => `$${value.toLocaleString('en-US')}`;
+
 /**
- * Where a job goes: skipped (too old, already tracked, a skipped title, the wrong work mode), a
+ * Why a job's pay is under the floor, or null when it is not (or cannot be told). Only a range whose
+ * top is below the floor counts: $120k to $170k meets a $140k floor. A posting with no pay, or pay
+ * in another currency, is not judged.
+ */
+export function belowSalaryFloor(pay: PostedPay | null, floor: number | null): string | null {
+  if (floor === null || pay === null || pay.currency !== 'USD' || pay.max >= floor) return null;
+  return `Pays up to ${dollars(pay.max)}, under your ${dollars(floor)} floor`;
+}
+
+/**
+ * Where a job goes: skipped (too old, already tracked, a skipped title, the wrong work mode, pay
+ * under the floor), a
  * target role (the title has an include word), keyword-only (the word is in the posting but not
  * the title), or finish-yourself (a target on a board that needs an account).
  */
@@ -678,6 +703,8 @@ export function sortJob(job: JobFacts, rules: SortRules): Sorted {
     };
   if (job.workMode && rules.workModes.length > 0 && !rules.workModes.includes(job.workMode))
     return { kind: 'skipped', reason: `${job.workMode}, which you don't want` };
+  const underFloor = belowSalaryFloor(job.salary ?? null, rules.salaryFloor);
+  if (underFloor) return { kind: 'skipped', reason: underFloor };
 
   const wanted = rules.includeTitles.length > 0 ? rules.includeTitles : rules.queryTerms;
   const inTitle = wanted.length === 0 || anyIn(wanted, job.title) !== undefined;
@@ -826,6 +853,11 @@ export const JobSearchProfileSchema = z
     needsSponsorship: z.boolean(),
     salaryMin: z.number().int().min(0).max(LIMITS.salaryMax),
     salaryMax: z.number().int().min(0).max(LIMITS.salaryMax).nullable(),
+    /**
+     * The lowest yearly pay (USD) worth a job: one whose posted range tops out below it is skipped.
+     * Null: no floor. Setups saved before it load without one.
+     */
+    salaryFloor: z.number().int().min(1).max(LIMITS.salaryMax).nullable().default(null),
     linkedin: link,
     portfolio: link,
     website: link,
@@ -887,6 +919,7 @@ export type JobSearchProfile = z.infer<typeof JobSearchProfileSchema>;
 
 /** What the setup form starts with. */
 export const PROFILE_DEFAULTS = {
+  salaryFloor: null,
   workModes: ['Remote', 'Hybrid'] as WorkMode[],
   usOnly: true,
   queries: [] as string[],
@@ -1948,6 +1981,7 @@ export function olderMatchKind(
       workModes: profile.workModes,
       timeframeDays: profile.timeframeDays,
       usOnly: profile.usOnly,
+      salaryFloor: profile.salaryFloor,
       now,
     },
   );

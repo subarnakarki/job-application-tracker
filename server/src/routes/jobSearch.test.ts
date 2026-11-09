@@ -149,6 +149,7 @@ const PROFILE: JobSearchProfile = {
   needsSponsorship: false,
   salaryMin: 150000,
   salaryMax: null,
+  salaryFloor: null,
   linkedin: 'https://www.linkedin.com/in/pat',
   portfolio: '',
   website: '',
