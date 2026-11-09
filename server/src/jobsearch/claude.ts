@@ -16,6 +16,7 @@ import {
   type Status,
 } from '@jat/shared';
 import { ignoreUsage, usageEntry, type UsageRecorder } from '../usage/record';
+import { trimPostingBoilerplate } from '../postings/trim';
 import { AnalyzerUnavailableError } from '../resume/analyze';
 
 export const JOB_SEARCH_MODEL = 'claude-opus-5-5';
@@ -189,27 +190,54 @@ const block = (tag: string, text: string) =>
     `</${tag}>`,
   ].join('\n');
 
-/** The tailoring request as delimited blocks. */
-export function renderTailorRequest(request: TailorRequest): string {
+/**
+ * A request's blocks, the resume first. The resume is the same in every request a user makes, so
+ * with the system prompt before it, it is a cacheable prefix: marked with `cache_control`, the next
+ * request within five minutes (the next draft in a run) reads it at a twentieth of the price.
+ */
+type RequestParts = [resume: string, ...rest: string[]];
+
+const joinParts = (parts: RequestParts) => parts.join('\n\n');
+
+/** The user message: the resume block cached, then the rest. */
+export function cachedContent(parts: RequestParts): Anthropic.Beta.BetaTextBlockParam[] {
+  const [resume, ...rest] = parts;
+  return [
+    { type: 'text', text: `${resume}\n\n`, cache_control: { type: 'ephemeral' } },
+    { type: 'text', text: rest.join('\n\n') || '(nothing else)' },
+  ];
+}
+
+/** The posting as the model sees it: legal boilerplate removed (see `trimPostingBoilerplate`). */
+const postingBlock = (company: string, role: string, postingText: string) =>
+  block('posting', `${company}: ${role}\n\n${trimPostingBoilerplate(postingText)}`);
+
+function tailorParts(request: TailorRequest): RequestParts {
   return [
     block('resume', request.resumeText),
-    block('posting', `${request.company}: ${request.role}\n\n${request.postingText}`),
+    postingBlock(request.company, request.role, request.postingText),
     block('missing', request.missing.join('\n') || '(none)'),
-  ].join('\n\n');
+  ];
+}
+
+/** The tailoring request as delimited blocks. */
+export const renderTailorRequest = (request: TailorRequest) => joinParts(tailorParts(request));
+
+function tailorPostingParts(request: TailorPostingRequest): RequestParts {
+  return [
+    block('resume', request.resumeText),
+    postingBlock(request.company, request.role, request.postingText),
+  ];
 }
 
 /** The tailoring request for an application as delimited blocks. */
-export function renderTailorPostingRequest(request: TailorPostingRequest): string {
-  return [
-    block('resume', request.resumeText),
-    block('posting', `${request.company}: ${request.role}\n\n${request.postingText}`),
-  ].join('\n\n');
-}
+export const renderTailorPostingRequest = (request: TailorPostingRequest) =>
+  joinParts(tailorPostingParts(request));
 
-/** The message request as delimited blocks; the owner's own line is a block of its own. */
-export function renderLeadMessageRequest(request: LeadMessageModelRequest): string {
+function leadMessageParts(request: LeadMessageModelRequest): RequestParts {
   const notes = request.notes.map((note) => `${note.heldOn}: ${note.body}`).join('\n\n');
   return [
+    block('resume', request.resumeText),
     `Kind of message: ${request.kind}`,
     block('job', `${request.company}: ${request.role}\nStatus: ${request.status}`),
     block(
@@ -217,15 +245,17 @@ export function renderLeadMessageRequest(request: LeadMessageModelRequest): stri
       `${request.lead.name}${request.lead.company ? ` (${request.lead.company})` : ''}`,
     ),
     block('notes', notes || '(none)'),
-    block('resume', request.resumeText),
-    ...(request.postingText ? [block('posting', request.postingText)] : []),
+    ...(request.postingText ? [block('posting', trimPostingBoilerplate(request.postingText))] : []),
     block('steer', request.steer || '(none)'),
     ...(request.tooLong ? [`Too long last time: ${request.tooLong}. Stay within the limits.`] : []),
-  ].join('\n\n');
+  ];
 }
 
-/** The draft request as delimited blocks; forged closing tags cannot end a block early. */
-export function renderDraftRequest(request: DraftRequest): string {
+/** The message request as delimited blocks; the owner's own line is a block of its own. */
+export const renderLeadMessageRequest = (request: LeadMessageModelRequest) =>
+  joinParts(leadMessageParts(request));
+
+function draftParts(request: DraftRequest): RequestParts {
   const questions = request.questions
     .map((question, index) => {
       const options = question.options.length ? ` Options: ${question.options.join(' | ')}` : '';
@@ -234,10 +264,13 @@ export function renderDraftRequest(request: DraftRequest): string {
     .join('\n');
   return [
     block('resume', request.resumeText),
-    block('posting', `${request.company}: ${request.role}\n\n${request.postingText}`),
+    postingBlock(request.company, request.role, request.postingText),
     block('questions', questions || '(none)'),
-  ].join('\n\n');
+  ];
 }
+
+/** The draft request as delimited blocks; forged closing tags cannot end a block early. */
+export const renderDraftRequest = (request: DraftRequest) => joinParts(draftParts(request));
 
 const URL_IN_TEXT = /https?:\/\/[^\s<>"')\]]+/g;
 
@@ -324,7 +357,7 @@ export function claudeJobSearch(
           fallbacks: 'default',
           output_config: { effort: 'medium', format: betaZodOutputFormat(ModelDraftSchema) },
           system: DRAFT_PROMPT,
-          messages: [{ role: 'user', content: renderDraftRequest(request) }],
+          messages: [{ role: 'user', content: cachedContent(draftParts(request)) }],
         });
         await record(usageEntry('draft', response));
         if (response.stop_reason === 'refusal' || response.stop_reason === 'max_tokens')
@@ -354,7 +387,7 @@ export function claudeJobSearch(
           fallbacks: 'default',
           output_config: { effort: 'medium', format: betaZodOutputFormat(TailorAnswerSchema) },
           system: TAILOR_PROMPT,
-          messages: [{ role: 'user', content: renderTailorRequest(request) }],
+          messages: [{ role: 'user', content: cachedContent(tailorParts(request)) }],
         });
         await record(usageEntry('tailor', response));
         if (response.stop_reason === 'refusal' || response.stop_reason === 'max_tokens')
@@ -387,7 +420,7 @@ export function claudeJobSearch(
             format: betaZodOutputFormat(ApplicationTailorAnswerSchema),
           },
           system: TAILOR_POSTING_PROMPT,
-          messages: [{ role: 'user', content: renderTailorPostingRequest(request) }],
+          messages: [{ role: 'user', content: cachedContent(tailorPostingParts(request)) }],
         });
         await record(usageEntry('tailor', response));
         if (response.stop_reason === 'refusal' || response.stop_reason === 'max_tokens')
@@ -417,7 +450,7 @@ export function claudeJobSearch(
           fallbacks: 'default',
           output_config: { effort: 'low', format: betaZodOutputFormat(LeadMessageAnswerSchema) },
           system: LEAD_MESSAGE_PROMPT,
-          messages: [{ role: 'user', content: renderLeadMessageRequest(request) }],
+          messages: [{ role: 'user', content: cachedContent(leadMessageParts(request)) }],
         });
         await record(usageEntry('lead_message', response));
         if (response.stop_reason === 'refusal' || response.stop_reason === 'max_tokens')

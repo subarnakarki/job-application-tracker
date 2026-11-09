@@ -41,6 +41,11 @@ function claudeAnswering(answers: { status: number; body: unknown }[]) {
   return { claude: claudeJobSearch(client, record), requests, usage };
 }
 
+/** The user message sent, as its text blocks. */
+const sentBlocks = (request: Record<string, unknown> | undefined) =>
+  (request?.['messages'] as { content: { text: string; cache_control?: unknown }[] }[])[0]
+    ?.content ?? [];
+
 const message = (stopReason: string, content: unknown[], searches = 0) => ({
   id: 'msg_1',
   type: 'message',
@@ -184,8 +189,13 @@ describe('claudeJobSearch.draft', () => {
       { status: 200, body: message('end_turn', [{ type: 'text', text: JSON.stringify(draft) }]) },
     ]);
     expect(await claude.draft(request)).toEqual(draft);
-    const sent = (requests[0]?.['messages'] as { content: string }[])[0]?.content ?? '';
+    const blocks = sentBlocks(requests[0]);
+    const sent = blocks.map((part) => part.text).join('');
     expect(sent).toBe(renderDraftRequest(request));
+    // The resume comes first, marked for caching: the next draft in a run reads it from the cache.
+    expect(blocks[0]).toMatchObject({ cache_control: { type: 'ephemeral' } });
+    expect(blocks[0]?.text).toMatch(/^<resume>[\s\S]*<\/resume>\n\n$/);
+    expect(blocks[1]?.cache_control).toBeUndefined();
     expect(sent).toContain('1. Why us? (required)\n2. Worked here? Options: Yes | No');
     expect(requests[0]).toMatchObject({ output_config: { format: { type: 'json_schema' } } });
   });
@@ -236,8 +246,10 @@ describe('tailor', () => {
       },
     ]);
     expect(await claude.tailor(request)).toEqual(tailoring);
-    const sent = (requests[0]?.['messages'] as { content: string }[])[0]?.content ?? '';
+    const blocks = sentBlocks(requests[0]);
+    const sent = blocks.map((part) => part.text).join('');
     expect(sent).toBe(renderTailorRequest(request));
+    expect(blocks[0]).toMatchObject({ cache_control: { type: 'ephemeral' } });
     expect(sent).toContain('<missing>\nk6\ntest strategy\n</missing>');
     expect(requests[0]).toMatchObject({ system: TAILOR_PROMPT });
   });

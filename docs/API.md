@@ -226,6 +226,14 @@ too).
 
 ## Model usage
 
+**Token efficiency.** Drafting, tailoring and lead messages send the resume as the first block of the request,
+marked for prompt caching: with the system prompt before it, it is the same in every request a user makes, so
+the next one within five minutes (the next draft in a run) reads it at a twentieth of the input price. Posting
+text has its legal boilerplate removed before it is sent (`server/src/postings/trim.ts`: equal-opportunity,
+accommodation, E-Verify, privacy and agency notices). The job search is not cached: in real runs (2026-11-09)
+each query finished in one turn, so nothing is resent, and caching would only add the cache-write cost to its
+search results.
+
 Every Claude call records one row in `model_usage` (migration 0013): the kind of call (`job_search`, `draft`,
 `tailor`, `classify_email`, `posting_keywords`, `resume_analysis`), the model that answered, and its input,
 cache-write, cache-read and output tokens and web searches. No user and no text are stored. A failed write is
