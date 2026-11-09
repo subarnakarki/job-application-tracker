@@ -81,13 +81,12 @@ describe.skipIf(!TEST_DATABASE_URL)('model_usage (real Postgres)', () => {
     ]);
   });
 
-  it('accepts every kind of call the code records, and only those', async () => {
-    for (const call of MODEL_CALLS) await dbUsageRecorder(testDb.db)({ ...ENTRY, call });
+  it('accepts every kind of call the code records, and refuses a malformed one', async () => {
     const errors: unknown[] = [];
-    await dbUsageRecorder(testDb.db, (error) => errors.push(error))({
-      ...ENTRY,
-      call: 'other' as UsageEntry['call'],
-    });
+    const record = dbUsageRecorder(testDb.db, (error) => errors.push(error));
+    for (const call of MODEL_CALLS) await record({ ...ENTRY, call });
+    expect(errors).toEqual([]);
+    await record({ ...ENTRY, call: 'Not a kind!' as UsageEntry['call'] });
     expect(errors).toHaveLength(1);
   });
 });

@@ -938,7 +938,7 @@ does not change.
 | Model         | **One call:** the Phase 16 tailoring call also returns the posting's 10 to 20 keywords (as drafting does, in the 14c shape), so no separate keyword call and no `ANALYSIS_RULE` spend. The Phase 16 guardrails are unchanged. Shares the tailoring's 10-a-day limit                                                                                                   |
 | Editing       | Pick the suggestions (as in 16c), then edit the full text by hand. The fit before and after is recalculated as you type from the stored keywords (code, no model call)                                                                                                                                                                                                |
 | Saved per job | **Save as this job's resume** stores the edited text, the edits as original/new pairs (chosen suggestions, plus lines changed by hand worked out by a line diff), and the resume it came from (`resume_sha256`). Edit, Download and Remove on the application page                                                                                                    |
-| Storage       | Migration `0014`: a table `application_tailorings` (`application_id` primary key, `user_id`; `tailoring`, `keywords`, `posting_text`, `tailored_text` (60,000), `edits`, `resume_sha256`, timestamps), foreign key `(user_id, application_id)` to the application, deleted with it. In the data export (`DataExportSchema`); delete-account is covered by the cascade |
+| Storage       | Migration `0015`: a table `application_tailorings` (`application_id` primary key, `user_id`; `tailoring`, `keywords`, `posting_text`, `tailored_text` (60,000), `edits`, `resume_sha256`, timestamps), foreign key `(user_id, application_id)` to the application, deleted with it. In the data export (`DataExportSchema`); delete-account is covered by the cascade |
 | From a queue  | The queue's tailoring (16c) gains the same editor. **Save** there first asks to **Track it** (it uses up an application), then saves on that application, with the job's keywords                                                                                                                                                                                     |
 | Routes        | `POST /api/applications/:id/tailor` (optional `postingText`), `PUT` and `DELETE /api/applications/:id/tailored-resume`; `auth: 'user'`, in `ISOLATION_COVERAGE`                                                                                                                                                                                                       |
 
@@ -964,7 +964,7 @@ does not change.
 ### Order, deploys and tests
 
 1. 18a, then 18b (neither needs a migration).
-2. `0014` pushed and applied to Neon (Migrate workflow) before 18c.
+2. `0015` pushed and applied to Neon (Migrate workflow) before 18c.
 3. 18c, 18d, then 18e, which can be dropped if it proves too fragile.
 4. Each step green (lint, format, type-check, unit, API, e2e), pushed, and stopped for review.
 
