@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import {
   ApplicationDetailSchema,
+  ApplicationTailoringSchema,
   ApplyQueueSchema,
   SEARCH_SOURCES,
   EMPTY_MORE_ANSWERS,
@@ -754,6 +755,61 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
     const tailor = (cookie: string, id: string) =>
       send('POST', `/api/job-search/hits/${id}/tailor`, cookie);
 
+    const saveFromQueue = (cookie: string, id: string, text: string) =>
+      send('POST', `/api/job-search/hits/${id}/tailored-resume`, cookie, { text });
+    const tailoringOfApplication = async (cookie: string, applicationId: string) =>
+      ApplicationTailoringSchema.parse(
+        (await send('GET', `/api/applications/${applicationId}/tailoring`, cookie)).json(),
+      );
+
+    it("saves this job's resume from the queue: tracked as Saved, with the queue's suggestions", async () => {
+      const { cookie, target } = await drafted();
+      claude.tailorAnswer = {
+        edits: [
+          {
+            original: LINE,
+            suggested: 'Senior product manager, eight years of roadmaps written in SQL.',
+            keywordsAdded: ['SQL'],
+            why: 'Roadmap work.',
+          },
+        ],
+        notCovered: [],
+      };
+      await tailor(cookie, target.id);
+      const resume = (await send('GET', '/api/resume/text', cookie)).json<{ text: string }>().text;
+      const text = `${resume}\n- Wrote the SQL behind the growth reports.`;
+
+      const hit = hitOf(await saveFromQueue(cookie, target.id, text));
+
+      // Tracked as Saved, still in the queue.
+      expect(hit.state).toBe('needs_you');
+      expect(hit.tracked?.status).toBe('Saved');
+      const tailoring = await tailoringOfApplication(cookie, hit.applicationId ?? '');
+      expect(tailoring.saved).toMatchObject({ text, resumeChanged: false });
+      expect(tailoring.saved?.edits).toEqual([
+        { original: '', replacement: '- Wrote the SQL behind the growth reports.' },
+      ]);
+      // The queue's suggestions and the posting keywords came with it.
+      expect(tailoring.tailoring?.edits[0]?.keywordsAdded).toEqual(['SQL']);
+      expect(tailoring.keywords.map((keyword) => keyword.term)).toEqual(claude.keywords);
+    });
+
+    it('saves onto the application already tracked, without a second one', async () => {
+      const { cookie, target, user } = await drafted();
+      const tracked = hitOf(await send('POST', `/api/job-search/hits/${target.id}/track`, cookie));
+      const resume = (await send('GET', '/api/resume/text', cookie)).json<{ text: string }>().text;
+
+      const hit = hitOf(await saveFromQueue(cookie, target.id, `${resume}\n- One more line.`));
+
+      expect(hit.applicationId).toBe(tracked.applicationId);
+      const count = await t.db.query<{ n: number }>(
+        'select count(*)::int as n from applications where user_id = $1',
+        [user.id],
+      );
+      expect(count.rows[0]?.n).toBe(1);
+      expect((await tailoringOfApplication(cookie, hit.applicationId ?? '')).saved).not.toBeNull();
+    });
+
     it('stores the checked edits: invented lines dropped, invented facts flagged', async () => {
       const { cookie, target } = await drafted();
       claude.tailorAnswer = {
@@ -1043,6 +1099,7 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
       const probes: [string, string, object | undefined][] = [
         ['GET', `/api/job-search/runs/{id}`, undefined],
         ['POST', `/api/job-search/hits/{id}/track`, undefined],
+        ['POST', `/api/job-search/hits/{id}/tailored-resume`, { text: 'Mine now' }],
         ['POST', `/api/job-search/hits/{id}/applied`, undefined],
         ['POST', `/api/job-search/hits/{id}/blocked`, { reason: 'x' }],
         ['POST', `/api/job-search/hits/{id}/skip`, undefined],

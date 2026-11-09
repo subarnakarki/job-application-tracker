@@ -37,6 +37,7 @@ import {
   useResumeAnalyses,
   useResumeAnalysis,
   useResumeText,
+  useSaveHitResume,
   useRunJobSearch,
   useSaveJobSearchProfile,
   useTailorResume,
@@ -48,6 +49,7 @@ import { Glow } from '../components/ui/Glow';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Pill } from '../components/ui/Pill';
 import { formatDateTime } from '../format';
+import { ResumeEditor } from '../components/TailoringSection';
 import { TailorSuggestions, useChosenEdits } from '../components/TailorSuggestions';
 import { FIT_LABELS } from '../resume';
 import {
@@ -1491,6 +1493,8 @@ function TailorPanel({ hit }: { hit: JobHit }) {
   const tailoring = hit.tailoring;
   const resume = useResumeText(tailoring !== null);
   const { off, chosen, toggle } = useChosenEdits(tailoring);
+  const saveVersion = useSaveHitResume(hit.id);
+  const [editing, setEditing] = useState<string | null>(null);
   const fit = hit.fit;
   if (!fit || (fit.missing.length === 0 && !tailoring)) return null;
   const job = `${hit.company}, ${hit.role}`;
@@ -1549,31 +1553,52 @@ function TailorPanel({ hit }: { hit: JobHit }) {
               {after ? ` → ${String(after.percent)}% with the ticked edits` : ''}
             </p>
             <TailorSuggestions tailoring={tailoring} off={off} onToggle={toggle} />
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className="btn-w"
-                disabled={!tailoredText || chosen.length === 0}
-                onClick={() => tailoredText && copy(tailoredText, 'Tailored resume copied')}
-              >
-                Copy tailored resume
-              </button>
-              <button
-                type="button"
-                className="btn-d"
-                disabled={chosen.length === 0}
-                onClick={() =>
-                  copy(
-                    chosen
-                      .map((edit) => `Before: ${edit.original}\nAfter: ${edit.suggested}`)
-                      .join('\n\n'),
-                    'Changes copied',
-                  )
-                }
-              >
-                Copy changes only
-              </button>
-            </div>
+            {editing !== null ? (
+              <ResumeEditor
+                initial={editing}
+                keywords={hit.draft?.keywords ?? []}
+                before={fit.percent}
+                save={saveVersion}
+                {...(hit.tracked
+                  ? {}
+                  : { note: 'Saving also adds this job to your applications as Saved.' })}
+                onDone={() => setEditing(null)}
+              />
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="btn-w"
+                  disabled={!tailoredText || chosen.length === 0}
+                  onClick={() => tailoredText && copy(tailoredText, 'Tailored resume copied')}
+                >
+                  Copy tailored resume
+                </button>
+                <button
+                  type="button"
+                  className="btn-d"
+                  disabled={!tailoredText}
+                  onClick={() => tailoredText && setEditing(tailoredText)}
+                >
+                  Edit and save as this job's resume
+                </button>
+                <button
+                  type="button"
+                  className="btn-d"
+                  disabled={chosen.length === 0}
+                  onClick={() =>
+                    copy(
+                      chosen
+                        .map((edit) => `Before: ${edit.original}\nAfter: ${edit.suggested}`)
+                        .join('\n\n'),
+                      'Changes copied',
+                    )
+                  }
+                >
+                  Copy changes only
+                </button>
+              </div>
+            )}
           </div>
         </details>
       )}

@@ -1,5 +1,7 @@
 import {
+  APPLICATION_TAILOR_LIMITS,
   ApplicationTailoringSchema,
+  lineEdits,
   LineEditSchema,
   TailoringSchema,
   type ApplicationTailoring,
@@ -182,4 +184,15 @@ export async function exportTailorings(
       tailoring: presentTailoring(stored, stored.saved?.resumeSha256 ?? null),
     };
   });
+}
+
+/** A saved version's changes from the resume, as stored (capped and clipped to the schema). */
+export function versionEdits(resumeText: string, text: string): LineEdit[] {
+  const max = LineEditSchema.shape.original.maxLength ?? 2400;
+  return lineEdits(resumeText, text)
+    .slice(0, APPLICATION_TAILOR_LIMITS.savedEdits)
+    .map((edit) => ({
+      original: edit.original.slice(0, max),
+      replacement: edit.replacement.slice(0, max),
+    }));
 }

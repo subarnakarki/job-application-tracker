@@ -661,6 +661,28 @@ export function useApplyQueue(enabled = true) {
 
 export type HitAction = 'applied' | 'track' | 'blocked' | 'skip' | 'queue' | 'redraft' | 'closed';
 
+/** Saves a queue job's resume: tracks the job (Saved) if needed, then keeps the version. */
+export function useSaveHitResume(hitId: string) {
+  const refresh = useRefreshJobSearch();
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (text: string) =>
+      apiRequest(
+        `/api/job-search/hits/${encodeURIComponent(hitId)}/tailored-resume`,
+        JobHitSchema,
+        { method: 'POST', body: { text } },
+      ),
+    onSuccess: async () => {
+      await refresh();
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['tailoring'] }),
+        client.invalidateQueries({ queryKey: ['applications'] }),
+        client.invalidateQueries({ queryKey: ['pipeline'] }),
+      ]);
+    },
+  });
+}
+
 /** "Tailor my resume": suggested edits for one job, stored on it. */
 export function useTailorResume() {
   const refresh = useRefreshJobSearch();

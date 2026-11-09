@@ -14,6 +14,7 @@ import {
   JobSearchRunListSchema,
   JobSearchSetupSchema,
   QueueCheckResultSchema,
+  SaveTailoredResumeSchema,
   localDateIn,
   olderMatchKind,
   refillDraft,
@@ -53,6 +54,7 @@ import {
   setHitState,
 } from '../repo/jobSearch';
 import { getResume, getResumeText } from '../repo/resumes';
+import { getTailoring, saveSuggestions, saveVersion, versionEdits } from '../repo/tailorings';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -440,20 +442,61 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
     return created.value.record.id;
   };
 
+  /** The queue job's application: the tracked one, else a new Saved one (linked either way). */
+  const trackHit = async (
+    db: Db,
+    user: { id: string; isDemo: boolean; timeZone: string },
+    hit: JobHit,
+    now: Date,
+  ): Promise<string> => {
+    if (!['new', 'ready', 'needs_you'].includes(hit.state))
+      throw new ApiError(409, 'not_in_queue', 'This job is no longer in the queue');
+    // `tracked` is the job's own application while it exists, else the tracker's match.
+    const applicationId =
+      hit.tracked?.applicationId ?? (await createFromHit(db, user, hit, 'Saved', now));
+    if (applicationId !== hit.applicationId)
+      await linkHitApplication(db, user.id, hit.id, applicationId, now);
+    return applicationId;
+  };
+
   hitRoute(
     'track',
     'Track a queue job in the tracker as Saved (or link the application already there)',
     undefined,
     { 409: 'The job is no longer in the queue, or the application limit is reached' },
     async ({ db, user, hit }) => {
-      if (!['new', 'ready', 'needs_you'].includes(hit.state))
-        throw new ApiError(409, 'not_in_queue', 'This job is no longer in the queue');
+      await trackHit(db, user, hit, deps.clock.now());
+    },
+  );
+
+  hitRoute(
+    'tailored-resume',
+    "Save this job's resume from the queue: tracks the job (Saved) if needed, keeps the version",
+    SaveTailoredResumeSchema,
+    { 409: 'No resume, the job is no longer in the queue, or the application limit is reached' },
+    async ({ db, user, hit, request }) => {
+      const { text } = parseInput(SaveTailoredResumeSchema, request.body);
+      const resume = await getResumeText(db, user.id);
+      if (!resume) throw new ApiError(409, 'no_resume', 'Upload your resume first');
       const now = deps.clock.now();
-      // `tracked` is the job's own application while it exists, else the tracker's match.
-      const applicationId =
-        hit.tracked?.applicationId ?? (await createFromHit(db, user, hit, 'Saved', now));
-      if (applicationId !== hit.applicationId)
-        await linkHitApplication(db, user.id, hit.id, applicationId, now);
+      const applicationId = await trackHit(db, user, hit, now);
+      // The queue's suggestions and keywords go with it, unless the application has its own.
+      const stored = await getTailoring(db, user.id, applicationId);
+      if (!stored?.tailoring && hit.tailoring)
+        await saveSuggestions(
+          db,
+          user.id,
+          applicationId,
+          { tailoring: hit.tailoring, keywords: hit.draft?.keywords ?? [], postingText: null },
+          now,
+        );
+      await saveVersion(
+        db,
+        user.id,
+        applicationId,
+        { text, edits: versionEdits(resume.text, text), resumeSha256: resume.textSha256 },
+        now,
+      );
     },
   );
 

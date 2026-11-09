@@ -260,22 +260,32 @@ function SavedVersion({
   );
 }
 
+/** What saving a version needs: a mutation taking the text (the application's or the queue's). */
+export interface SaveVersion {
+  mutate: (text: string, options: { onSuccess: () => void }) => void;
+  isPending: boolean;
+  isError: boolean;
+  error: unknown;
+}
+
 /** The whole text, edited by hand, with the fit as it is typed; saved as this job's resume. */
-function Editor({
-  applicationId,
+export function ResumeEditor({
   initial,
   keywords,
   before,
+  save,
+  note,
   onDone,
 }: {
-  applicationId: string;
   initial: string;
   keywords: ApplicationTailoring['keywords'];
   before: number | null;
+  save: SaveVersion;
+  /** Said before saving, when saving does more than save (tracking the job, from the queue). */
+  note?: string;
   onDone: () => void;
 }) {
   const id = useId();
-  const save = useSaveTailoredResume(applicationId);
   const toast = useToast();
   const [value, setValue] = useState(initial);
   const fit = fitOf(keywords, value);
@@ -310,6 +320,7 @@ function Editor({
             (fit.missing.length ? ` · still missing: ${fit.missing.join(', ')}` : '')
           : 'Tailor first to see the fit with this posting.'}
       </p>
+      {note && <p className="text-sm text-fg-3">{note}</p>}
       {save.isError && (
         <p role="alert" className="text-sm text-red">
           {errorText(save.error, 'Could not save. Try again.')}
@@ -325,4 +336,19 @@ function Editor({
       </div>
     </form>
   );
+}
+
+/** The application page's editor: saves on the application. */
+function Editor({
+  applicationId,
+  ...props
+}: {
+  applicationId: string;
+  initial: string;
+  keywords: ApplicationTailoring['keywords'];
+  before: number | null;
+  onDone: () => void;
+}) {
+  const save = useSaveTailoredResume(applicationId);
+  return <ResumeEditor {...props} save={save} />;
 }

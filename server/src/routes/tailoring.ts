@@ -2,8 +2,6 @@ import {
   acceptTailoring,
   APPLICATION_TAILOR_LIMITS,
   ApplicationTailoringSchema,
-  lineEdits,
-  LineEditSchema,
   matchPosting,
   POSTING_KEYWORDS_MAX,
   SaveTailoredResumeSchema,
@@ -28,6 +26,7 @@ import {
   removeVersion,
   saveSuggestions,
   saveVersion,
+  versionEdits,
 } from '../repo/tailorings';
 import { AnalyzerUnavailableError } from '../resume/analyze';
 import { TAILOR_RULE } from './jobSearch';
@@ -35,7 +34,6 @@ import { PREVIEW_RULE } from './postings';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const IdParams = z.object({ id: z.string() });
-const MAX_EDIT = LineEditSchema.shape.original.maxLength ?? 2400;
 
 const POSTING_MESSAGES: Record<PreviewFailure, string> = {
   unsupported_site:
@@ -226,12 +224,7 @@ export function registerTailoringRoutes(app: FastifyInstance, deps: TailoringRou
       const { text } = parseInput(SaveTailoredResumeSchema, request.body);
       const resume = await getResumeText(db, user.id);
       if (!resume) throw new ApiError(409, 'no_resume', 'Upload your resume first');
-      const edits = lineEdits(resume.text, text)
-        .slice(0, APPLICATION_TAILOR_LIMITS.savedEdits)
-        .map((edit) => ({
-          original: edit.original.slice(0, MAX_EDIT),
-          replacement: edit.replacement.slice(0, MAX_EDIT),
-        }));
+      const edits = versionEdits(resume.text, text);
       await saveVersion(
         db,
         user.id,

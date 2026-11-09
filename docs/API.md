@@ -202,6 +202,27 @@ Open to the same users as the job search (`JOB_SEARCH_USER_IDS`), never the demo
 LinkedIn messages: the owner copies one, opens the lead's profile and sends it. A lead from another account, in
 the path or the body, gets 404.
 
+## A resume tailored to an application (owner only)
+
+| Method | Path                                       | Auth | Notes                                                        |
+| ------ | ------------------------------------------ | ---- | ------------------------------------------------------------ |
+| GET    | `/api/applications/:id/tailoring`          | user | `{ tailoring, keywords, hasPostingText, saved }`: the last   |
+|        |                                            |      | suggestions and the version saved for this job               |
+|        |                                            |      | (`resumeChanged` when the resume was replaced since)         |
+| POST   | `/api/applications/:id/tailor`             | user | `{ postingText? }`: reads the job link (or the stored or     |
+|        |                                            |      | pasted posting) and asks Claude once for the keywords and    |
+|        |                                            |      | edits. 422 `no_job_link` or `posting_unreadable`: paste it.  |
+|        |                                            |      | 10 a day, shared with the queue's tailoring                  |
+| PUT    | `/api/applications/:id/tailored-resume`    | user | `{ text }`: saves this job's version and its changes from    |
+|        |                                            |      | the resume, line by line                                     |
+| DELETE | `/api/applications/:id/tailored-resume`    | user | Removes the saved version; the suggestions stay              |
+| POST   | `/api/job-search/hits/:id/tailored-resume` | user | `{ text }`: from the queue; tracks the job as Saved if       |
+|        |                                            |      | needed, then saves the version (and the queue's suggestions) |
+|        |                                            |      | on its application                                           |
+
+Stored in `application_tailorings`, deleted with the application and included in the data export (posting text
+too).
+
 ## Model usage
 
 Every Claude call records one row in `model_usage` (migration 0013): the kind of call (`job_search`, `draft`,

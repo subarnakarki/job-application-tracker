@@ -558,3 +558,51 @@ test('track it: a queue job is saved in the tracker before applying', async ({ p
   await expect(page.getByRole('heading', { name: 'Hooli', level: 1 })).toBeVisible();
   await expect(page.getByText('Saved from the job search (Greenhouse).')).toBeVisible();
 });
+
+test("save a queue job's tailored resume: it is tracked as Saved and kept on the application", async ({
+  page,
+  api,
+}) => {
+  await api.uploadResumeText(
+    'Pat Example. Senior product manager: roadmaps and launches for growth teams. '.repeat(4),
+  );
+  await api.seedJobSearch({
+    profile: PROFILE,
+    jobs: [
+      {
+        board: 'hooli',
+        company: 'Hooli',
+        title: 'Senior Product Manager',
+        location: 'Remote, US',
+        hoursAgo: 3,
+        content: 'Own the roadmap. '.repeat(20),
+        questions: QUESTIONS.filter((question) => !/clearance/.test(question.label)),
+        keywords: ['roadmaps', 'launches', 'SQL', 'Figma', 'Jira'],
+      },
+    ],
+    answers: { 'Why do you want to work here?': 'Your roadmap work matches my launches.' },
+  });
+  const queue = new ApplyQueuePage(page);
+  await queue.goto();
+  const job = queue.job('Hooli: Senior Product Manager');
+  await job.getByRole('button', { name: /^Tailor my resume/ }).click();
+  await job.getByRole('checkbox', { name: /Use suggestion 1/ }).check();
+  await job.getByRole('button', { name: "Edit and save as this job's resume" }).click();
+
+  await expect(
+    job.getByText('Saving also adds this job to your applications as Saved.'),
+  ).toBeVisible();
+  const editor = job.getByLabel("This job's resume");
+  await editor.fill(`${await editor.inputValue()}\n- Planned launches in Jira.`);
+  await job.getByRole('button', { name: "Save as this job's resume" }).click();
+
+  const saved = job.getByRole('link', { name: /Saved/ });
+  await expect(saved).toBeVisible();
+  await saved.click();
+  const section = page.getByRole('region', { name: 'Tailored resume' });
+  await expect(section.getByText(/^Saved for this job on/)).toBeVisible();
+  await section.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(section.getByLabel("This job's resume")).toHaveValue(
+    /- Planned launches in Jira\.$/,
+  );
+});

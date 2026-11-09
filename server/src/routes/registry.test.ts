@@ -59,6 +59,7 @@ const ISOLATION_COVERAGE: Record<string, string> = {
   'POST /api/applications/:id/resume-match': 'server/src/routes/resume.test.ts',
   'GET /api/job-search/runs/:id': 'server/src/routes/jobSearch.test.ts',
   'POST /api/job-search/hits/:id/track': 'server/src/routes/jobSearch.test.ts',
+  'POST /api/job-search/hits/:id/tailored-resume': 'server/src/routes/jobSearch.test.ts',
   'POST /api/applications/:id/lead-message': 'server/src/routes/leadMessages.test.ts',
   'POST /api/applications/:id/lead-message/sent': 'server/src/routes/leadMessages.test.ts',
   'GET /api/applications/:id/tailoring': 'server/src/routes/tailoring.test.ts',
