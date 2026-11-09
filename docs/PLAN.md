@@ -895,6 +895,101 @@ Built as planned (17a, 17b, 17c), with the review refinements above and these de
 - **Local e2e on Windows:** "tailor my resume" fails on trailing spaces in the copied text, on `main` too; it
   passes in CI (Linux). Not changed here.
 
+## Phase 18 plan: a resume for each job, and a LinkedIn message to a lead (approved)
+
+**Goal:** for any job, applied to or not, (1) make a version of the resume tailored to it, edited by the owner and
+downloaded as .docx or .pdf, and (2) draft a LinkedIn message to a lead about it, sent by the owner. Decided with
+the owner (2026-11-09): .docx and .pdf; the owner sends the message (copy and open LinkedIn); owner-only, like
+the job search; a queue job goes into the tracker as **Saved** first. Revised after an independent review of the
+first draft against the code (same day).
+
+**Access, everywhere in this phase:** owner-only through the job search's gate (`JOB_SEARCH_USER_IDS`), moved
+into one shared helper rather than copied. The application page learns whether to show these buttons from the
+existing `available` flag (`GET /api/job-search/profile`). The demo account never sees them, so the demo seed
+does not change.
+
+### 18a. Track a queue job before applying (no migration)
+
+| Area          | Decision                                                                                                                                                                                                                                                                                            |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Which one     | A queue job's application is `applicationId`, else the tracker match already shown on the card (`tracked`: same link, else same company and role). **Track it** and **Mark applied** both use it, and store the link when it came from the match. A new application is made only when there is none |
+| Track it      | No application yet: creates a **Saved** one (company, role, job link, location, work mode, posting date) and links it. The job stays in the queue. Route `POST /api/job-search/hits/:id/track` (`auth: 'user'`, in `ISOLATION_COVERAGE`); 409 at the application limit                              |
+| Mark applied  | Its application is **Saved**: moved to **Applied** with today's date through the normal update (so it is in the status history). Already Applied or later: left as it is (never moved back). None: created as today                                                                                 |
+| Leaving queue | A tracked job later skipped or closed leaves its Saved application as it is                                                                                                                                                                                                                         |
+
+### 18b. LinkedIn message to a lead (no migration)
+
+| Area    | Decision                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lead    | **Message a lead** on the application page: the linked lead, or pick one (leads at the same company first, by `companyKey`), or add one there (name, company, profile link). A picked lead is linked to the application when the message is marked sent                                                                                                                                                                                           |
+| Kind    | Suggested by status, changeable: not applied yet: ask for a referral or an introduction; Applied or Screening: a short follow-up; Interviewing: thanks or a check-in; Offer, Rejected, Withdrawn: thanks and keep in touch. An optional "what I want to say" line steers it                                                                                                                                                                       |
+| Length  | A **connection note** of up to **200 characters** (LinkedIn's limit for free accounts) and a **message** of up to 1,000, counted in characters as people see them (code points). Counters shown; checked by code, and the model is asked once more if a draft is too long                                                                                                                                                                         |
+| Model   | Drafts from the job (company, role, the stored posting text when there is one), the resume, the lead (name, company, recent notes) and the status. No invented facts, numbers or shared history. Lead notes and the owner's steer line are their own delimited blocks, defused like the existing ones (`block()` gains the new tags). `claude-opus-5-5`, low effort, structured output, injected for tests; test users get a predictable stand-in |
+| Sending | The app cannot send LinkedIn messages (LinkedIn offers no API for this). **Copy and open profile** copies the message and opens the lead's link in a new tab (`noopener`); the button says **Open link** when the host is not linkedin.com, and there is only **Copy** when the lead has no link                                                                                                                                                  |
+| Logged  | **Mark sent** saves a dated note on the lead ("LinkedIn message about <Role> at <Company>" and the text), links the lead, and counts as activity on the application (`updated_at`, `last_activity_at` and `version`, as logging an interview does; an edit form open meanwhile gets the usual 409). Disabled while saving, so a double click makes one note                                                                                       |
+| Routes  | `POST /api/applications/:id/lead-message` (drafts, stores nothing; 30 a day) and `POST /api/applications/:id/lead-message/sent`; `auth: 'user'`, in `ISOLATION_COVERAGE`. A `leadId` in the body must be the owner's lead, else 404                                                                                                                                                                                                               |
+
+### 18c. Tailor the resume for an application (any status)
+
+| Area          | Decision                                                                                                                                                                                                                                                                                                                                                              |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Where         | **Tailor my resume** on the application page, for every status                                                                                                                                                                                                                                                                                                        |
+| Posting       | Read from the job link with the existing posting-text reader (14c: SSRF guard, 60-an-hour budget). When it cannot be read (LinkedIn, sign-in sites) or there is no link: **Paste the posting** (up to 20,000 characters)                                                                                                                                              |
+| Model         | **One call:** the Phase 16 tailoring call also returns the posting's 10 to 20 keywords (as drafting does, in the 14c shape), so no separate keyword call and no `ANALYSIS_RULE` spend. The Phase 16 guardrails are unchanged. Shares the tailoring's 10-a-day limit                                                                                                   |
+| Editing       | Pick the suggestions (as in 16c), then edit the full text by hand. The fit before and after is recalculated as you type from the stored keywords (code, no model call)                                                                                                                                                                                                |
+| Saved per job | **Save as this job's resume** stores the edited text, the edits as original/new pairs (chosen suggestions, plus lines changed by hand worked out by a line diff), and the resume it came from (`resume_sha256`). Edit, Download and Remove on the application page                                                                                                    |
+| Storage       | Migration `0014`: a table `application_tailorings` (`application_id` primary key, `user_id`; `tailoring`, `keywords`, `posting_text`, `tailored_text` (60,000), `edits`, `resume_sha256`, timestamps), foreign key `(user_id, application_id)` to the application, deleted with it. In the data export (`DataExportSchema`); delete-account is covered by the cascade |
+| From a queue  | The queue's tailoring (16c) gains the same editor. **Save** there first asks to **Track it** (it uses up an application), then saves on that application, with the job's keywords                                                                                                                                                                                     |
+| Routes        | `POST /api/applications/:id/tailor` (optional `postingText`), `PUT` and `DELETE /api/applications/:id/tailored-resume`; `auth: 'user'`, in `ISOLATION_COVERAGE`                                                                                                                                                                                                       |
+
+### 18d. Download as .docx and .pdf, clean layout
+
+| Area   | Decision                                                                                                                                                                                                                                                                                                                             |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Layout | Both files from the saved text in one clean one-column layout: name, section headings and bullets recognised from the text                                                                                                                                                                                                           |
+| .docx  | Written by our own code: a small zip writer (`node:zlib`, `zlib.crc32`) used with the existing reader. Text is XML-escaped, characters XML 1.0 does not allow are removed, `xml:space="preserve"`                                                                                                                                    |
+| .pdf   | `pdf-lib` (pinned exact version) with the built-in Helvetica, so no font file and nothing large in the API bundle. Helvetica prints Western European characters only: any other character is listed when saving ("these will not print in the PDF; the .docx keeps them"). A custom font is left for later, with a bundle-size check |
+| Routes | `GET /api/applications/:id/tailored-resume.docx` and `.pdf` (`auth: 'user'`, in `ISOLATION_COVERAGE`), file-download responses as in Phase 14. File name `Resume - <Company> - <Role>`, through one shared, tested `Content-Disposition` helper (also used by `/api/resume/file`)                                                    |
+
+### 18e. Keep the original DOCX's formatting (last, can be cut)
+
+| Area       | Decision                                                                                                                                                                                                                                                                             |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| When       | The uploaded resume is a DOCX and is still the one the version came from (`resume_sha256`). Otherwise the clean layout, with a note saying why                                                                                                                                       |
+| How        | Each stored edit is found in the document body with the same normalisation as the text extraction, and **only that text** is replaced inside the paragraph's runs, keeping paragraph properties (bullets, numbering) and the first run's formatting. Table cells count as paragraphs |
+| Left alone | Runs inside links or field codes, text boxes (stored twice in the file), tracked changes and headers: an edit that falls there is not placed                                                                                                                                         |
+| Not placed | Saving returns the edits that could not be placed, so they are shown before any download; the file then has the other edits                                                                                                                                                          |
+| Zip safety | Unchanged parts are copied byte for byte (compressed data and CRC); only `word/document.xml` is rewritten, with fresh headers. Zip64 is refused, as the reader does; macro-enabled or template content types are refused. The uploaded file is never changed                         |
+
+### Order, deploys and tests
+
+1. 18a, then 18b (neither needs a migration).
+2. `0014` pushed and applied to Neon (Migrate workflow) before 18c.
+3. 18c, 18d, then 18e, which can be dropped if it proves too fragile.
+4. Each step green (lint, format, type-check, unit, API, e2e), pushed, and stopped for review.
+
+Tests, per the conventions:
+
+- **Unit:** message kind by status; code-point lengths; the new prompt blocks defused; keywords from the tailoring
+  call; the line diff into edits; the clean layout's headings and bullets; the zip writer (stored and deflated
+  entries, entries with data descriptors) read back by the existing reader; XML escaping and removed control
+  characters; PDF text read back with `unpdf` and unprintable characters listed; the `Content-Disposition` helper
+  (quotes, CR/LF, Unicode, `'()*`); for 18e: an edit inside a paragraph, split runs, a bullet kept, a link, a line
+  break, a table cell, a text box, a tracked change, a header line not placed, and the stale-resume fallback.
+- **API (real Postgres), with two allowed users for isolation:** Track it (Saved and linked; uses a matched
+  application instead of making a second; 409 at the limit); Mark applied on a matched Saved application (one
+  application, Applied, in the history) and on one already at Interviewing (unchanged); drafting with a linked,
+  picked and new lead; another user's lead in the body gets 404; Mark sent adds one note, links the lead and
+  resets the follow-up clock; tailoring from the link and from pasted text (stub model), saved, replaced,
+  removed, the daily limit; both downloads (content type, file name; the uploaded file unchanged); the export
+  includes tailorings; the contracts and fuzzer cover the file responses.
+- **E2E:** Track it on a queue job; draft a message to a lead, copy it, mark it sent and see the note on the lead;
+  tailor the resume, edit a line by hand, save, download the .docx and read it back. The model is stubbed through
+  the test-only route. (The existing tailoring e2e fails locally on Windows only; see the Phase 17 outcome.)
+
+Not included: sending through LinkedIn itself or Claude in Chrome, emails to leads, cover letters per
+application, a PDF that keeps the DOCX's exact look, and a custom PDF font.
+
 ## Planned but not built
 
 | Item                                | Status                                                                                                    |
