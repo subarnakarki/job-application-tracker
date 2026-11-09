@@ -439,6 +439,35 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
       expect(byRole(hits, 'Product Manager, EMEA').kind).toBe('target');
     });
 
+    it('skips a job whose posted pay tops out below the floor, and keeps the rest', async () => {
+      const { cookie } = await member();
+      await send('PUT', '/api/job-search/profile', cookie, { ...PROFILE, salaryFloor: 140000 });
+      PAGES[apiUrl(106)] = greenhouseJob(
+        'Product Manager, Billing',
+        2,
+        `${'Own billing. '.repeat(20)} Salary range: $100,000 - $130,000 per year.`,
+      );
+      PAGES[apiUrl(107)] = greenhouseJob(
+        'Product Manager, Search',
+        2,
+        `${'Own search. '.repeat(20)} Salary range: $120,000 - $170,000 per year.`,
+      );
+      claude.links = [101, 106, 107].map(jobLink);
+      try {
+        const { hits } = runOf(await run(cookie));
+        expect(byRole(hits, 'Product Manager, Billing')).toMatchObject({
+          kind: 'skipped',
+          reason: 'Pays up to $130,000, under your $140,000 floor',
+        });
+        // A range reaching the floor, and a job with no pay posted, are kept.
+        expect(byRole(hits, 'Product Manager, Search').kind).toBe('target');
+        expect(byRole(hits, 'Senior Product Manager').kind).toBe('target');
+      } finally {
+        delete PAGES[apiUrl(106)];
+        delete PAGES[apiUrl(107)];
+      }
+    });
+
     it('searches only the ticked sites, with searches made from the titles', async () => {
       const { cookie } = await member();
       await send('PUT', '/api/job-search/profile', cookie, {

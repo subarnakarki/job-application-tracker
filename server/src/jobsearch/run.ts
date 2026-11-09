@@ -242,6 +242,7 @@ export async function runJobSearch(
           trackedStatus: tracked?.status ?? null,
           location: job.location,
           country: job.country,
+          salary: job.salary,
         },
         rules,
       );
@@ -401,6 +402,7 @@ export function jobFromSearchResult(
     postedDayOnly: true,
     country: null,
     applyLink: ref.link,
+    salary: null,
     text: '',
     questions: null,
   };

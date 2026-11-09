@@ -1,6 +1,12 @@
-import { LIMITS, type ApplicationQuestion, type JobRef, type WorkMode } from '@jat/shared';
+import {
+  LIMITS,
+  type ApplicationQuestion,
+  type JobRef,
+  type PostedPay,
+  type WorkMode,
+} from '@jat/shared';
 import { fromAshby, fromGreenhouse, fromLever } from '../postings/boards';
-import { asArray, cleanText, fieldOf, parseJson } from '../postings/details';
+import { asArray, cleanText, fieldOf, parseJson, salaryInText } from '../postings/details';
 import { FetchError, type PageFetcher } from '../postings/fetchPage';
 import { readPosting } from '../postings/preview';
 import { proseInJson, POSTING_TEXT_MAX, readPostingText } from '../postings/text';
@@ -26,6 +32,8 @@ export interface JobDetails {
   text: string;
   /** Null when the board does not publish its questions (Lever, Ashby, Workday). */
   questions: ApplicationQuestion[] | null;
+  /** The yearly pay the posting gives: the board's own field, else a pay range in its text. */
+  salary: PostedPay | null;
 }
 
 /**
@@ -177,6 +185,7 @@ export async function readJob(
         applyLink: ref.link,
         text: textOf(job),
         questions: greenhouseQuestions(job),
+        salary: details.salary ?? salaryInText(textOf(job)),
       };
     }
     case 'lever': {
@@ -199,6 +208,7 @@ export async function readJob(
           typeof apply === 'string' && apply.startsWith('https://') ? apply : `${ref.link}/apply`,
         text: textOf(posting),
         questions: null,
+        salary: details.salary ?? salaryInText(textOf(posting)),
       };
     }
     case 'ashby': {
@@ -228,6 +238,7 @@ export async function readJob(
             : `${ref.link}/application`,
         text: textOf(job),
         questions: null,
+        salary: details.salary ?? salaryInText(textOf(job)),
       };
     }
     case 'workable':
@@ -269,6 +280,7 @@ async function readThroughPosting(ref: JobRef, fetchPage: PageFetcher): Promise<
     applyLink: ref.link,
     text,
     questions: null,
+    salary: details.salary ?? (text ? salaryInText(text) : null),
   };
 }
 
@@ -302,6 +314,7 @@ async function readWorkable(ref: JobRef, fetchBoard: PageFetcher): Promise<JobDe
       typeof apply === 'string' && apply.startsWith('https://') ? apply : `${ref.link}apply/`,
     text: '',
     questions: null,
+    salary: null,
   };
 }
 
@@ -343,5 +356,6 @@ export async function readJobvite(ref: JobRef, fetchPage: PageFetcher): Promise<
     applyLink: `${ref.link}/apply`,
     text: cleanText(byClass(html, 'jv-job-detail-description', 'div'), POSTING_TEXT_MAX) ?? '',
     questions: null,
+    salary: salaryInText(byClass(html, 'jv-job-detail-description', 'div') ?? ''),
   };
 }
