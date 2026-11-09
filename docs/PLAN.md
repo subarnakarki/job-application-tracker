@@ -954,7 +954,10 @@ and every character prints (the browser's fonts).
 | Tokens   | `--color-paper`, `--color-ink`, `--color-ink-2` in `@theme`; print styles in `index.css`                                                                         |
 | Not done | A .docx download, a PDF made by the server (`pdf-lib`), and the zip writer: left for later if an editable file is needed                                         |
 
-### 18e. Keep the original DOCX's formatting (last, can be cut)
+### 18e. Keep the original DOCX's formatting (dropped: owner's choice, 2026-11-09)
+
+Dropped once the PDF came from the browser: it was the riskiest step and mattered only for an uploaded DOCX
+whose exact look must carry into each job's version. The design below is kept for reference.
 
 | Area       | Decision                                                                                                                                                                                                                                                                             |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -968,7 +971,7 @@ and every character prints (the browser's fonts).
 
 1. 18a, then 18b (neither needs a migration).
 2. `0015` pushed and applied to Neon (Migrate workflow) before 18c.
-3. 18c, 18d, then 18e, which can be dropped if it proves too fragile.
+3. 18c, then 18d (18e dropped).
 4. Each step green (lint, format, type-check, unit, API, e2e), pushed, and stopped for review.
 
 Tests, per the conventions:
@@ -993,14 +996,39 @@ Tests, per the conventions:
 Not included: sending through LinkedIn itself or Claude in Chrome, emails to leads, cover letters per
 application, a PDF that keeps the DOCX's exact look, and a custom PDF font.
 
+## Phase 18 outcome
+
+Built as revised after review (18a to 18d; 18e dropped), each step pushed green and reviewed:
+
+- **18a Track it** (`db86db5`): a queue job's application is its own link, else the tracker's match (`tracked`);
+  Mark applied moves a Saved one to Applied through the normal update and never moves one further along back.
+  The button's label is "Track it in your applications" (one with "Saved" clashed with a "Save" button locator).
+- **18b Message a lead** (`ad0659d`): owner-only through one shared gate (`server/src/jobsearch/access.ts`,
+  moved out of the job search routes); usage recorded as `lead_message`, which needed migration **0014** (the
+  usage table's list of call kinds became a pattern, so new kinds need no migration). The first Migrate run
+  failed before starting (a GitHub problem); the retry applied it.
+- **18c Tailor any application** (`f24ebd8`, `3bb936e`, `6d087b0`, `9884ad2`): migration **0015**
+  (`application_tailorings`); one model call returns the posting's keywords and the edits; a pasted posting when
+  the link cannot be read; the editor and the suggestion list are shared by the application page and the queue;
+  saving from the queue tracks the job first and says so. The fuzzer's string generator now respects a minimum
+  above its cap (the 200-character posting).
+- **18d PDF through the browser** (`d195fdc`): replaced the server-made .docx and .pdf (owner's choice): a
+  printable page (`/applications/:id/resume`), titled `Resume - <Company> - <Role>` so the PDF is named after
+  the job. A short all-caps line (such as "AWS") reads as a heading; noted in its unit test.
+- **Model usage** is recorded for every call (migration **0013**, built during this phase on request); the cost
+  report waits for a few days of runs.
+- **Not checked live:** real model drafts of lead messages and application tailorings (the tests use stand-ins).
+
 ## Planned but not built
 
-| Item                                | Status                                                                                                    |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Demo account reset daily            | Seed built (`npm run demo:seed`, manual "Seed demo" workflow); not scheduled yet. Cap and banner in place |
-| Nightly `pg_dump` and restore drill | Not built; Neon's built-in restore window is the only backup                                              |
-| Uptime check, error tracking        | Not built                                                                                                 |
-| PII-redacted logs                   | Not built: Fastify's default request logs include the URL (so search terms) and client address            |
-| Migrations as an automatic CD step  | Manual "Migrate" workflow instead                                                                         |
-| StrykerJS, ZAP, axe, flake check    | Deferred or dropped (see the scope change)                                                                |
-| Spike table `spike_ping` in Neon    | Still there; drop only with the owner's go-ahead                                                          |
+| Item                                  | Status                                                                                                    |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Demo account reset daily              | Seed built (`npm run demo:seed`, manual "Seed demo" workflow); not scheduled yet. Cap and banner in place |
+| Nightly `pg_dump` and restore drill   | Not built; Neon's built-in restore window is the only backup                                              |
+| Uptime check, error tracking          | Not built                                                                                                 |
+| PII-redacted logs                     | Not built: Fastify's default request logs include the URL (so search terms) and client address            |
+| Migrations as an automatic CD step    | Manual "Migrate" workflow instead                                                                         |
+| StrykerJS, ZAP, axe, flake check      | Deferred or dropped (see the scope change)                                                                |
+| Spike table `spike_ping` in Neon      | Still there; drop only with the owner's go-ahead                                                          |
+| Resume as .docx, or a server-made PDF | Phase 18d: replaced by Save as PDF from the browser                                                       |
+| Original DOCX formatting kept (18e)   | Dropped in Phase 18; design kept in the Phase 18 plan                                                     |

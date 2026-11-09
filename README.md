@@ -33,6 +33,10 @@ Built by an SDET as a portfolio project, so the tests matter as much as the feat
   or missing in the resume by plain code. "Check my resume" scores the resume against one application's posting.
 - Networking leads (people who help you, with conversation notes, linked to applications), interviews on an
   application's timeline, and an installable app for phones.
+- For any application (owner only): **Message a lead** drafts a LinkedIn connection note and message from the
+  job, the lead and your notes about them; you send it on LinkedIn and Mark sent logs it on the lead.
+  **Tailored resume** reads the posting (or a pasted one), suggests honest edits, lets you edit the whole text
+  and save it as that job's resume, then print it or save it as a PDF.
 - Job search (owner only): a one-time setup (contact details, standard answers, salary, work authorization,
   self-identification answers), then on your schedule it searches 15 job boards (Greenhouse, Lever, Ashby,
   Workable, Rippling, SmartRecruiters and more; tick which ones) for your titles, US-only by default, within a
@@ -49,6 +53,8 @@ Built by an SDET as a portfolio project, so the tests matter as much as the feat
   - **Tailor my resume:** Claude suggests rewording lines you already have so the missing keywords appear
     where your resume supports them. Code drops edits of lines you do not have and flags any number or name
     your resume never mentions; you tick what to use and copy the result.
+  - **Track it:** saves a queue job in the tracker as Saved before you apply; Mark applied then moves that
+    application on instead of making a second one.
 - Breadcrumbs and section navigation on every page.
 - Mobile-first, keyboard and screen-reader friendly, with a dark design (Inter, self-hosted) and
   respect for reduced-motion settings. Colours are tokens, so a light theme can be added later.
