@@ -9,6 +9,7 @@ import {
   type TailorAnswer,
   type SearchSource,
 } from '@jat/shared';
+import { ignoreUsage, usageEntry, type UsageRecorder } from '../usage/record';
 import { AnalyzerUnavailableError } from '../resume/analyze';
 
 export const JOB_SEARCH_MODEL = 'claude-opus-5-5';
@@ -145,7 +146,10 @@ function rejectBadKey(error: unknown): never | void {
 /** Turns a model's server-tool loop may pause; it is resumed this many times at most. */
 const MAX_CONTINUATIONS = 3;
 
-export function claudeJobSearch(client: Anthropic): JobSearchClaude {
+export function claudeJobSearch(
+  client: Anthropic,
+  record: UsageRecorder = ignoreUsage,
+): JobSearchClaude {
   return {
     async search(query, sources, timeframeDays, usOnly = false) {
       const allowed = [...new Set(sources.flatMap((source) => SOURCE_HOSTS[source]))];
@@ -183,6 +187,7 @@ export function claudeJobSearch(client: Anthropic): JobSearchClaude {
             ],
             messages,
           });
+          await record(usageEntry('job_search', response));
           for (const content of response.content) {
             if (content.type === 'web_search_tool_result' && Array.isArray(content.content))
               for (const result of content.content) {
@@ -215,6 +220,7 @@ export function claudeJobSearch(client: Anthropic): JobSearchClaude {
           system: DRAFT_PROMPT,
           messages: [{ role: 'user', content: renderDraftRequest(request) }],
         });
+        await record(usageEntry('draft', response));
         if (response.stop_reason === 'refusal' || response.stop_reason === 'max_tokens')
           return null;
         const text = response.content.find((content) => content.type === 'text')?.text ?? '';
@@ -244,6 +250,7 @@ export function claudeJobSearch(client: Anthropic): JobSearchClaude {
           system: TAILOR_PROMPT,
           messages: [{ role: 'user', content: renderTailorRequest(request) }],
         });
+        await record(usageEntry('tailor', response));
         if (response.stop_reason === 'refusal' || response.stop_reason === 'max_tokens')
           return null;
         const text = response.content.find((content) => content.type === 'text')?.text ?? '';
@@ -266,9 +273,10 @@ export function claudeJobSearch(client: Anthropic): JobSearchClaude {
 
 export function jobSearchClaudeFromEnv(
   env: Record<string, string | undefined>,
+  record: UsageRecorder = ignoreUsage,
 ): JobSearchClaude | null {
   const apiKey = env['ANTHROPIC_API_KEY']?.trim();
   return apiKey
-    ? claudeJobSearch(new Anthropic({ apiKey, timeout: 120_000, maxRetries: 1 }))
+    ? claudeJobSearch(new Anthropic({ apiKey, timeout: 120_000, maxRetries: 1 }), record)
     : null;
 }

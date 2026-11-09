@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
+import { ignoreUsage, usageEntry, type UsageRecorder } from '../usage/record';
 import {
   acceptAnswer,
   PostingKeywordsAnswerSchema,
@@ -73,7 +74,10 @@ export function renderResume(text: string): string {
   return ['<resume>', text.replace(/<\/?resume/gi, '< resume'), '</resume>'].join('\n');
 }
 
-export function claudeAnalyzer(client: Anthropic): ResumeAnalyzer {
+export function claudeAnalyzer(
+  client: Anthropic,
+  record: UsageRecorder = ignoreUsage,
+): ResumeAnalyzer {
   return {
     async postingKeywords(postingText) {
       try {
@@ -89,6 +93,7 @@ export function claudeAnalyzer(client: Anthropic): ResumeAnalyzer {
           system: POSTING_PROMPT,
           messages: [{ role: 'user', content: renderPosting(postingText) }],
         });
+        await record(usageEntry('posting_keywords', response));
         if (response.stop_reason === 'refusal') return { kind: 'failed', reason: 'Declined' };
         if (response.stop_reason === 'max_tokens')
           return { kind: 'failed', reason: 'Answer was cut off' };
@@ -115,6 +120,7 @@ export function claudeAnalyzer(client: Anthropic): ResumeAnalyzer {
           system: SYSTEM_PROMPT,
           messages: [{ role: 'user', content: renderResume(resumeText) }],
         });
+        await record(usageEntry('resume_analysis', response));
         if (response.stop_reason === 'refusal') return { kind: 'failed', reason: 'Declined' };
         if (response.stop_reason === 'max_tokens')
           return { kind: 'failed', reason: 'Answer was cut off' };
@@ -153,8 +159,13 @@ function parseJson(text: string): unknown {
   }
 }
 
-export function analyzerFromEnv(env: Record<string, string | undefined>): ResumeAnalyzer | null {
+export function analyzerFromEnv(
+  env: Record<string, string | undefined>,
+  record: UsageRecorder = ignoreUsage,
+): ResumeAnalyzer | null {
   const apiKey = env['ANTHROPIC_API_KEY']?.trim();
   // Two minutes per attempt: a full answer takes well under one. The function allows 300 s.
-  return apiKey ? claudeAnalyzer(new Anthropic({ apiKey, timeout: 120_000, maxRetries: 1 })) : null;
+  return apiKey
+    ? claudeAnalyzer(new Anthropic({ apiKey, timeout: 120_000, maxRetries: 1 }), record)
+    : null;
 }

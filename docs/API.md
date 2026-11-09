@@ -185,6 +185,23 @@ question left to Ready. Greenhouse publishes each form's questions
 (`questions=true`); Lever and Ashby do not, so their jobs carry the profile, standard answers, a cover letter
 and "why this job".
 
+## Model usage
+
+Every Claude call records one row in `model_usage` (migration 0013): the kind of call (`job_search`, `draft`,
+`tailor`, `classify_email`, `posting_keywords`, `resume_analysis`), the model that answered, and its input,
+cache-write, cache-read and output tokens and web searches. No user and no text are stored. A failed write is
+logged and never fails the call. Cost per kind of call, at Claude Opus 5.5 prices ($4 input, $5 cache write,
+$0.40 cache read, $20 output per million tokens; web search $10 per 1,000):
+
+```sql
+select call, count(*) as calls,
+  round(sum(input_tokens * 4 + cache_write_tokens * 5 + cache_read_tokens * 0.4 + output_tokens * 20)
+    / 1e6 + sum(web_searches) * 0.01, 2) as usd,
+  round(avg(input_tokens)) as avg_in, round(avg(output_tokens)) as avg_out, sum(web_searches) as searches
+from model_usage where created_at > now() - interval '7 days'
+group by call order by usd desc;
+```
+
 ## Health
 
 `GET /api/health` (never touches the database) and `GET /api/health/db` (proves the database answers).

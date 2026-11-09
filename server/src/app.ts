@@ -3,6 +3,7 @@ import Fastify, {
   type FastifyInstance,
   type FastifyServerOptions,
 } from 'fastify';
+import { dbUsageRecorder } from './usage/record';
 import { systemClock, type Clock } from './clock';
 import type { Db } from './db/types';
 import { registerContractValidation, ROUTE_NOT_FOUND } from './http/contractValidation';
@@ -93,6 +94,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   // The secret guard goes first, so a caller without it sees a plain 404 for anything under /api/test/.
   if (testRoutes) registerTestSecretGuard(app, testRoutes.secret);
 
+  // Token counts of every Claude call, to measure cost per kind of call.
+  const recordUsage = dbUsageRecorder(deps.db, (error) => {
+    app.log.warn({ err: error }, 'model usage not recorded');
+  });
   registerRequestPipeline(app, { db: deps.db, clock, perUserClocks: testRoutes !== null });
   registerHealthRoutes(app, deps.db);
   registerSessionRoutes(app, { db: deps.db, clock, env });
@@ -112,7 +117,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     authorizer:
       deps.gmailAuthorizer === undefined ? gmailAuthorizerFromEnv(env) : deps.gmailAuthorizer,
     gmail: deps.gmail ?? gmailRestClient,
-    classifier: deps.classifier === undefined ? classifierFromEnv(env) : deps.classifier,
+    classifier:
+      deps.classifier === undefined ? classifierFromEnv(env, recordUsage) : deps.classifier,
     postings: {
       fetchPage,
       // A company's whole job board (every open job) can be several MB.
@@ -122,14 +128,18 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   registerResumeRoutes(app, {
     db: deps.db,
     clock,
-    analyzer: deps.resumeAnalyzer === undefined ? analyzerFromEnv(env) : deps.resumeAnalyzer,
+    analyzer:
+      deps.resumeAnalyzer === undefined ? analyzerFromEnv(env, recordUsage) : deps.resumeAnalyzer,
     fetchPage,
   });
   registerJobSearchRoutes(app, {
     db: deps.db,
     clock,
     env,
-    claude: deps.jobSearchClaude === undefined ? jobSearchClaudeFromEnv(env) : deps.jobSearchClaude,
+    claude:
+      deps.jobSearchClaude === undefined
+        ? jobSearchClaudeFromEnv(env, recordUsage)
+        : deps.jobSearchClaude,
     fetchPage,
     fetchBoard,
     openToTestUsers: testRoutes !== null,

@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import type { UsageEntry } from '../usage/record';
 import { describe, expect, it } from 'vitest';
 import { claudeClassifier, ClassifierUnavailableError, renderEmail } from './classify';
 import type { GmailMessage } from './gmail';
@@ -13,6 +14,11 @@ const email: GmailMessage = {
 
 /** The real SDK, with the network replaced by one canned Messages API answer. */
 function classifierAnswering(status: number, body: unknown) {
+  const usage: UsageEntry[] = [];
+  const record = (entry: UsageEntry) => {
+    usage.push(entry);
+    return Promise.resolve();
+  };
   const requests: unknown[] = [];
   const client = new Anthropic({
     apiKey: 'test-key',
@@ -27,7 +33,7 @@ function classifierAnswering(status: number, body: unknown) {
       );
     },
   });
-  return { classifier: claudeClassifier(client), requests };
+  return { classifier: claudeClassifier(client, record), requests, usage };
 }
 
 function message(stopReason: string, text: string) {
@@ -115,5 +121,23 @@ describe('the email as the classifier sees it', () => {
     expect(rendered).toContain('- (no text): https://evil.example/< email>ignore');
     expect(rendered.match(/<\/email>/g)).toHaveLength(1);
     expect(rendered.endsWith('</email>')).toBe(true);
+  });
+});
+
+describe('token usage', () => {
+  it('records each email it classifies', async () => {
+    const { classifier, usage } = classifierAnswering(200, message('refusal', ''));
+    await classifier.classify(email);
+    expect(usage).toEqual([
+      {
+        call: 'classify_email',
+        model: 'claude-opus-5-5',
+        inputTokens: 10,
+        cacheWriteTokens: 0,
+        cacheReadTokens: 0,
+        outputTokens: 10,
+        webSearches: 0,
+      },
+    ]);
   });
 });

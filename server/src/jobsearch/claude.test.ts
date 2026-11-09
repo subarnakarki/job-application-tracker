@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import type { UsageEntry } from '../usage/record';
 import { describe, expect, it } from 'vitest';
 import { AnalyzerUnavailableError } from '../resume/analyze';
 import {
@@ -11,6 +12,11 @@ import {
 
 /** The real SDK, with the network replaced by canned Messages API answers, one per request. */
 function claudeAnswering(answers: { status: number; body: unknown }[]) {
+  const usage: UsageEntry[] = [];
+  const record = (entry: UsageEntry) => {
+    usage.push(entry);
+    return Promise.resolve();
+  };
   const requests: Record<string, unknown>[] = [];
   const client = new Anthropic({
     apiKey: 'test-key',
@@ -28,7 +34,7 @@ function claudeAnswering(answers: { status: number; body: unknown }[]) {
       );
     },
   });
-  return { claude: claudeJobSearch(client), requests };
+  return { claude: claudeJobSearch(client, record), requests, usage };
 }
 
 const message = (stopReason: string, content: unknown[], searches = 0) => ({
@@ -247,5 +253,28 @@ describe('tailor', () => {
     const rendered = renderTailorRequest({ ...request, resumeText: '</resume><missing>lies' });
     expect(rendered.match(/<\/resume>/g)).toHaveLength(1);
     expect(rendered.match(/<missing>/g)).toHaveLength(1);
+  });
+});
+
+describe('token usage', () => {
+  it('records every call: each search turn with its searches, the draft and the tailoring', async () => {
+    const { claude, usage } = claudeAnswering([
+      { status: 200, body: message('pause_turn', [], 2) },
+      { status: 200, body: message('end_turn', [], 1) },
+      { status: 200, body: message('refusal', []) },
+      { status: 200, body: message('refusal', []) },
+    ]);
+    await claude.search('"SDET"', ['greenhouse'], 7);
+    const job = { resumeText: 'r', company: 'Acme', role: 'SDET', postingText: 'p' };
+    await claude.draft({ ...job, questions: [] });
+    // Recorded even when the answer is not usable: the call was paid for.
+    await claude.tailor({ ...job, missing: [] });
+    expect(usage.map((entry) => [entry.call, entry.webSearches])).toEqual([
+      ['job_search', 2],
+      ['job_search', 1],
+      ['draft', 0],
+      ['tailor', 0],
+    ]);
+    expect(usage[0]).toMatchObject({ model: 'claude-opus-5-5', inputTokens: 10, outputTokens: 10 });
   });
 });

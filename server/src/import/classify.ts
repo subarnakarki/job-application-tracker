@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
+import { ignoreUsage, usageEntry, type UsageRecorder } from '../usage/record';
 import type { GmailMessage } from './gmail';
 import { EmailVerdictSchema, type EmailVerdict } from './verdict';
 
@@ -67,7 +68,10 @@ export function renderEmail(message: GmailMessage): string {
   ].join('\n');
 }
 
-export function claudeClassifier(client: Anthropic): EmailClassifier {
+export function claudeClassifier(
+  client: Anthropic,
+  record: UsageRecorder = ignoreUsage,
+): EmailClassifier {
   return {
     async classify(message) {
       try {
@@ -82,6 +86,7 @@ export function claudeClassifier(client: Anthropic): EmailClassifier {
           system: SYSTEM_PROMPT,
           messages: [{ role: 'user', content: renderEmail(message) }],
         });
+        await record(usageEntry('classify_email', response));
         if (response.stop_reason === 'refusal') return { kind: 'unclassified', reason: 'Declined' };
         if (response.stop_reason === 'max_tokens') {
           return { kind: 'unclassified', reason: 'Answer was cut off' };
@@ -115,7 +120,10 @@ function parseJson(text: string): unknown {
   }
 }
 
-export function classifierFromEnv(env: Record<string, string | undefined>): EmailClassifier | null {
+export function classifierFromEnv(
+  env: Record<string, string | undefined>,
+  record: UsageRecorder = ignoreUsage,
+): EmailClassifier | null {
   const apiKey = env['ANTHROPIC_API_KEY']?.trim();
-  return apiKey ? claudeClassifier(new Anthropic({ apiKey, timeout: 60_000 })) : null;
+  return apiKey ? claudeClassifier(new Anthropic({ apiKey, timeout: 60_000 }), record) : null;
 }
