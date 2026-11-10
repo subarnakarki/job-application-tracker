@@ -30,6 +30,8 @@ export interface SetupValues {
   portfolio: string;
   website: string;
   workModes: WorkMode[];
+  /** Places a hybrid or on-site job must be in, one per line; blank for no such rule. */
+  commuteArea: string;
   usOnly: boolean;
   queries: string;
   includeTitles: string;
@@ -92,6 +94,7 @@ export function emptySetup(prefill: { name?: string | null; email?: string }): S
     portfolio: '',
     website: '',
     workModes: PROFILE_DEFAULTS.workModes,
+    commuteArea: '',
     usOnly: PROFILE_DEFAULTS.usOnly,
     queries: PROFILE_DEFAULTS.queries.join('\n'),
     includeTitles: '',
@@ -122,6 +125,7 @@ export function toSetupValues(profile: JobSearchProfile): SetupValues {
     salaryMin: String(profile.salaryMin),
     salaryMax: profile.salaryMax === null ? '' : String(profile.salaryMax),
     salaryFloor: profile.salaryFloor === null ? '' : String(profile.salaryFloor),
+    commuteArea: profile.commuteArea.join('\n'),
     queries: profile.queries.join('\n'),
     includeTitles: profile.includeTitles.join('\n'),
     skipTitles: profile.skipTitles.join('\n'),
@@ -147,6 +151,10 @@ export function fromSetupValues(
     salaryMin: amount(values.salaryMin) ?? NaN,
     salaryMax: amount(values.salaryMax),
     salaryFloor: amount(values.salaryFloor),
+    // Only hybrid and on-site jobs have a commute: with remote alone the area is not kept.
+    commuteArea: values.workModes.some((mode) => mode !== 'Remote')
+      ? lines(values.commuteArea)
+      : [],
     queries: lines(values.queries),
     includeTitles: lines(values.includeTitles),
     skipTitles: lines(values.skipTitles),
@@ -202,11 +210,19 @@ export const DISABILITY_LABELS: Record<JobSearchProfile['disabilityStatus'], str
 };
 
 /** The searches the form's current values would make (for the live preview). */
-export function previewSearches(values: Pick<SetupValues, 'queries' | 'includeTitles' | 'sites'>) {
+export function previewSearches(
+  values: Pick<
+    SetupValues,
+    'queries' | 'includeTitles' | 'sites' | 'commuteArea' | 'workModes' | 'state'
+  >,
+) {
   return searchQueries({
     queries: lines(values.queries),
     includeTitles: lines(values.includeTitles),
     sites: values.sites,
+    commuteArea: lines(values.commuteArea),
+    workModes: values.workModes,
+    state: values.state,
   });
 }
 

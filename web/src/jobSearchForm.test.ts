@@ -52,6 +52,19 @@ describe('job search setup form', () => {
     expect(!bad.ok && bad.errors).toEqual({ salaryFloor: 'Enter a number' });
   });
 
+  it('keeps the commute area as a list, and drops it when only remote work is wanted', () => {
+    const near = fromSetupValues({
+      ...filled,
+      workModes: ['Remote', 'Hybrid'],
+      commuteArea: 'Charlotte\n Concord \n',
+    });
+    if (!near.ok) throw new Error('invalid');
+    expect(near.profile.commuteArea).toEqual(['Charlotte', 'Concord']);
+    expect(toSetupValues(near.profile).commuteArea).toBe('Charlotte\nConcord');
+    const remote = fromSetupValues({ ...filled, workModes: ['Remote'], commuteArea: 'Charlotte' });
+    expect(remote.ok && remote.profile.commuteArea).toEqual([]);
+  });
+
   it('names the field with each problem', () => {
     const result = fromSetupValues({
       ...filled,
@@ -89,9 +102,26 @@ describe('job search setup form', () => {
 
 describe('search preview', () => {
   it('shows the searches the current answers make', () => {
+    const answers = {
+      queries: '',
+      includeTitles: 'SDET\nQA lead',
+      sites: ['lever' as const],
+      commuteArea: '',
+      workModes: ['Remote' as const],
+      state: 'NC',
+    };
+    expect(previewSearches(answers)).toEqual([
+      'site:jobs.lever.co "SDET"',
+      'site:jobs.lever.co "QA lead"',
+    ]);
+    // With a commute area and hybrid work, the search near home shows too.
     expect(
-      previewSearches({ queries: '', includeTitles: 'SDET\nQA lead', sites: ['lever'] }),
-    ).toEqual(['site:jobs.lever.co "SDET"', 'site:jobs.lever.co "QA lead"']);
+      previewSearches({
+        ...answers,
+        commuteArea: 'Charlotte\nConcord',
+        workModes: ['Remote', 'Hybrid'],
+      })[2],
+    ).toBe('site:jobs.lever.co "SDET" OR "QA lead" "Charlotte, NC"');
   });
 });
 

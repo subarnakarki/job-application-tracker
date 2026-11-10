@@ -1,5 +1,6 @@
 import {
   applyEdits,
+  CHARLOTTE_CORE,
   chromePrompt,
   jobFit,
   titleSuggestions,
@@ -163,7 +164,7 @@ function ListField({
   errors,
   onChange,
 }: {
-  name: 'queries' | 'includeTitles' | 'skipTitles';
+  name: 'queries' | 'includeTitles' | 'skipTitles' | 'commuteArea';
   label: string;
   hint: string;
   values: SetupValues;
@@ -393,6 +394,10 @@ function Summary({ profile }: { profile: JobSearchProfile }) {
     ['Portfolio', profile.portfolio || '—'],
     ['Website', profile.website || '—'],
     ['Work mode', profile.workModes.join(', ')],
+    [
+      'Commute area (hybrid and on-site)',
+      profile.commuteArea.length > 0 ? profile.commuteArea.join(', ') : 'Anywhere',
+    ],
     ['United States only', profile.usOnly ? 'Yes' : 'No, anywhere'],
     [
       'Job sites',
@@ -729,6 +734,30 @@ function SetupForm({ initial, onSaved }: { initial: SetupValues; onSaved: () => 
           </div>
           {errors['workModes'] && <p className="text-sm text-red">Pick at least one</p>}
         </fieldset>
+        {values.workModes.some((mode) => mode !== 'Remote') && (
+          <div className="flex flex-col gap-2">
+            <ListField
+              name="commuteArea"
+              label="Commute area for hybrid and on-site jobs"
+              hint="One place per line. A hybrid or on-site job is kept only when its location names one of these, in your state; remote jobs can be anywhere. Blank: no such rule."
+              {...field}
+            />
+            <div>
+              <button
+                type="button"
+                className="btn-d"
+                onClick={() =>
+                  setValues((current) => ({
+                    ...current,
+                    commuteArea: CHARLOTTE_CORE.join('\n'),
+                  }))
+                }
+              >
+                Use the Charlotte core area
+              </button>
+            </div>
+          </div>
+        )}
       </Fieldset>
 
       <Fieldset legend="What to search for">

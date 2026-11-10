@@ -643,3 +643,36 @@ test('a job that could not be drafted waits in Needs you, with Redraft', async (
     }),
   ).toBeVisible();
 });
+
+test('commute area: filled with the Charlotte core area, confirmed, saved and kept', async ({
+  page,
+  api,
+}) => {
+  await api.uploadResumeText('Pat Example. Senior product manager. '.repeat(10));
+  await api.seedJobSearch({ profile: PROFILE, jobs: [], answers: {} });
+  await page.goto('/job-search/setup');
+  const area = page.getByLabel('Commute area for hybrid and on-site jobs');
+  await expect(area).toHaveValue('');
+
+  await page.getByRole('button', { name: 'Use the Charlotte core area' }).click();
+  await expect(area).toHaveValue(/^Charlotte\nConcord\nKannapolis/);
+  // The search near home joins the searches that will run (it is made from the titles).
+  await page.getByLabel('Job titles to search for').fill('SDET');
+  await expect(
+    page.getByRole('list', { name: 'Searches that will run' }).getByRole('listitem').last(),
+  ).toContainText('"Charlotte, ');
+  await page.getByRole('button', { name: 'Review' }).click();
+  await expect(
+    page.getByRole('region', { name: 'Check everything before it is saved' }),
+  ).toContainText('Commute area (hybrid and on-site)Charlotte, Concord, Kannapolis');
+  await page.getByRole('button', { name: 'Confirm and save' }).click();
+  await expect(page).toHaveURL('/job-search');
+
+  await page.goto('/job-search/setup');
+  await expect(page.getByLabel('Commute area for hybrid and on-site jobs')).toHaveValue(
+    /^Charlotte\nConcord/,
+  );
+  // Only remote work: no commute, so the field goes.
+  await page.getByRole('checkbox', { name: 'Hybrid' }).uncheck();
+  await expect(page.getByLabel('Commute area for hybrid and on-site jobs')).toHaveCount(0);
+});
