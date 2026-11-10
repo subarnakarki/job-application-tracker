@@ -1148,6 +1148,45 @@ Built as planned, each step pushed green:
   `fallbacks` (both are rejected on Haiku 5.5). The trial starts when the owner sets the variable in Vercel.
 - **Not covered:** the Windows-only "tailor my resume" e2e failure is unchanged (passes on CI's Linux).
 
+## Phase 21 plan: remote anywhere, or hybrid and onsite near home (proposed, awaiting approval)
+
+Today the live setup accepts Remote only, so a Charlotte hybrid or onsite job is skipped, and nothing filters by
+place. The owner's rule: **Remote anywhere in the US; Hybrid or Onsite only in the commute area.** Owner's answers:
+the core metro (Mecklenburg and Cabarrus counties); a hybrid or onsite job whose location cannot be placed is
+skipped; one extra Charlotte query per run.
+
+### 21a. The commute area (shared, pure logic; no migration, the profile is JSON)
+
+- `commuteArea: string[]` on the profile: place names, matched as whole words in a job's location (any of a
+  multi-place location). Setups saved before it load as `[]`, meaning no commute rule (today's behaviour).
+- `CHARLOTTE_CORE`: Charlotte, Concord, Kannapolis, Huntersville, Cornelius, Davidson, Matthews, Mint Hill,
+  Pineville, Harrisburg, Midland, Mount Pleasant; offered as a one-click fill on the setup page, editable.
+- `sortJob`: with a commute area set, a Hybrid or Onsite job (the posting's work mode) is kept only when its
+  location names a place in the area and is in North Carolina (or names no state). Otherwise it is skipped: "Hybrid
+  in Austin, TX: outside your commute area", or "Onsite, and the location isn't clear". Remote and unknown-mode jobs
+  follow today's rules. With no commute area, work modes filter as today.
+
+### 21b. A local search query
+
+- `searchQueries`: with a commute area set and Hybrid or Onsite wanted, one more query: the titles plus
+  `"Charlotte, NC"` (the area's first place and the profile's state). It is the last query, so the deadline drops it
+  first, and it does not count against `MAX_SEARCHES` for the title queries (at most 4 queries a run).
+
+### 21c. Setup page
+
+- Under "Work modes": "Commute area for hybrid and onsite jobs", a list of places with "Use the Charlotte core
+  area" to fill it; hidden when only Remote is ticked. Then the live setup: Remote, Hybrid and On-site ticked and the
+  Charlotte core area set.
+
+### Order and tests
+
+21a, then 21b, then 21c; each a small commit, green and pushed. Unit: hybrid in Concord kept, hybrid in Charlotte
+with "NC" kept, hybrid in "Charlotte, VT"-style other states skipped, onsite in Austin skipped, hybrid with a blank
+or "Multiple locations" skipped, a multi-place location with one area place kept, remote anywhere kept, no commute
+area unchanged, an old setup; the extra query present only when hybrid or onsite is wanted. API: the setup
+round-trip with the area; a run that keeps a Concord hybrid job and skips an Austin one. E2E: the setup fills and
+saves the Charlotte core area.
+
 ## Planned but not built
 
 | Item                                  | Status                                                                                                    |
