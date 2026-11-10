@@ -1213,6 +1213,67 @@ Built as planned, each step pushed green (CI passed on the last):
   already waiting in the queue are not re-read. Workday, iCIMS, Taleo and SuccessFactors jobs are never drafted, so
   only their board fields and the text scan apply (their text is not read during a run).
 
+## Phase 22 plan: find jobs within an hour of posting (proposed, awaiting approval)
+
+Measured on 9 November 2026: a matching job is about 11 days old (median) when it reaches the queue. Web search
+returns pages indexed days ago; the fast, free path (reading a company's own board) covers only the 40 most recent
+of 167 known boards, once a weekday; and titles match only as exact phrases ("Lead QA Engineer" and "Automation QA
+Engineer" are missed). Owner's answers: read every known board every hour, every day; no alerts, the queue shows
+newest first; keep jobs posted in the last 7 days; try reading Workday boards directly.
+
+### 22a. Titles match in any word order (shared, pure logic; no migration)
+
+- A multi-word title matches when all its words are in the job's title as whole words, in any order: "QA
+  automation engineer" matches "Automation QA Engineer - Senior". One-word titles and skip titles are unchanged.
+  Used by `sortJob` and the board sweep (`worthReading`).
+- The setup page offers "Add common variants" for the titles already there (a fixed table: SDET, "software
+  development engineer in test", "QA engineer", "quality assurance engineer", "test engineer", "automation
+  engineer", "quality assurance manager"); the owner picks which to add to the live setup.
+
+### 22b. Every known board, every hour (migration 0017 goes out alone first)
+
+- Migration `0017_job_search_boards.sql`: table `job_search_boards` (user, source, board, added by `search` or
+  `user`, `last_swept_at`, `last_error`), filled from the boards of existing hits; the run trigger check also
+  allows `sweep`. Additive.
+- The hourly cron, for each user, every knock: sweep the boards least recently swept first, as many as fit in
+  about 60 seconds (all 167 at today's size), read and sort the new jobs, then draft as now. No model call unless
+  a new job matches. New jobs are stored under a `sweep` run, created only when something new is found, so the
+  runs list is not filled with empty rows. A board that fails is noted and tried again next hour.
+- The daily search run keeps finding new companies; each board it finds joins the table.
+- The sweep and the scheduled run use a 7-day window (the live setup's timeframe is set to 7).
+
+### 22c. Companies to watch (no further migration)
+
+- On the job search overview: "Companies watched (167)", with "Add a company": paste a link to its careers board
+  or to any of its jobs (Greenhouse, Lever, Ashby and the other listable boards); the board is parsed from the
+  link, checked once, and swept from the next hour. Remove works the same way. Routes: `GET`, `POST` and `DELETE
+/api/job-search/boards` (`user` auth, isolation test for the id).
+
+### 22d. Newest first in the queue
+
+- Ready and Needs you sort by posting time, newest first, with "Posted 2 hours ago" on each card; a "Best fit
+  first" toggle keeps today's order. The fit score stays on the card.
+
+### 22e. Workday boards (a spike first)
+
+- Workday career sites answer a public job-list request (`/wday/cxs/{tenant}/{site}/jobs`, a POST with a search
+  text) with titles, locations and "Posted Today" or "Posted 3 Days Ago". Spike against five real tenants from the
+  queue: does it answer without a session, and is the posted day usable. If yes: a `workday` board reader (the
+  page fetcher gains a guarded JSON POST, same SSRF rules), swept like the others; Workday jobs stay "finish
+  yourself". If not: dropped and noted here.
+
+### Order and tests
+
+22a; migration 0017 alone, Migrate; 22b; 22c; 22d; 22e. Each a small commit, green and pushed. Unit: any-order
+title matching (and that "QA lead" does not match "Lead Engineer, QA Tools" unless every word is there; skip titles
+unchanged); least-recently-swept ordering; the sweep window. API: a knock with nothing due still sweeps and stores
+a new job under a `sweep` run; an empty sweep leaves no run; a failing board does not stop the rest; add and
+remove a watched board, with another user getting 404; the queue's new order. E2E: add a company by link; the
+queue shows newest first and the toggle. Cost note: sweeps are free; drafts stay capped at 25 a knock and by the
+daily limits.
+
+Not in this phase: alerts (email or push), LinkedIn-only postings, and re-reading jobs already in the queue.
+
 ## Planned but not built
 
 | Item                                  | Status                                                                                                    |
