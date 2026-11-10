@@ -25,6 +25,8 @@ import { FetchError, type PageFetcher } from '../postings/fetchPage';
 import { createTestApp, SAME_ORIGIN, T0, type TestApp } from '../test/app';
 import { TEST_DATABASE_URL } from '../test/testDb';
 import { getHit } from '../repo/jobSearch';
+import { consumeRateLimit } from '../auth/rateLimit';
+import { createSession } from '../auth/sessions';
 import { CHECK_RULE, MANUAL_RUN_RULE, RUN_BUDGET_MS, TAILOR_RULE } from './jobSearch';
 
 const MISSING_ID = '00000000-0000-4000-8000-000000000000';
@@ -1323,6 +1325,35 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
       expect(runs.json<{ items: { status: string }[] }>().items.map((item) => item.status)).toEqual(
         ['done'],
       );
+    });
+
+    it('deletes expired sessions and rate-limit windows on each knock', async () => {
+      const { user } = await t.login();
+      await createSession(t.db, user.id, new Date(T0.getTime() - 2 * HOUR), HOUR); // expired
+      await createSession(t.db, user.id, T0, 10 * HOUR); // live
+      const rule = { name: 'housekeeping-test', limit: 5, windowMs: HOUR };
+      await consumeRateLimit(
+        t.db,
+        'housekeeping-test:old',
+        rule,
+        new Date(T0.getTime() - 48 * HOUR),
+      );
+      await consumeRateLimit(t.db, 'housekeeping-test:new', rule, T0);
+
+      expect((await cron(CRON_SECRET)).statusCode).toBe(200);
+
+      const sessions = await t.db.query<{ expires_at: Date }>(
+        'select expires_at from sessions where user_id = $1',
+        [user.id],
+      );
+      // The login's own session and the live one; the expired one is gone.
+      expect(sessions.rows).toHaveLength(2);
+      for (const row of sessions.rows)
+        expect(row.expires_at.getTime()).toBeGreaterThan(T0.getTime());
+      const windows = await t.db.query<{ key: string }>(
+        "select key from rate_limits where key like 'housekeeping-test:%'",
+      );
+      expect(windows.rows.map((row) => row.key)).toEqual(['housekeeping-test:new']);
     });
 
     it('checks waiting jobs about once a day, closing the gone ones', async () => {

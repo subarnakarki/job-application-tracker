@@ -25,7 +25,13 @@ import {
 } from '@jat/shared';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { consumeRateLimit, rateLimitKey, type RateLimitRule } from '../auth/rateLimit';
+import {
+  consumeRateLimit,
+  deleteExpiredRateLimits,
+  rateLimitKey,
+  type RateLimitRule,
+} from '../auth/rateLimit';
+import { deleteExpiredSessions } from '../auth/sessions';
 import type { Clock } from '../clock';
 import type { Db } from '../db/types';
 import { ApiError, parseInput } from '../http/errors';
@@ -731,6 +737,15 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
         throw new ApiError(404, 'not_found', 'Not found');
       const { db, claude } = deps;
       const deadline = started + RUN_BUDGET_MS;
+      // Housekeeping, once per knock: expired sessions and rate-limit windows. Never fatal.
+      try {
+        const now = deps.clock.now();
+        const sessions = await deleteExpiredSessions(db, now);
+        const rateLimits = await deleteExpiredRateLimits(db, now);
+        request.log.info({ sessions, rateLimits }, 'job search schedule: housekeeping');
+      } catch (error) {
+        request.log.error({ err: error }, 'job search schedule: housekeeping failed');
+      }
       let runs = 0;
       let drafted = 0;
       let failed = 0;
