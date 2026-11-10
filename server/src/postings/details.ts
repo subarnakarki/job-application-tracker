@@ -147,6 +147,24 @@ export function locationOf(places: unknown[]): string | null {
   return cleanText(`${shown}${more}`, LIMITS.location);
 }
 
+/** The HTML inside the first element with this class. */
+export function byClass(html: string, className: string, tag = '[a-z0-9]+'): string | null {
+  const match = new RegExp(
+    `<(${tag})[^>]*class=["'][^"']*\\b${className}\\b[^"']*["'][^>]*>([\\s\\S]*?)</\\1>`,
+    'i',
+  ).exec(html);
+  return match?.[2] ?? null;
+}
+
+/** "City, State, Country" from those fields of a job, skipping the empty ones. */
+export function placeOf(job: unknown, keys: string[]): string {
+  return keys
+    .map((key) => fieldOf(job, key))
+    .filter((part): part is string => typeof part === 'string' && part.trim() !== '')
+    .map((part) => part.trim())
+    .join(', ');
+}
+
 /** One property of a JSON value, if it is an object. */
 export function fieldOf(value: unknown, key: string): unknown {
   return value !== null && typeof value === 'object'

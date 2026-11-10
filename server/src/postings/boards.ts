@@ -1,6 +1,7 @@
 import { LIMITS } from '@jat/shared';
 import {
   asArray,
+  byClass,
   cleanText,
   dayOf,
   EMPTY,
@@ -9,6 +10,7 @@ import {
   merge,
   onlySalary,
   parseJson,
+  placeOf,
   salaryInText,
   salaryRange,
   workModeOf,
@@ -295,10 +297,7 @@ export function fromZoho(job: unknown, company: string | null): Details {
   const field = (key: string) => fieldOf(job, key);
   const salary = field('Salary');
   const description = field('Job_Description');
-  const place = ['City', 'State', 'Country']
-    .map(field)
-    .filter((part): part is string => typeof part === 'string' && part.trim() !== '')
-    .join(', ');
+  const place = placeOf(job, ['City', 'State', 'Country']);
   return {
     company,
     role: text(field('Posting_Title')) ?? text(field('Job_Opening_Name')),
@@ -309,6 +308,43 @@ export function fromZoho(job: unknown, company: string | null): Details {
     location: locationOf([place]),
     workMode: field('Remote_Job') === true ? 'Remote' : null,
     postedOn: dayOf(field('Date_Opened')),
+  };
+}
+
+/** One job in a Workable account's public list (`account` is the list, which names the company). */
+export function fromWorkable(account: unknown, job: unknown): Details {
+  return {
+    company: text(fieldOf(account, 'name'), LIMITS.company),
+    role: text(fieldOf(job, 'title')),
+    salary: null,
+    location: locationOf([placeOf(job, ['city', 'state', 'country'])]),
+    workMode: fieldOf(job, 'telecommuting') === true ? 'Remote' : null,
+    postedOn: dayOf(fieldOf(job, 'published_on')) ?? dayOf(fieldOf(job, 'created_at')),
+  };
+}
+
+/** A Jobvite page's description, as HTML. */
+export const jobviteDescription = (html: string): string | null =>
+  byClass(html, 'jv-job-detail-description', 'div');
+
+/**
+ * Jobvite: no API and no JobPosting data, so the page itself is read. It gives no date, and a
+ * closed job lands on the company's job list, which has no job title (role null).
+ */
+export function fromJobvite(html: string): Details {
+  // "Sales | Omaha, Nebraska | Denver, Colorado": the department, then each place.
+  const places = (byClass(html, 'jv-job-detail-meta', 'p') ?? '')
+    .split(/<span[^>]*jv-inline-separator[^>]*><\/span>/i)
+    .map((part) => cleanText(part, LIMITS.location))
+    .filter((part): part is string => part !== null)
+    .slice(1);
+  return {
+    company: text(/<title>([^<]*?)\s+Careers\b/i.exec(html)?.[1], LIMITS.company),
+    role: text(byClass(html, 'jv-header', 'h2')),
+    salary: salaryInText(jobviteDescription(html) ?? ''),
+    location: locationOf(places),
+    workMode: places.some((place) => /^remote\b/i.test(place)) ? 'Remote' : null,
+    postedOn: null,
   };
 }
 
@@ -324,9 +360,12 @@ interface Read {
 
 /**
  * Workday has a public API for one posting, but none that lists a company's jobs by name; Zoho
- * Recruit has only the posting's own page.
+ * Recruit and Jobvite have only the posting's own page; Workable's list is rate-limited, so the
+ * hourly search reads it apart from the boards it lists.
  */
-export type Site = { kind: BoardSource | 'workday' | 'zoho'; reads: Read[] } | { kind: 'page' };
+export type Site =
+  | { kind: BoardSource | 'workday' | 'zoho' | 'workable' | 'jobvite'; reads: Read[] }
+  | { kind: 'page' };
 
 /** Links whose board has a public API, and what to read. Every id is validated before it is used in a URL. */
 export function siteOf(url: URL): Site {
@@ -501,6 +540,47 @@ export function siteOf(url: URL): Site {
             parse: (body) => {
               const posting = zohoJobs(body).find((entry) => fieldOf(entry, 'id') === id);
               return posting ? fromZoho(posting, zohoCompany(body)) : null;
+            },
+          },
+        ],
+      };
+  }
+  // https://apply.workable.com/acme/j/ABC123/: the page is drawn by script; the account's public
+  // list has the job (a /j/ABC123 link without the account cannot be read this way).
+  if (host === 'apply.workable.com') {
+    const [account, kind, code] = parts;
+    if (account && kind === 'j' && code && SLUG.test(account) && /^[A-Z0-9]{6,20}$/i.test(code)) {
+      const shortcode = code.toUpperCase();
+      return {
+        kind: 'workable',
+        reads: [
+          {
+            url: `https://apply.workable.com/api/v1/widget/accounts/${account}`,
+            required: true,
+            parse: (body) => {
+              const list = parseJson(body);
+              const posting = asArray(fieldOf(list, 'jobs')).find(
+                (entry) => String(fieldOf(entry, 'shortcode')).toUpperCase() === shortcode,
+              );
+              return posting ? fromWorkable(list, posting) : null;
+            },
+          },
+        ],
+      };
+    }
+  }
+  if (host === 'jobs.jobvite.com') {
+    const [company, kind, id] = parts;
+    if (company && kind === 'job' && id && SLUG.test(company) && /^[A-Za-z0-9]{4,20}$/.test(id))
+      return {
+        kind: 'jobvite',
+        reads: [
+          {
+            url: `https://jobs.jobvite.com/${company}/job/${id}`,
+            required: true,
+            parse: (body) => {
+              const details = fromJobvite(body);
+              return details.role ? details : null;
             },
           },
         ],

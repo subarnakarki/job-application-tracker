@@ -5,7 +5,14 @@ import {
   type PostedPay,
   type WorkMode,
 } from '@jat/shared';
-import { fromAshby, fromGreenhouse, fromLever } from '../postings/boards';
+import {
+  fromAshby,
+  fromGreenhouse,
+  fromJobvite,
+  fromLever,
+  fromWorkable,
+  jobviteDescription,
+} from '../postings/boards';
 import { asArray, cleanText, fieldOf, parseJson, salaryInText } from '../postings/details';
 import { FetchError, type PageFetcher } from '../postings/fetchPage';
 import { readPosting } from '../postings/preview';
@@ -296,18 +303,14 @@ async function readWorkable(ref: JobRef, fetchBoard: PageFetcher): Promise<JobDe
   const job = asArray(fieldOf(board, 'jobs')).find(
     (entry) => String(fieldOf(entry, 'shortcode')).toUpperCase() === ref.jobId,
   );
-  const role = job ? cleanText(fieldOf(job, 'title'), LIMITS.role) : null;
-  if (!job || !role) throw new JobReadError('workable: no such job', true);
-  const place = [fieldOf(job, 'city'), fieldOf(job, 'state'), fieldOf(job, 'country')]
-    .map(stringOf)
-    .filter(Boolean)
-    .join(', ');
+  const details = job ? fromWorkable(board, job) : null;
+  if (!job || !details?.role) throw new JobReadError('workable: no such job', true);
   const apply = fieldOf(job, 'application_url');
   return {
-    company: cleanText(fieldOf(board, 'name'), LIMITS.company) ?? companyFromSlug(ref.board),
-    role,
-    location: place || null,
-    workMode: fieldOf(job, 'telecommuting') === true ? 'Remote' : null,
+    company: details.company ?? companyFromSlug(ref.board),
+    role: details.role,
+    location: details.location,
+    workMode: details.workMode,
     postedAt: instant(fieldOf(job, 'published_on')) ?? instant(fieldOf(job, 'created_at')),
     country: stringOf(fieldOf(job, 'country')),
     applyLink:
@@ -318,16 +321,7 @@ async function readWorkable(ref: JobRef, fetchBoard: PageFetcher): Promise<JobDe
   };
 }
 
-/** The text inside the first element with this class. */
-function byClass(html: string, className: string, tag = '[a-z0-9]+'): string | null {
-  const match = new RegExp(
-    `<(${tag})[^>]*class=["'][^"']*\\b${className}\\b[^"']*["'][^>]*>([\\s\\S]*?)</\\1>`,
-    'i',
-  ).exec(html);
-  return match?.[2] ?? null;
-}
-
-/** Jobvite: no API and no JobPosting data, so the page itself is read. It gives no date. */
+/** Jobvite: the page itself (see fromJobvite). It gives no date. */
 export async function readJobvite(ref: JobRef, fetchPage: PageFetcher): Promise<JobDetails> {
   let html: string;
   try {
@@ -336,26 +330,19 @@ export async function readJobvite(ref: JobRef, fetchPage: PageFetcher): Promise<
     if (error instanceof FetchError) throw readFailure(error);
     throw error;
   }
-  const role = cleanText(byClass(html, 'jv-header', 'h2'), LIMITS.role);
+  const details = fromJobvite(html);
   // A closed Jobvite job lands on the company's job list, which has no job title.
-  if (!role) throw new JobReadError('jobvite: no title', true);
-  // "Sales | Omaha, Nebraska | Denver, Colorado": the department, then each place.
-  const meta = (byClass(html, 'jv-job-detail-meta', 'p') ?? '')
-    .split(/<span[^>]*jv-inline-separator[^>]*><\/span>/i)
-    .map((part) => cleanText(part, 200))
-    .filter((part): part is string => part !== null);
-  const places = meta.slice(1);
-  const company = cleanText(/<title>([^<]*?)\s+Careers\b/i.exec(html)?.[1], LIMITS.company);
+  if (!details.role) throw new JobReadError('jobvite: no title', true);
   return {
-    company: company ?? companyFromSlug(ref.board),
-    role,
-    location: places.length ? places.join('; ').slice(0, 200) : null,
-    workMode: places.some((place) => /^remote\b/i.test(place)) ? 'Remote' : null,
+    company: details.company ?? companyFromSlug(ref.board),
+    role: details.role,
+    location: details.location,
+    workMode: details.workMode,
     postedAt: null,
     country: null,
     applyLink: `${ref.link}/apply`,
-    text: cleanText(byClass(html, 'jv-job-detail-description', 'div'), POSTING_TEXT_MAX) ?? '',
+    text: cleanText(jobviteDescription(html), POSTING_TEXT_MAX) ?? '',
     questions: null,
-    salary: salaryInText(byClass(html, 'jv-job-detail-description', 'div') ?? ''),
+    salary: details.salary,
   };
 }

@@ -102,7 +102,11 @@ export async function readPostingText(raw: string, fetchPage: PageFetcher): Prom
   if (isSignInSite(url)) throw new PreviewError('unsupported_site', url.hostname);
 
   const site = siteOf(url);
-  const targets = site.kind === 'page' ? [url.toString()] : site.reads.map((read) => read.url);
+  // Workable's read is the account's whole job list: its text is not this posting's.
+  const targets =
+    site.kind === 'page' || site.kind === 'workable'
+      ? [url.toString()]
+      : site.reads.map((read) => read.url);
   const texts: string[] = [];
   for (const target of targets) {
     try {

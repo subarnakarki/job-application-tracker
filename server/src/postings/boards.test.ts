@@ -8,6 +8,9 @@ import { previewPosting } from './preview';
 /** Real responses from each board's public API, saved and trimmed (see ./fixtures). */
 const fixture = (name: string) =>
   readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
+/** The job search's saved pages, for the boards it read first. */
+const searchFixture = (name: string) =>
+  readFileSync(new URL(`../jobsearch/fixtures/${name}`, import.meta.url), 'utf8');
 
 function pages(map: Record<string, string>): PageFetcher & { asked: string[] } {
   const asked: string[] = [];
@@ -143,6 +146,49 @@ describe('reading a posting link on each job board', () => {
     await expect(
       previewPosting(page, pages({ [page]: fixture('zoho-job-page.html') })),
     ).rejects.toMatchObject({ code: 'no_posting_data' });
+  });
+
+  it('Workable: the page is drawn by script, so the account’s public job list is read', async () => {
+    const list = 'https://apply.workable.com/api/v1/widget/accounts/huggingface';
+    const fetcher = pages({ [list]: searchFixture('workable-account.json') });
+    const link = 'https://apply.workable.com/huggingface/j/19a136f8e2/';
+    expect(await previewPosting(link, fetcher)).toEqual({
+      jobLink: link,
+      company: 'Hugging Face',
+      role: 'Open-Source Machine Learning Engineer - US Remote',
+      salaryMin: null,
+      salaryMax: null,
+      salaryCurrency: null,
+      location: expect.stringMatching(/United States$/) as unknown,
+      workMode: 'Remote',
+      postedOn: '2026-05-29',
+    });
+    expect(fetcher.asked).toEqual([list]);
+
+    // A job no longer in the list says nothing.
+    await expect(
+      previewPosting('https://apply.workable.com/huggingface/j/000000AAAA/', fetcher),
+    ).rejects.toMatchObject({ code: 'no_posting_data' });
+  });
+
+  it('Jobvite: no API and no JobPosting data, so the page’s own markup is read', async () => {
+    const link = 'https://jobs.jobvite.com/nutanix/job/oFBIAfwi';
+    const fetcher = pages({ [link]: searchFixture('jobvite-job.html') });
+    const preview = await previewPosting(link, fetcher);
+    expect(preview).toMatchObject({
+      jobLink: link,
+      company: 'Nutanix',
+      role: 'Service Providers Sales Systems Engineer',
+      salaryMin: null,
+      postedOn: null,
+    });
+    expect(preview.location).toMatch(/^Omaha, Nebraska; Minneapolis, Minnesota/);
+
+    // A closed job lands on the company's job list: no title, so nothing is filled.
+    const closed = pages({ [link]: '<title>Nutanix Careers</title><h1>Open jobs</h1>' });
+    await expect(previewPosting(link, closed)).rejects.toMatchObject({
+      code: 'no_posting_data',
+    });
   });
 
   it('Greenhouse: title, company, place, posting date and a yearly salary (in cents)', async () => {
