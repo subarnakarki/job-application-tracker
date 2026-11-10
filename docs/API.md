@@ -168,8 +168,8 @@ Open to the users in `JOB_SEARCH_USER_IDS` when `ANTHROPIC_API_KEY` is set; ever
 |        |                                    |        | Also deletes expired sessions and rate-limit windows. One user's       |
 |        |                                    |        | error is logged and the rest still run. On a knock with no run due,    |
 |        |                                    |        | every watched board is read for new jobs (the hourly sweep, below).    |
-|        |                                    |        | `{ started, drafted, failed, found }`. Called hourly by the "Job       |
-|        |                                    |        | search schedule" workflow                                              |
+|        |                                    |        | `{ started, drafted, failed, found }`. Called four times an hour       |
+|        |                                    |        | (minutes 2, 17, 32, 47) by the "Job search schedule" workflow          |
 | GET    | `/api/job-search/boards`           | user   | The companies watched: `{ items, total }`, read longest ago first      |
 | POST   | `/api/job-search/boards`           | user   | `{ link }`: a careers board (Greenhouse, Lever, Ashby, Workday) or any |
 |        |                                    |        | job on a readable board. The list is read once to check it. 201; 422   |

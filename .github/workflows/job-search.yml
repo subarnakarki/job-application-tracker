@@ -1,6 +1,11 @@
-# Hourly: asks the app to start the job searches that are due (in each user's own time zone) and to
-# keep drafting. The app decides what is due; this only knocks. Vercel's free cron runs once a day at
-# most, so the schedule lives here.
+# Asks the app to start the job searches that are due (in each user's own time zone), to read the
+# watched companies' boards for new jobs, and to keep drafting. The app decides what is due; this
+# only knocks. Vercel's free cron runs once a day at most, so the schedule lives here.
+#
+# Four times an hour: GitHub delays or drops scheduled runs when it is busy (on 9 November 2026 the
+# one hourly slot fired 4 times in 30 hours), so more slots mean more knocks arrive. A knock with
+# nothing new costs no model call; the concurrency group below keeps knocks from overlapping. The
+# minutes avoid the top of the hour, GitHub's busiest time.
 #
 # Needs one repository secret, JOB_SEARCH_CRON_SECRET (the same value as the Vercel environment
 # variable, 32+ characters); without it the job does nothing. The app's address is public, so it is
@@ -9,7 +14,7 @@ name: Job search schedule
 
 on:
   schedule:
-    - cron: '17 * * * *'
+    - cron: '2,17,32,47 * * * *'
   workflow_dispatch:
 
 permissions: {}
