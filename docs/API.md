@@ -138,7 +138,8 @@ Open to the users in `JOB_SEARCH_USER_IDS` when `ANTHROPIC_API_KEY` is set; ever
 | GET    | `/api/job-search/runs/:id`         | user   | One run and every job it found                                         |
 | GET    | `/api/job-search/queue`            | user   | `{ ready, needsYou, finishYourself, keywordOnly, olderMatches,`        |
 |        |                                    |        | `notDrafted, checks: { lastCheckedAt, closedThisWeek } }`              |
-|        |                                    |        | Ready and Needs you are sorted by `fit` (best first). Each job's       |
+|        |                                    |        | Ready and Needs you are sorted by `fit` (best first); the page shows   |
+|        |                                    |        | them newest posting first unless asked for best fit. Each job's        |
 |        |                                    |        | `fit` is `{ percent, found, missing }` against the current resume,     |
 |        |                                    |        | from the posting keywords its draft kept (null before that)            |
 | POST   | `/api/job-search/queue/check`      | user   | Reads each waiting job again (up to 60); a board that says it is gone  |
@@ -165,8 +166,24 @@ Open to the users in `JOB_SEARCH_USER_IDS` when `ANTHROPIC_API_KEY` is set; ever
 |        |                                    |        | run is tried again on later knocks, at most 3 tries a day), then       |
 |        |                                    |        | keeps drafting; a job whose draft failed 3 times moves to Needs you.   |
 |        |                                    |        | Also deletes expired sessions and rate-limit windows. One user's       |
-|        |                                    |        | error is logged and the rest still run: `{ started, drafted, failed }` |
-|        |                                    |        | Called hourly by the "Job search schedule" workflow                    |
+|        |                                    |        | error is logged and the rest still run. On a knock with no run due,    |
+|        |                                    |        | every watched board is read for new jobs (the hourly sweep, below).    |
+|        |                                    |        | `{ started, drafted, failed, found }`. Called hourly by the "Job       |
+|        |                                    |        | search schedule" workflow                                              |
+| GET    | `/api/job-search/boards`           | user   | The companies watched: `{ items, total }`, read longest ago first      |
+| POST   | `/api/job-search/boards`           | user   | `{ link }`: a careers board (Greenhouse, Lever, Ashby, Workday) or any |
+|        |                                    |        | job on a readable board. The list is read once to check it. 201; 422   |
+|        |                                    |        | `unsupported_board` or `board_unreadable`; 409 at 500; 40 a day        |
+| DELETE | `/api/job-search/boards/:id`       | user   | Stops watching (jobs already found stay). 204                          |
+
+**The hourly sweep.** Web search returns pages indexed days ago; a company's own board lists a job the day it is
+posted. So every board a search finds (and every company added by hand) is kept in `job_search_boards`, and each
+hourly knock without a due run reads them all, the ones read longest ago first, for at most 60 seconds: the public
+list APIs of Greenhouse, Lever, Ashby, Rippling, SmartRecruiters, Breezy HR, Recruitee, Teamtailor and Personio,
+and each Workday site's own job-list request (a guarded JSON POST, newest postings first, up to three pages). A
+new job whose title matches is read, sorted and saved under a run with trigger `sweep` (no run is recorded when
+nothing is new), then drafted on the same knock. No model is called unless a new job matches. A wanted title
+matches in any word order ("QA automation engineer" matches "Automation QA Engineer").
 
 **Boards.** Searched and filled: Greenhouse, Lever, Ashby, Rippling, SmartRecruiters, Breezy HR, Recruitee,
 Teamtailor, Personio, Workable and Jobvite. Searched and listed to finish by hand (they need an account): Workday,

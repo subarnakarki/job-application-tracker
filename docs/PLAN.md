@@ -1213,7 +1213,7 @@ Built as planned, each step pushed green (CI passed on the last):
   already waiting in the queue are not re-read. Workday, iCIMS, Taleo and SuccessFactors jobs are never drafted, so
   only their board fields and the text scan apply (their text is not read during a run).
 
-## Phase 22 plan: find jobs within an hour of posting (proposed, awaiting approval)
+## Phase 22 plan: find jobs within an hour of posting (approved)
 
 Measured on 9 November 2026: a matching job is about 11 days old (median) when it reaches the queue. Web search
 returns pages indexed days ago; the fast, free path (reading a company's own board) covers only the 40 most recent
@@ -1273,6 +1273,33 @@ queue shows newest first and the toggle. Cost note: sweeps are free; drafts stay
 daily limits.
 
 Not in this phase: alerts (email or push), LinkedIn-only postings, and re-reading jobs already in the queue.
+
+## Phase 22 outcome
+
+Built as planned, each step pushed green:
+
+- **22a** (`6ec33d9`): `titleMatch`, any word order, used when sorting and by the sweep. The owner's titles were
+  extended by hand (29 to search for, 9 to skip), so the "Add common variants" button was **not built**.
+- **0017** (`2e260ed`), applied through Migrate; **22b** (`a923126`): `job_search_boards`; `sweepNewJobs` on every
+  knock without a due run (400 boards, 60 seconds at most), new jobs under a `sweep` run; the cron's answer gained
+  `found`. The live window is 7 days.
+- **22c** (`0524416`, `b12c82d`): `GET`, `POST`, `DELETE /api/job-search/boards` and "Companies watched" on the
+  overview. A board page is understood for Greenhouse, Lever, Ashby and Workday; for the other boards, paste a job
+  link.
+- **22d** (`da948c2`): the queue is ordered in the browser (`orderQueue`), newest posting first, with "Posted 2
+  hours ago" and a "Best fit first" toggle; the API's order is unchanged.
+- **22e**: the spike passed (five of five real Workday sites answered without a session, newest first, with
+  "Posted Today" or "Posted N Days Ago"). **0018** (`d33a7e0`), applied through Migrate: 44 Workday boards named
+  by host and site. Reader and sweep (`bdd17c6`): `readWorkdayBoard`; the page fetcher gained a guarded JSON POST
+  that never follows a redirect.
+- **Not covered:**
+  - Workday lists give a day, not a time, so a Workday job reads "Posted 0 days ago" until its page is read.
+  - Some boards give only the day a job was posted, so "Posted 5 hours ago" can be off by up to a day for them.
+  - A Workday site posting more than sixty jobs within an hour could push one past the three pages read.
+  - The Workday reader is tested against recorded shapes, and by hand against five live sites; no test calls
+    Workday.
+  - One e2e test (`fill-from-posting`, desktop) failed once in a full local run and passed three times alone.
+  - A sweep test relied on the order of two runs started at the same frozen instant; fixed in `0524416`.
 
 ## Planned but not built
 
