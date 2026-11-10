@@ -237,6 +237,8 @@ describe('claudeJobSearch.draft', () => {
     answers: [{ question: 'Why us?', answer: 'Because.', needsCandidate: false }],
     coverLetter: 'Dear Acme',
     whyInterested: 'Testing.',
+    workMode: 'unknown',
+    location: '',
     keywords: [{ term: 'Playwright', group: 'tool' }],
   };
 

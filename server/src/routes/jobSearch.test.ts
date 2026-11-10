@@ -91,6 +91,8 @@ interface StubClaude extends JobSearchClaude {
   searchFails: boolean;
   /** The next this many searches throw, then they work again. */
   searchFailuresLeft: number;
+  /** What every draft reads in the posting about where the job is worked. */
+  reads: { workMode: ModelDraft['workMode']; location: string };
   /** Called inside each search, with the deadline it was given. */
   onSearch: ((deadline: number | undefined) => void) | null;
   /** The posting keywords every draft returns. */
@@ -108,6 +110,7 @@ const claude: StubClaude = {
   searchFails: false,
   searchFailuresLeft: 0,
   onSearch: null,
+  reads: { workMode: 'unknown', location: '' },
   keywords: [],
   tailorAnswer: null,
   tailorRequests: [],
@@ -156,6 +159,8 @@ const claude: StubClaude = {
       })),
       coverLetter: 'Dear Acme team, ...',
       whyInterested: 'The roadmap work.',
+      workMode: claude.reads.workMode,
+      location: claude.reads.location,
       keywords: claude.keywords.map((term) => ({ term, group: 'hard_skill' as const })),
     });
   },
@@ -239,6 +244,7 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
     claude.searchFails = false;
     claude.searchFailuresLeft = 0;
     claude.onSearch = null;
+    claude.reads = { workMode: 'unknown', location: '' };
     claude.keywords = [];
     claude.tailorAnswer = null;
     claude.tailorRequests = [];
@@ -491,6 +497,47 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
         await send('GET', '/api/job-search/profile', cookie),
       );
       expect(setup.profile?.commuteArea).toEqual(area);
+    });
+
+    it('reads where a job is worked from its posting when the board does not say', async () => {
+      const { cookie } = await member();
+      await send('PUT', '/api/job-search/profile', cookie, {
+        ...PROFILE,
+        workModes: ['Remote', 'Hybrid', 'On-site'],
+        commuteArea: ['Charlotte', 'Concord'],
+        state: 'NC',
+      });
+      // The board gives a city and no work mode; the draft reads the posting.
+      PAGES[apiUrl(108)] = greenhouseJob('Product Manager, Payments', 2, undefined, 'Austin, TX');
+      claude.links = [jobLink(108)];
+      try {
+        claude.reads = { workMode: 'On-site', location: 'Austin, TX' };
+        const away = runOf(await run(cookie));
+        expect(byRole(away.hits, 'Product Manager, Payments')).toMatchObject({
+          kind: 'skipped',
+          workMode: 'On-site',
+          draft: null,
+          reason: 'On-site in Austin, TX: outside your commute area (read in the posting)',
+        });
+        const queue = queueOf(await send('GET', '/api/job-search/queue', cookie));
+        expect([...queue.ready, ...queue.needsYou]).toEqual([]);
+        expect(queue.notDrafted).toBe(0);
+      } finally {
+        delete PAGES[apiUrl(108)];
+      }
+
+      // A hybrid job the posting places in the commute area is drafted as usual.
+      PAGES[apiUrl(109)] = greenhouseJob('Product Manager, Lending', 2, undefined, 'United States');
+      claude.links = [jobLink(109)];
+      try {
+        claude.reads = { workMode: 'Hybrid', location: 'Charlotte, NC' };
+        const near = runOf(await run(cookie));
+        const kept = byRole(near.hits, 'Product Manager, Lending');
+        expect(kept).toMatchObject({ kind: 'target', workMode: 'Hybrid' });
+        expect(kept.draft).not.toBeNull();
+      } finally {
+        delete PAGES[apiUrl(109)];
+      }
     });
 
     it('skips a job whose posted pay tops out below the floor, and keeps the rest', async () => {

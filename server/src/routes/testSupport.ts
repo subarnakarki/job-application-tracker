@@ -323,6 +323,8 @@ export function registerTestRoutes(app: FastifyInstance, deps: TestRouteDeps): v
                 }),
                 coverLetter: `Dear ${draftRequest.company} team, I would love to join as ${draftRequest.role}.`,
                 whyInterested: 'The work matches my experience.',
+                workMode: 'unknown',
+                location: '',
                 keywords: (
                   body.jobs.find(
                     (job) =>

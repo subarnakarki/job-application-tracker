@@ -438,6 +438,34 @@ export async function listUndrafted(
   return withTracked(db, userId, result.rows.map(toHit));
 }
 
+/**
+ * What the draft read in a waiting job's posting, for a job whose board did not say how it is
+ * worked: the work mode, the location when the board gave none, and, when that rules the job out,
+ * the reason it is skipped. Only a job not drafted yet changes.
+ */
+export async function savePostingRead(
+  db: Queryable,
+  userId: string,
+  id: string,
+  read: { workMode: WorkMode; location: string | null; skipReason: string | null },
+  now: Date,
+): Promise<void> {
+  await db.query(
+    `update job_search_hits set work_mode = $3, location = coalesce(location, $4),
+        kind = case when $5::text is null then kind else 'skipped' end,
+        reason = coalesce($5, reason), updated_at = $6
+      where user_id = $1 and id = $2 and state = 'new'`,
+    [
+      userId,
+      id,
+      read.workMode,
+      read.location?.slice(0, 200) ?? null,
+      read.skipReason?.slice(0, 300) ?? null,
+      now,
+    ],
+  );
+}
+
 /** Failed drafts before a job stops being drafted automatically. */
 export const MAX_DRAFT_ATTEMPTS = 3;
 export const GAVE_UP_DRAFTING = `Couldn't draft this job after ${String(MAX_DRAFT_ATTEMPTS)} tries: answer it yourself, or press Redraft`;

@@ -10,6 +10,7 @@ import {
   questionsForModel,
   sortJob,
   uniqueJobRefs,
+  workModeProblem,
   type JobRef,
   type JobSearchProfile,
   type SearchSource,
@@ -24,6 +25,7 @@ import {
   listTrackedApplications,
   listUndrafted,
   saveDraft,
+  savePostingRead,
   seenJobKeys,
   setRunProgress,
   startRun,
@@ -340,6 +342,28 @@ export async function draftHit(
       deps.clock.now(),
     );
     return false;
+  }
+  // The board did not say how the job is worked, and the posting does: a job that turns out to
+  // be on-site somewhere else leaves the queue here, before it is ever shown as ready.
+  if (hit.state === 'new' && !hit.workMode && model.workMode !== 'unknown') {
+    const stated = model.location.trim() || null;
+    const problem = workModeProblem(model.workMode, stated ?? hit.location, {
+      workModes: profile.workModes,
+      commuteArea: profile.commuteArea,
+      homeState: profile.state,
+    });
+    await savePostingRead(
+      deps.db,
+      userId,
+      hitId,
+      {
+        workMode: model.workMode,
+        location: stated,
+        skipReason: problem ? `${problem} (read in the posting)` : null,
+      },
+      deps.clock.now(),
+    );
+    if (problem) return false;
   }
   await saveDraft(
     deps.db,

@@ -736,6 +736,46 @@ export function belowSalaryFloor(pay: PostedPay | null, floor: number | null): s
 }
 
 /**
+ * Why a job's work mode rules it out, or null: a mode the user does not want, or a hybrid or
+ * on-site job outside the commute area (or with a location that cannot be placed). An unknown mode
+ * is never a problem.
+ */
+export function workModeProblem(
+  workMode: WorkMode | null,
+  location: string | null,
+  rules: Pick<SortRules, 'workModes' | 'commuteArea' | 'homeState'>,
+): string | null {
+  if (!workMode) return null;
+  if (rules.workModes.length > 0 && !rules.workModes.includes(workMode))
+    return `${workMode}, which you don't want`;
+  if (workMode === 'Remote' || rules.commuteArea.length === 0) return null;
+  const commute = commuteVerdict(location, rules.commuteArea, rules.homeState);
+  if (commute === 'outside')
+    return `${workMode} in ${(location ?? '').slice(0, 120)}: outside your commute area`;
+  return commute === 'unclear' ? `${workMode}, and the location isn't clear` : null;
+}
+
+const SAYS_REMOTE =
+  /\b(fully|100%|completely) remote\b|\bremote[- ]first\b|\b(this is a|is a) remote (role|position|job)\b|\bwork from anywhere\b/i;
+const SAYS_HYBRID =
+  /\bhybrid (role|position|job|schedule|work(ing)? (model|schedule|environment|arrangement))\b|\b(this is a|is a) hybrid\b|\b(\d|one|two|three|four) days (a|per|each) week (in|at|from) (the|our|an?) office\b/i;
+const SAYS_ON_SITE =
+  /\b(this is an|is an) (on-?site|in-?office|in-?person) (role|position|job)\b|\b(fully|100%) (on-?site|in-?office|in-?person)\b|\b(five|5) days (a|per|each) week (in|at|from) (the|our|an?) office\b|\bnot (a )?remote (role|position|job)\b/i;
+
+/**
+ * How a posting says the job is worked, when its text is clear about it: one kind of statement
+ * only ("this is a hybrid role", "fully remote", "5 days a week in the office"). Words that only
+ * mention a mode ("hybrid cloud", "remote teams"), or a posting that states two, give null.
+ */
+export function workModeInText(text: string): WorkMode | null {
+  const said: WorkMode[] = [];
+  if (SAYS_REMOTE.test(text)) said.push('Remote');
+  if (SAYS_HYBRID.test(text)) said.push('Hybrid');
+  if (SAYS_ON_SITE.test(text)) said.push('On-site');
+  return said.length === 1 ? (said[0] ?? null) : null;
+}
+
+/**
  * Where a job goes: skipped (too old, already tracked, a skipped title, the wrong work mode, pay
  * under the floor), a
  * target role (the title has an include word), keyword-only (the word is in the posting but not
@@ -766,18 +806,14 @@ export function sortJob(job: JobFacts, rules: SortRules): Sorted {
       kind: 'skipped',
       reason: `Outside the United States${job.location ? ` (${job.location.slice(0, 120)})` : ''}`,
     };
-  if (job.workMode && rules.workModes.length > 0 && !rules.workModes.includes(job.workMode))
-    return { kind: 'skipped', reason: `${job.workMode}, which you don't want` };
-  if (job.workMode && job.workMode !== 'Remote' && rules.commuteArea.length > 0) {
-    const commute = commuteVerdict(job.location, rules.commuteArea, rules.homeState);
-    if (commute === 'outside')
-      return {
-        kind: 'skipped',
-        reason: `${job.workMode} in ${(job.location ?? '').slice(0, 120)}: outside your commute area`,
-      };
-    if (commute === 'unclear')
-      return { kind: 'skipped', reason: `${job.workMode}, and the location isn't clear` };
-  }
+  // A board that does not say how the job is worked: the posting's own words, when they are clear.
+  const fromText = job.workMode ? null : workModeInText(job.text);
+  const wrongPlace = workModeProblem(job.workMode ?? fromText, job.location, rules);
+  if (wrongPlace)
+    return {
+      kind: 'skipped',
+      reason: fromText ? `${wrongPlace} (from the posting's text)` : wrongPlace,
+    };
   const underFloor = belowSalaryFloor(job.salary ?? null, rules.salaryFloor);
   if (underFloor) return { kind: 'skipped', reason: underFloor };
 
@@ -1671,6 +1707,16 @@ export const ModelDraftSchema = z.strictObject({
     .array(z.strictObject({ term: z.string(), group: z.enum(KEYWORD_GROUPS) }))
     .describe(
       'The 10 to 20 terms this posting asks for (skills, tools, certifications), as written in it, most important first',
+    ),
+  workMode: z
+    .enum([...WORK_MODES, 'unknown'])
+    .describe(
+      'How the posting says the job is worked; unknown when it does not say. A job that can be done fully remotely is Remote',
+    ),
+  location: z
+    .string()
+    .describe(
+      'Where the job is based, as the posting states it ("Austin, TX"); several places separated by ";"; empty when it does not say',
     ),
 });
 export type ModelDraft = z.infer<typeof ModelDraftSchema>;

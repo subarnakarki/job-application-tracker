@@ -23,6 +23,7 @@ import {
   EMPTY_MORE_ANSWERS,
   googleSearchUrl,
   isRunDue,
+  workModeInText,
   CHARLOTTE_CORE,
   MAX_SCHEDULED_TRIES_PER_DAY,
   JobSearchProfileSchema,
@@ -232,6 +233,36 @@ describe('sortJob', () => {
       const sorted = sortJob(job(overrides), { ...rules, ...near });
       expect(sorted.kind).toBe(kind);
       if (reason) expect(sorted.reason).toBe(reason);
+    });
+
+    it('reads a clear work mode in the posting when the board gives none', () => {
+      const austin = job({
+        workMode: null,
+        location: 'Austin, TX',
+        text: 'This is a hybrid role: three days a week in our office.',
+      });
+      expect(sortJob(austin, { ...rules, ...near })).toEqual({
+        kind: 'skipped',
+        reason: "Hybrid in Austin, TX: outside your commute area (from the posting's text)",
+      });
+      // The board's own work mode wins over the text.
+      expect(sortJob({ ...austin, workMode: 'Remote' }, { ...rules, ...near }).kind).toBe('target');
+    });
+
+    it.each<[string, string | null]>([
+      ['This is a fully remote position within the US.', 'Remote'],
+      ['We are remote-first.', 'Remote'],
+      ['This is a hybrid role based in Austin.', 'Hybrid'],
+      ['You will work 3 days a week in the office.', 'Hybrid'],
+      ['This is an on-site role in our Dallas lab.', 'On-site'],
+      ['Expect five days per week in our office.', 'On-site'],
+      ['This is not a remote position.', 'On-site'],
+      // Words that only mention a mode, and postings that state two, say nothing.
+      ['You will test our hybrid cloud with remote teams.', null],
+      ['Fully remote, or a hybrid schedule if you prefer the office.', null],
+      ['', null],
+    ])('work mode in "%s"', (text, mode) => {
+      expect(workModeInText(text)).toBe(mode);
     });
 
     it('changes nothing without a commute area', () => {
@@ -718,6 +749,8 @@ describe('assembleDraft', () => {
     ],
     coverLetter: 'Dear team, ...',
     whyInterested: 'The mission.',
+    workMode: 'unknown',
+    location: '',
     keywords: [
       { term: 'Playwright', group: 'tool' },
       { term: ' ', group: 'tool' },
@@ -1175,6 +1208,8 @@ describe('more screening answers, set once', () => {
       ],
       coverLetter: '',
       whyInterested: '',
+      workMode: 'unknown',
+      location: '',
       keywords: [],
     });
     expect(needsYou).toBe(false);
@@ -1406,6 +1441,8 @@ describe('self-identification answers against real form options', () => {
         answers: [{ question: 'Gender', answer: 'Male', needsCandidate: false }],
         coverLetter: '',
         whyInterested: '',
+        workMode: 'unknown',
+        location: '',
         keywords: [],
       },
     );
