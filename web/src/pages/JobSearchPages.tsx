@@ -54,6 +54,7 @@ import { formatDateTime } from '../format';
 import { ResumeEditor } from '../components/TailoringSection';
 import { TailorSuggestions, useChosenEdits } from '../components/TailorSuggestions';
 import { FIT_LABELS } from '../resume';
+import { ago, orderQueue, QUEUE_ORDER_LABELS, QUEUE_ORDERS, type QueueOrder } from '../queueOrder';
 import {
   CADENCE_LABELS,
   CADENCES,
@@ -1259,7 +1260,9 @@ const STATE_LABELS: Record<JobHit['state'], string> = {
 };
 
 function posted(hit: JobHit): string {
-  return hit.postedAt ? `Posted ${formatDateTime(hit.postedAt)}` : 'Posting time unknown';
+  return hit.postedAt
+    ? `Posted ${ago(hit.postedAt, new Date())} (${formatDateTime(hit.postedAt)})`
+    : `Posting time unknown; found ${ago(hit.createdAt, new Date())}`;
 }
 
 export function JobSearchRunPage() {
@@ -1989,7 +1992,10 @@ export function ApplyQueuePage() {
       ? asked
       : (QUEUE_TABS.find((entry) => groups[entry.id].length > 0)?.id ?? 'ready');
   const current = QUEUE_TABS.find((entry) => entry.id === tab) ?? QUEUE_TABS[0];
-  const hits = groups[tab];
+  // Newest first unless asked: applying early matters more than a few points of fit.
+  const order: QueueOrder = params.get('order') === 'fit' ? 'fit' : 'newest';
+  const ordered = tab === 'ready' || tab === 'needs' || tab === 'finish';
+  const hits = ordered ? orderQueue(groups[tab], order) : groups[tab];
 
   return (
     <div className="flex flex-col gap-6">
@@ -2029,7 +2035,9 @@ export function ApplyQueuePage() {
                 <button
                   type="button"
                   aria-current={active ? 'page' : undefined}
-                  onClick={() => setParams({ tab: entry.id })}
+                  onClick={() =>
+                    setParams(order === 'fit' ? { tab: entry.id, order } : { tab: entry.id })
+                  }
                   className={`flex min-h-11 items-center gap-2 rounded-full px-4 text-sm transition-colors ${
                     active ? 'bg-fg text-bg' : 'bg-s2 text-fg-2 hover:text-fg'
                   }`}
@@ -2055,10 +2063,8 @@ export function ApplyQueuePage() {
           {current?.label} ({hits.length})
         </h2>
         <p className="text-sm text-fg-3">
-          {tab === 'ready' &&
-            'Drafted and ready, best fit with your resume first. Open a job to see every answer for its form.'}
-          {tab === 'needs' &&
-            'Answer what only you can, then the job moves to Ready to apply. Best fit first.'}
+          {tab === 'ready' && 'Drafted and ready. Open a job to see every answer for its form.'}
+          {tab === 'needs' && 'Answer what only you can, then the job moves to Ready to apply.'}
           {tab === 'finish' &&
             "These need an account on the company's site, which can't be created for you. The answers are ready to copy."}
           {tab === 'older' &&
@@ -2066,6 +2072,23 @@ export function ApplyQueuePage() {
           {tab === 'keyword' &&
             'These mention your keywords, but the title is a different role. Add one to the queue to have it drafted.'}
         </p>
+        {ordered && hits.length > 1 && (
+          <div role="group" aria-label="Order" className="flex flex-wrap gap-2">
+            {QUEUE_ORDERS.map((entry) => (
+              <button
+                key={entry}
+                type="button"
+                aria-pressed={order === entry}
+                onClick={() => setParams(entry === 'fit' ? { tab, order: entry } : { tab })}
+                className={`min-h-11 rounded-full px-4 text-sm transition-colors ${
+                  order === entry ? 'bg-fg text-bg' : 'bg-s2 text-fg-2 hover:text-fg'
+                }`}
+              >
+                {QUEUE_ORDER_LABELS[entry]}
+              </button>
+            ))}
+          </div>
+        )}
         {hits.length === 0 && <p className="text-fg-2">Nothing here right now.</p>}
         {(tab === 'ready' || tab === 'needs' || tab === 'finish') &&
           hits.map((hit) => (

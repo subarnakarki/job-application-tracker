@@ -389,19 +389,19 @@ test('a job found closed on its form is marked closed and leaves the queue', asy
   );
 });
 
-test('the ready jobs are ordered by fit with the resume, with the missing keywords', async ({
+test('the ready jobs are listed newest first, or by fit with the resume, with the missing keywords', async ({
   page,
   api,
 }) => {
   await api.uploadResumeText(
     'Pat Example. Senior product manager: roadmaps, SQL and A/B testing. '.repeat(4),
   );
-  const job = (company: string, keywords: string[]) => ({
+  const job = (company: string, hoursAgo: number, keywords: string[]) => ({
     board: company.toLowerCase(),
     company,
     title: 'Senior Product Manager',
     location: 'Remote, US',
-    hoursAgo: 3,
+    hoursAgo,
     content: 'Own the roadmap. '.repeat(20),
     questions: QUESTIONS.filter((question) => !/clearance/.test(question.label)),
     keywords,
@@ -409,14 +409,28 @@ test('the ready jobs are ordered by fit with the resume, with the missing keywor
   await api.seedJobSearch({
     profile: PROFILE,
     jobs: [
-      job('Initech', ['roadmaps', 'Figma', 'Jira', 'Kubernetes', 'SQL']),
-      job('Hooli', ['roadmaps', 'SQL', 'A/B testing', 'product manager', 'Figma']),
+      job('Initech', 1, ['roadmaps', 'Figma', 'Jira', 'Kubernetes', 'SQL']),
+      job('Hooli', 5, ['roadmaps', 'SQL', 'A/B testing', 'product manager', 'Figma']),
     ],
     answers: { 'Why do you want to work here?': 'Your roadmap work matches my launches.' },
   });
   const queue = new ApplyQueuePage(page);
   await queue.goto();
   const cards = queue.section(/^Ready to apply/).getByRole('article');
+  // Newest first: Initech was posted an hour ago, Hooli five.
+  await expect(cards.getByRole('heading', { level: 3 })).toHaveText([
+    'Initech: Senior Product Manager',
+    'Hooli: Senior Product Manager',
+  ]);
+  await expect(queue.job('Initech: Senior Product Manager')).toContainText(
+    /Posted \d+ (minute|hour)s? ago/,
+  );
+  const order = page.getByRole('group', { name: 'Order' });
+  await expect(order.getByRole('button', { name: 'Newest first' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await order.getByRole('button', { name: 'Best fit first' }).click();
   await expect(cards.getByRole('heading', { level: 3 })).toHaveText([
     'Hooli: Senior Product Manager',
     'Initech: Senior Product Manager',
