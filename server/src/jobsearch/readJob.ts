@@ -249,7 +249,7 @@ export async function readJob(
       };
     }
     case 'workable':
-      return readWorkable(ref, fetchBoard);
+      return readWorkable(ref, fetchBoard, fetchPage);
     case 'jobvite':
       return readJobvite(ref, fetchPage);
     default:
@@ -292,10 +292,15 @@ async function readThroughPosting(ref: JobRef, fetchPage: PageFetcher): Promise<
 }
 
 /**
- * Workable: the account's public job list has every field but the description. Workable limits
- * how often it may be read, so a refusal is common: the job then falls back to the search result.
+ * Workable: the account's public job list has every field but the description, which the job's
+ * own API (through readPostingText) adds. Workable limits how often the list may be read, so a
+ * refusal is common: the job then falls back to the search result.
  */
-async function readWorkable(ref: JobRef, fetchBoard: PageFetcher): Promise<JobDetails> {
+async function readWorkable(
+  ref: JobRef,
+  fetchBoard: PageFetcher,
+  fetchPage: PageFetcher,
+): Promise<JobDetails> {
   const board = await readJson(
     fetchBoard,
     `https://apply.workable.com/api/v1/widget/accounts/${ref.board}`,
@@ -306,6 +311,8 @@ async function readWorkable(ref: JobRef, fetchBoard: PageFetcher): Promise<JobDe
   const details = job ? fromWorkable(board, job) : null;
   if (!job || !details?.role) throw new JobReadError('workable: no such job', true);
   const apply = fieldOf(job, 'application_url');
+  // The text is a second read; a job is still usable without it.
+  const text = await readPostingText(ref.link, fetchPage).catch(() => '');
   return {
     company: details.company ?? companyFromSlug(ref.board),
     role: details.role,
@@ -315,9 +322,9 @@ async function readWorkable(ref: JobRef, fetchBoard: PageFetcher): Promise<JobDe
     country: stringOf(fieldOf(job, 'country')),
     applyLink:
       typeof apply === 'string' && apply.startsWith('https://') ? apply : `${ref.link}apply/`,
-    text: '',
+    text,
     questions: null,
-    salary: null,
+    salary: text ? salaryInText(text) : null,
   };
 }
 

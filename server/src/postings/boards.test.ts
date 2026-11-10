@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { BOARDS } from './boards';
+import { BOARDS, zohoDay } from './boards';
 import { dayOf, locationOf, salaryInText, workModeOf } from './details';
 import { FetchError, type PageFetcher } from './fetchPage';
 import { previewPosting } from './preview';
@@ -107,68 +107,108 @@ describe('reading a posting link on each job board', () => {
     ]);
   });
 
-  it('Zoho Recruit: no JobPosting data, so the job array its page script is drawn from is read', async () => {
+  describe('Zoho Recruit: no JobPosting data on its pages', () => {
     const page = 'https://quoris.zohorecruit.com/jobs/Careers/837266000007382093';
-    const fetcher = pages({ [page]: fixture('zoho-job-page.html') });
+    const list =
+      'https://quoris.zohorecruit.com/recruit/v2/public/Job_Openings?pagename=Careers&source=CareerSite';
     const link = `${page}/Healthcare-QA-Testing-Lead?source=CareerSite`;
-    expect(await previewPosting(link, fetcher)).toEqual({
-      jobLink: link,
-      company: 'Quoris, LLC',
-      role: 'Healthcare QA Testing Lead',
-      salaryMin: null,
-      salaryMax: null,
-      salaryCurrency: null,
-      location: null,
-      workMode: 'Remote',
-      postedOn: '2026-10-30',
+
+    it('reads the public job list, and the page’s script for the company and exact date', async () => {
+      const fetcher = pages({
+        [page]: fixture('zoho-job-page.html'),
+        [list]: fixture('zoho-job-list.json'),
+      });
+      expect(await previewPosting(link, fetcher)).toEqual({
+        jobLink: link,
+        company: 'Quoris, LLC',
+        role: 'Healthcare QA Testing Lead',
+        salaryMin: null,
+        salaryMax: null,
+        salaryCurrency: null,
+        location: null,
+        workMode: 'Remote',
+        postedOn: '2026-10-30',
+      });
+      expect(fetcher.asked.sort()).toEqual([list, page].sort());
     });
-    expect(fetcher.asked).toEqual([page]);
-  });
 
-  it('Zoho Recruit: a salary and a place, when the job gives them', async () => {
-    const page = 'https://quoris.zohorecruit.com/jobs/Careers/837266000007382093';
-    const filled = fixture('zoho-job-page.html')
-      .replace('\\x22Salary\\x22:null', '\\x22Salary\\x22:\\x22$95,000 - $120,000\\x22')
-      .replace('\\x22City\\x22:null', '\\x22City\\x22:\\x22Austin\\x22')
-      .replace('\\x22State\\x22:null', '\\x22State\\x22:\\x22Texas\\x22')
-      .replace('\\x22Remote_Job\\x22:true', '\\x22Remote_Job\\x22:false');
-    expect(await previewPosting(page, pages({ [page]: filled }))).toMatchObject({
-      salaryMin: 95000,
-      salaryMax: 120000,
-      salaryCurrency: 'USD',
-      location: 'Austin, Texas',
-      workMode: null,
+    it('still fills from the list when the page cannot be read (pages can pass 2 MB)', async () => {
+      expect(
+        await previewPosting(link, pages({ [list]: fixture('zoho-job-list.json') })),
+      ).toMatchObject({
+        company: null,
+        role: 'Healthcare QA Testing Lead',
+        workMode: 'Remote',
+        postedOn: '2026-10-30', // the list's 10/30/2026, month first on zohorecruit.com
+      });
+    });
+
+    it('a salary and a place, when the job gives them', async () => {
+      const filled = fixture('zoho-job-page.html')
+        .replace('\\x22Salary\\x22:null', '\\x22Salary\\x22:\\x22$95,000 - $120,000\\x22')
+        .replace('\\x22City\\x22:null', '\\x22City\\x22:\\x22Austin\\x22')
+        .replace('\\x22State\\x22:null', '\\x22State\\x22:\\x22Texas\\x22')
+        .replace('\\x22Remote_Job\\x22:true', '\\x22Remote_Job\\x22:false');
+      const listed = fixture('zoho-job-list.json').replace(
+        /"Remote_Job": "Yes"/g,
+        '"Remote_Job": "No"',
+      );
+      expect(await previewPosting(page, pages({ [page]: filled, [list]: listed }))).toMatchObject({
+        salaryMin: 95000,
+        salaryMax: 120000,
+        salaryCurrency: 'USD',
+        location: 'Austin, Texas',
+        workMode: null,
+      });
+    });
+
+    it('says nothing for a job the portal does not list', async () => {
+      const gone = 'https://quoris.zohorecruit.com/jobs/Careers/837266000000000001';
+      await expect(
+        previewPosting(
+          gone,
+          pages({ [gone]: fixture('zoho-job-page.html'), [list]: fixture('zoho-job-list.json') }),
+        ),
+      ).rejects.toMatchObject({ code: 'no_posting_data' });
+    });
+
+    it('reads the list’s dates in either order, guessing only where Zoho’s default applies', () => {
+      expect(zohoDay('2026-10-30', false)).toBe('2026-10-30');
+      expect(zohoDay('10/30/2026', false)).toBe('2026-10-30');
+      expect(zohoDay('30/10/2026', true)).toBe('2026-10-30');
+      expect(zohoDay('10/09/2026', true)).toBe('2026-10-09');
+      expect(zohoDay('10/09/2026', false)).toBeNull();
+      expect(zohoDay('13/13/2026', true)).toBeNull();
     });
   });
 
-  it('Zoho Recruit: a page whose job array lacks the linked job says nothing', async () => {
-    const page = 'https://quoris.zohorecruit.com/jobs/Careers/837266000000000001';
-    await expect(
-      previewPosting(page, pages({ [page]: fixture('zoho-job-page.html') })),
-    ).rejects.toMatchObject({ code: 'no_posting_data' });
-  });
-
-  it('Workable: the page is drawn by script, so the account’s public job list is read', async () => {
+  it('Workable: the page is drawn by script, so the job’s own API and the account list are read', async () => {
+    const job = 'https://apply.workable.com/api/v1/accounts/huggingface/jobs/81B46579FE';
     const list = 'https://apply.workable.com/api/v1/widget/accounts/huggingface';
-    const fetcher = pages({ [list]: searchFixture('workable-account.json') });
-    const link = 'https://apply.workable.com/huggingface/j/19a136f8e2/';
+    const fetcher = pages({
+      [job]: fixture('workable-job.json'),
+      [list]: searchFixture('workable-account.json'),
+    });
+    const link = 'https://apply.workable.com/huggingface/j/81b46579fe/';
     expect(await previewPosting(link, fetcher)).toEqual({
       jobLink: link,
       company: 'Hugging Face',
-      role: 'Open-Source Machine Learning Engineer - US Remote',
+      role: 'Open-Source Machine Learning Engineer - EMEA Remote',
       salaryMin: null,
       salaryMax: null,
       salaryCurrency: null,
-      location: expect.stringMatching(/United States$/) as unknown,
+      location: 'Paris, Île-de-France, France',
       workMode: 'Remote',
       postedOn: '2026-05-29',
     });
-    expect(fetcher.asked).toEqual([list]);
 
-    // A job no longer in the list says nothing.
-    await expect(
-      previewPosting('https://apply.workable.com/huggingface/j/000000AAAA/', fetcher),
-    ).rejects.toMatchObject({ code: 'no_posting_data' });
+    // The list is rate-limited: without it, all but the company still fills.
+    expect(
+      await previewPosting(link, pages({ [job]: fixture('workable-job.json') })),
+    ).toMatchObject({
+      company: null,
+      role: 'Open-Source Machine Learning Engineer - EMEA Remote',
+    });
   });
 
   it('Jobvite: no API and no JobPosting data, so the page’s own markup is read', async () => {

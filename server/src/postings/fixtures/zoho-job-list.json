@@ -1,0 +1,46 @@
+{
+  "code": "success",
+  "data": [
+    {
+      "Remote_Job": "Yes",
+      "Posting_Title": "Senior Systems Administrator",
+      "Is_Locked": false,
+      "City": "",
+      "Industry": "Health Care",
+      "Job_Description": "Senior Systems Administrator Start Date: December 1, 2026 Duration: Full-Time, Permanent Daily Working Hours: Full-Time Travel: Remote Work Authorization: Must be eligible to work in the U.S. without company sponsorship No Third Parties Please Salary: $95,000 – $112,000 Scope Quoris is seeking a Sen",
+      "Work_Experience": "4-5 years",
+      "Job_Type": "Permanent",
+      "Job_Opening_Name": "Senior Systems Administrator",
+      "State": "",
+      "Country": "",
+      "$url": "https://quoris.zohorecruit.com/jobs/Careers/837266000007292143/Senior-Systems-Administrator?source=CareerSite",
+      "Zip_Code": "",
+      "id": "837266000007292143",
+      "Publish": true,
+      "Date_Opened": "10/20/2026",
+      "Keep_on_Career_Site": false
+    },
+    {
+      "Remote_Job": "Yes",
+      "Posting_Title": "Healthcare QA Testing Lead",
+      "Is_Locked": false,
+      "City": "",
+      "Industry": "Health Care",
+      "Job_Description": "Healthcare QA Testing Lead Start Date: ASAP Duration: Through March 2027; possible extension Daily Working Hours: Full-Time Travel: Primarily remote; occasional onsite up to 15% Work Authorization: Must be eligible to work in the U.S. without company sponsorship No Third Parties Please Project Scope We are seeking a Healthcare Analytics QA Lead to co-own internal testing and client user acceptance testing for a Contract Performance Analytics Platform built on Exasol and Tableau. The platform integrates Epic, CMS, and payer claims data to deliver eight operational dashboards supporting an MSSP ACO, employee health plan, and Medicare Advantage and commercial value-based care contracts. Key milestones include a beta release and client UAT in January 2027 and full MVP go-live on March 1, 2027. Position Summary This is a hands-on QA lead role for a healthcare data professional who can ensure every dashboard number ties back to source claims and clinical data. You will own the quality assurance approach end to end — drafting and executing test scripts, leading UIT and UAT kickoffs, managing defect triage, and reporting go-live readiness to the PMO. Financial reconciliation to within ±3% of source claims is a hard deliverable of this engagement. Key Responsibilities Own the quality assurance approach; review and execute test cases and scripts in JIRA that trace back to requirements. Define and run the ±3% financial reconciliation test covering total cost of care, PMPM, benchmarks, and projections. Validate data pipelines, Exasol transformations, and Tableau dashboards for accuracy, completeness, and filter logic. Test role-based access controls, restricted data sets, and PHI audit logging. Coordinate client UAT testers; lead defect triage and maintain a 72-hour turnaround standard. Report test progress, defect trends, and go-live readiness to the PMO. Qualifications 5+ years of QA/testing experience, including 2+ years leading testing on data or BI projects. Healthcare data experience with claims, eligibility, or EHR data. Strong SQL skills for data validation and reconciliation. Experience running UAT and managing defects in JIRA. Bachelor’s degree or equivalent experience. Preferred Qualifications Experience with value-based care analytics including MSSP/ACO, Medicare Advantage, or total cost of care. Tableau dashboard testing experience; Exasol or comparable analytical database experience. Familiarity with HEDIS or eCQM quality measures. Ideal Candidate Profile Methodical, numbers-first QA professional who won’t sign off until the data ties. Experienced running both internal testing and client-facing UAT in a healthcare data environment. Comfortable holding a 72-hour defect turnaround standard and escalating blockers to the PMO early. SQL-fluent and able to trace a dashboard figure back through transformations to source claims independently. Clear communicator who can translate test status and defect risk into terms project leadership can act on. When working with Quoris as a consultant, you are eligible for competitive benefits including Health, Dental, Vision, 401k, and a great culture/working environment. #LI-JG1 #LI-Remote",
+      "Work_Experience": "5+ years",
+      "Job_Type": "Contract",
+      "Job_Opening_Name": "Healthcare QA Testing Lead",
+      "State": "",
+      "Country": "",
+      "$url": "https://quoris.zohorecruit.com/jobs/Careers/837266000007382093/Healthcare-QA-Testing-Lead?source=CareerSite",
+      "Zip_Code": "",
+      "id": "837266000007382093",
+      "Publish": true,
+      "Date_Opened": "10/30/2026",
+      "Keep_on_Career_Site": false
+    }
+  ],
+  "info": {
+    "page_name": "Careers"
+  }
+}

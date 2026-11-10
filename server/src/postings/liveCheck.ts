@@ -98,8 +98,7 @@ const PROBES: Probe[] = [
       const code = fieldOf(asArray(fieldOf(list, 'jobs'))[0], 'shortcode');
       return typeof code === 'string' ? `https://apply.workable.com/${company}/j/${code}/` : null;
     },
-    // Its pages are drawn by script and the app reads only the account's list, which has no text.
-    hasText: false,
+    hasText: true,
   },
   {
     board: 'Jobvite',
@@ -128,8 +127,7 @@ const PROBES: Probe[] = [
         ? `https://${company}.zohorecruit.com/jobs/Careers/${id}`
         : null;
     },
-    // The description is inside the page's script, which the text reader skips.
-    hasText: false,
+    hasText: true,
   },
 ];
 

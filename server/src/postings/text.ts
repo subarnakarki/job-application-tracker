@@ -25,6 +25,9 @@ const TEXT_KEYS = new Set([
   'additionalPlain',
   'qualifications',
   'responsibilities',
+  // Workable
+  'requirements',
+  'benefits',
 ]);
 
 /** Plain text from HTML, or from HTML that was itself escaped (Greenhouse's `content`). */
@@ -102,18 +105,29 @@ export async function readPostingText(raw: string, fetchPage: PageFetcher): Prom
   if (isSignInSite(url)) throw new PreviewError('unsupported_site', url.hostname);
 
   const site = siteOf(url);
-  const page = url.toString();
-  // A board's API first, then the posting's own page. Some boards' reads are the company's whole
-  // job list (Breezy, Recruitee), whose text proseInJson drops, so the page is what has it.
-  // Workable's list is never read: it holds the company's description, not the posting's.
-  const targets =
-    site.kind === 'page' || site.kind === 'workable'
+  const page = { url: url.toString(), text: textOfBody };
+  // A board's API first, then the posting's own page (unless it is drawn by script). Reads of a
+  // company's whole job list (Breezy, Recruitee, Workable) hold no text of this posting's.
+  const sources =
+    site.kind === 'page'
       ? [page]
-      : [...new Set([...site.reads.map((read) => read.url), page])];
+      : [
+          ...site.reads.flatMap(({ url: target, text }) =>
+            text === false
+              ? []
+              : [
+                  {
+                    url: target,
+                    text: text ? (body: string) => plain(text(body) ?? '') : textOfBody,
+                  },
+                ],
+          ),
+          ...(site.pageHasText === false ? [] : [page]),
+        ].filter((source, index, all) => all.findIndex((s) => s.url === source.url) === index);
   const texts: string[] = [];
-  for (const target of targets) {
+  for (const source of sources) {
     try {
-      const text = textOfBody((await fetchPage(target)).text).trim();
+      const text = source.text((await fetchPage(source.url)).text).trim();
       // The first source with a real posting is enough; later ones would repeat it.
       if (text.length >= MIN_TEXT) {
         texts.push(text);

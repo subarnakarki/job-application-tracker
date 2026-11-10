@@ -293,11 +293,32 @@ function zohoCompany(html: string): string | null {
   return text(meta, LIMITS.company);
 }
 
-export function fromZoho(job: unknown, company: string | null): Details {
+/**
+ * A Zoho date: the page gives 2026-10-30; the public list writes it in the portal's own format
+ * (10/30/2026), which it does not name. A day over 12 settles the order; otherwise month first,
+ * Zoho's default, is assumed only on zohorecruit.com (the US data centre), else it is not guessed.
+ */
+export function zohoDay(value: unknown, monthFirst: boolean): string | null {
+  const iso = dayOf(value);
+  if (iso || typeof value !== 'string') return iso;
+  const match = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(value.trim());
+  if (!match) return null;
+  const [, a = '', b = '', year = ''] = match;
+  const [first, second] = [Number(a), Number(b)];
+  const order =
+    first > 12 ? 'dayFirst' : second > 12 ? 'monthFirst' : monthFirst ? 'monthFirst' : null;
+  if (!order) return null;
+  const [month, day] = order === 'monthFirst' ? [first, second] : [second, first];
+  return dayOf(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
+}
+
+/** One Zoho job: from the page's script (Remote_Job true) or the public list (Remote_Job "Yes"). */
+export function fromZoho(job: unknown, company: string | null, monthFirst = true): Details {
   const field = (key: string) => fieldOf(job, key);
   const salary = field('Salary');
   const description = field('Job_Description');
   const place = placeOf(job, ['City', 'State', 'Country']);
+  const remote = field('Remote_Job');
   return {
     company,
     role: text(field('Posting_Title')) ?? text(field('Job_Opening_Name')),
@@ -306,8 +327,33 @@ export function fromZoho(job: unknown, company: string | null): Details {
       (typeof salary === 'string' ? salaryInText(salary) : null) ??
       (typeof description === 'string' ? salaryInText(description) : null),
     location: locationOf([place]),
-    workMode: field('Remote_Job') === true ? 'Remote' : null,
-    postedOn: dayOf(field('Date_Opened')),
+    workMode:
+      remote === true || (typeof remote === 'string' && /^yes$/i.test(remote)) ? 'Remote' : null,
+    postedOn: zohoDay(field('Date_Opened'), monthFirst),
+  };
+}
+
+/** One job in a Zoho portal's public list, by id. */
+function zohoListJob(body: string, id: string): unknown {
+  return asArray(fieldOf(parseJson(body), 'data')).find((entry) => fieldOf(entry, 'id') === id);
+}
+
+/** One Workable job from its own public API: everything but the company, the text included. */
+export function fromWorkableJob(job: unknown): Details {
+  const places = asArray(fieldOf(job, 'locations')).map((place) =>
+    placeOf(place, ['city', 'region', 'country']),
+  );
+  const description = fieldOf(job, 'description');
+  return {
+    company: null,
+    role: text(fieldOf(job, 'title')),
+    salary: typeof description === 'string' ? salaryInText(description) : null,
+    location: locationOf(
+      places.length ? places : [placeOf(fieldOf(job, 'location'), ['city', 'region', 'country'])],
+    ),
+    workMode:
+      workModeOf(fieldOf(job, 'workplace')) ?? (fieldOf(job, 'remote') === true ? 'Remote' : null),
+    postedOn: dayOf(fieldOf(job, 'published')),
   };
 }
 
@@ -356,6 +402,12 @@ interface Read {
   /** False: if it fails, the other reads still count (it only adds, say, the salary). */
   required: boolean;
   parse: (body: string) => Partial<Details> | null;
+  /**
+   * Where the posting's text is in the body (for job fit): by default, the prose fields of a JSON
+   * answer or the page's own text. False for a read with none of this posting's text (a company's
+   * whole job list), which is then not fetched for the text at all.
+   */
+  text?: false | ((body: string) => string | null);
 }
 
 /**
@@ -364,7 +416,12 @@ interface Read {
  * hourly search reads it apart from the boards it lists.
  */
 export type Site =
-  | { kind: BoardSource | 'workday' | 'zoho' | 'workable' | 'jobvite'; reads: Read[] }
+  | {
+      kind: BoardSource | 'workday' | 'zoho' | 'workable' | 'jobvite';
+      reads: Read[];
+      /** False when the posting's page is drawn by script, so its text is not worth a read. */
+      pageHasText?: false;
+    }
   | { kind: 'page' };
 
 /** Links whose board has a public API, and what to read. Every id is validated before it is used in a URL. */
@@ -416,6 +473,7 @@ export function siteOf(url: URL): Site {
           {
             url: `https://api.ashbyhq.com/posting-api/job-board/${org}?includeCompensation=true`,
             required: false,
+            text: false,
             parse: (body) => {
               const jobs = asArray(fieldOf(parseJson(body), 'jobs'));
               const job = jobs.find((entry) => fieldOf(entry, 'id') === id);
@@ -466,6 +524,7 @@ export function siteOf(url: URL): Site {
           {
             url: `https://${breezy}.breezy.hr/json`,
             required: true,
+            text: false,
             parse: (body) => {
               const job = asArray(parseJson(body)).find((entry) => fieldOf(entry, 'id') === id);
               return job ? fromBreezy(job) : null;
@@ -489,6 +548,7 @@ export function siteOf(url: URL): Site {
         {
           url: `https://${recruitee}.recruitee.com/api/offers/`,
           required: true,
+          text: false,
           parse: (body) => {
             const offer = asArray(fieldOf(parseJson(body), 'offers')).find(
               (entry) => fieldOf(entry, 'slug') === slug,
@@ -526,37 +586,62 @@ export function siteOf(url: URL): Site {
       };
   }
   // https://acme.zohorecruit.com/jobs/Careers/837266000007382093/QA-Lead?source=CareerSite: the
-  // page itself is read, for the job data its script is drawn from.
+  // portal's public job list (small, with the text) and the page (big, drawn by script from a job
+  // array in it), which alone names the company and gives an unambiguous date.
   const zoho = /^([a-z0-9-]+)\.zohorecruit\.(com|eu|in|com\.au|jp|ca)$/.exec(host)?.[1];
   if (zoho && SUBDOMAIN.test(zoho) && parts[0] === 'jobs') {
     const [, portal, id] = parts;
-    if (portal && id && SLUG.test(portal) && /^\d{6,25}$/.test(id))
+    if (portal && id && SLUG.test(portal) && /^\d{6,25}$/.test(id)) {
+      const monthFirst = host.endsWith('.zohorecruit.com');
       return {
         kind: 'zoho',
+        pageHasText: false,
         reads: [
           {
             url: `https://${host}/jobs/${portal}/${id}`,
-            required: true,
+            required: false,
+            text: false,
             parse: (body) => {
               const posting = zohoJobs(body).find((entry) => fieldOf(entry, 'id') === id);
               return posting ? fromZoho(posting, zohoCompany(body)) : null;
             },
           },
+          {
+            url: `https://${host}/recruit/v2/public/Job_Openings?pagename=${portal}&source=CareerSite`,
+            required: true,
+            parse: (body) => {
+              const posting = zohoListJob(body, id);
+              return posting ? fromZoho(posting, null, monthFirst) : null;
+            },
+            text: (body) => {
+              const description = fieldOf(zohoListJob(body, id), 'Job_Description');
+              return typeof description === 'string' ? description : null;
+            },
+          },
         ],
       };
+    }
   }
-  // https://apply.workable.com/acme/j/ABC123/: the page is drawn by script; the account's public
-  // list has the job (a /j/ABC123 link without the account cannot be read this way).
+  // https://apply.workable.com/acme/j/ABC123/: the page is drawn by script. The job's own public
+  // API has all but the company, which the account's list (rate-limited, so optional) names. A
+  // /j/ABC123 link without the account cannot be read this way.
   if (host === 'apply.workable.com') {
     const [account, kind, code] = parts;
     if (account && kind === 'j' && code && SLUG.test(account) && /^[A-Z0-9]{6,20}$/i.test(code)) {
       const shortcode = code.toUpperCase();
       return {
         kind: 'workable',
+        pageHasText: false,
         reads: [
           {
-            url: `https://apply.workable.com/api/v1/widget/accounts/${account}`,
+            url: `https://apply.workable.com/api/v1/accounts/${account}/jobs/${shortcode}`,
             required: true,
+            parse: (body) => fromWorkableJob(parseJson(body)),
+          },
+          {
+            url: `https://apply.workable.com/api/v1/widget/accounts/${account}`,
+            required: false,
+            text: false,
             parse: (body) => {
               const list = parseJson(body);
               const posting = asArray(fieldOf(list, 'jobs')).find(

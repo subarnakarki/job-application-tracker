@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { FetchError, type PageFetcher } from './fetchPage';
 import { PreviewError } from './preview';
@@ -113,6 +114,37 @@ describe('posting text', () => {
     expect(await readPostingText(breezyLink, fetchPage)).toBe(PROSE.trim());
     expect(await readPostingText(recruiteeLink, fetchPage)).toBe(PROSE.trim());
     expect(asked).toContain(breezyLink);
+  });
+
+  it('Workable and Zoho: the text from the job’s own API, never the list or the scripted page', async () => {
+    const saved = (name: string) =>
+      readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
+    const zohoList =
+      'https://quoris.zohorecruit.com/recruit/v2/public/Job_Openings?pagename=Careers&source=CareerSite';
+    const { fetchPage, asked } = fetcher({
+      'https://apply.workable.com/api/v1/accounts/huggingface/jobs/81B46579FE':
+        saved('workable-job.json'),
+      [zohoList]: saved('zoho-job-list.json'),
+    });
+
+    const workable = await readPostingText(
+      'https://apply.workable.com/huggingface/j/81B46579FE/',
+      fetchPage,
+    );
+    expect(workable).toMatch(/^At Hugging Face, we're on a journey to democratize good AI/);
+    expect(workable).toMatch(/cover letter/); // its requirements too
+
+    const zoho = await readPostingText(
+      'https://quoris.zohorecruit.com/jobs/Careers/837266000007382093/Healthcare-QA-Testing-Lead',
+      fetchPage,
+    );
+    expect(zoho).toMatch(/^Healthcare QA Testing Lead Start Date: ASAP/);
+    expect(zoho).not.toMatch(/Senior Systems Administrator/); // the other listed job
+
+    expect(asked).toEqual([
+      'https://apply.workable.com/api/v1/accounts/huggingface/jobs/81B46579FE',
+      zohoList,
+    ]);
   });
 
   it('reads a plain careers page', async () => {
