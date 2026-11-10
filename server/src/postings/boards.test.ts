@@ -104,6 +104,47 @@ describe('reading a posting link on each job board', () => {
     ]);
   });
 
+  it('Zoho Recruit: no JobPosting data, so the job array its page script is drawn from is read', async () => {
+    const page = 'https://quoris.zohorecruit.com/jobs/Careers/837266000007382093';
+    const fetcher = pages({ [page]: fixture('zoho-job-page.html') });
+    const link = `${page}/Healthcare-QA-Testing-Lead?source=CareerSite`;
+    expect(await previewPosting(link, fetcher)).toEqual({
+      jobLink: link,
+      company: 'Quoris, LLC',
+      role: 'Healthcare QA Testing Lead',
+      salaryMin: null,
+      salaryMax: null,
+      salaryCurrency: null,
+      location: null,
+      workMode: 'Remote',
+      postedOn: '2026-10-30',
+    });
+    expect(fetcher.asked).toEqual([page]);
+  });
+
+  it('Zoho Recruit: a salary and a place, when the job gives them', async () => {
+    const page = 'https://quoris.zohorecruit.com/jobs/Careers/837266000007382093';
+    const filled = fixture('zoho-job-page.html')
+      .replace('\\x22Salary\\x22:null', '\\x22Salary\\x22:\\x22$95,000 - $120,000\\x22')
+      .replace('\\x22City\\x22:null', '\\x22City\\x22:\\x22Austin\\x22')
+      .replace('\\x22State\\x22:null', '\\x22State\\x22:\\x22Texas\\x22')
+      .replace('\\x22Remote_Job\\x22:true', '\\x22Remote_Job\\x22:false');
+    expect(await previewPosting(page, pages({ [page]: filled }))).toMatchObject({
+      salaryMin: 95000,
+      salaryMax: 120000,
+      salaryCurrency: 'USD',
+      location: 'Austin, Texas',
+      workMode: null,
+    });
+  });
+
+  it('Zoho Recruit: a page whose job array lacks the linked job says nothing', async () => {
+    const page = 'https://quoris.zohorecruit.com/jobs/Careers/837266000000000001';
+    await expect(
+      previewPosting(page, pages({ [page]: fixture('zoho-job-page.html') })),
+    ).rejects.toMatchObject({ code: 'no_posting_data' });
+  });
+
   it('Greenhouse: title, company, place, posting date and a yearly salary (in cents)', async () => {
     const job = JSON.parse(fixture('greenhouse-job-pay.json')) as { id: number };
     const fetch = pages({

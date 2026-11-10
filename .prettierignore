@@ -7,3 +7,5 @@ package-lock.json
 build
 api/index.ts
 docs/openapi.json
+# Saved as Zoho serves it: formatting would rewrite the escaped JS string the reader parses
+server/src/postings/fixtures/zoho-job-page.html

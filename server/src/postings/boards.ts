@@ -266,6 +266,52 @@ export function fromWorkday(body: unknown): Details {
   };
 }
 
+/** The text of a single-quoted JavaScript string literal's body, escapes decoded. */
+function jsStringText(body: string): string {
+  const named: Record<string, string> = { n: '\n', r: '\r', t: '\t', b: '\b', f: '\f', v: '\v' };
+  return body.replace(/\\(x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|[\s\S])/g, (_, escape: string) =>
+    escape.length > 1
+      ? String.fromCharCode(parseInt(escape.slice(1), 16))
+      : (named[escape] ?? escape),
+  );
+}
+
+/**
+ * The jobs a Zoho Recruit page is drawn from: its pages carry no JobPosting data, only a script
+ * line `var jobs = JSON.parse('[{…}]')` with the posting's fields.
+ */
+export function zohoJobs(html: string): unknown[] {
+  const literal = /\bjobs\s*=\s*JSON\.parse\('((?:[^'\\]|\\[\s\S])*)'\)/.exec(html)?.[1];
+  return literal === undefined ? [] : asArray(parseJson(jsStringText(literal)));
+}
+
+/** The company is not in the job data, but the page names it as the site. */
+function zohoCompany(html: string): string | null {
+  const meta = /<meta\s+property="og:site_name"\s+content="([^"]*)"/i.exec(html)?.[1];
+  return text(meta, LIMITS.company);
+}
+
+export function fromZoho(job: unknown, company: string | null): Details {
+  const field = (key: string) => fieldOf(job, key);
+  const salary = field('Salary');
+  const description = field('Job_Description');
+  const place = ['City', 'State', 'Country']
+    .map(field)
+    .filter((part): part is string => typeof part === 'string' && part.trim() !== '')
+    .join(', ');
+  return {
+    company,
+    role: text(field('Posting_Title')) ?? text(field('Job_Opening_Name')),
+    // Zoho's salary is free text ("$90,000 - $110,000"); the description may say it instead.
+    salary:
+      (typeof salary === 'string' ? salaryInText(salary) : null) ??
+      (typeof description === 'string' ? salaryInText(description) : null),
+    location: locationOf([place]),
+    workMode: field('Remote_Job') === true ? 'Remote' : null,
+    postedOn: dayOf(field('Date_Opened')),
+  };
+}
+
 // ---------- Reading a posting link ----------
 
 /** A request to make for a link, and how to read what comes back. */
@@ -276,8 +322,11 @@ interface Read {
   parse: (body: string) => Partial<Details> | null;
 }
 
-/** Workday has a public API for one posting, but none that lists a company's jobs by name. */
-export type Site = { kind: BoardSource | 'workday'; reads: Read[] } | { kind: 'page' };
+/**
+ * Workday has a public API for one posting, but none that lists a company's jobs by name; Zoho
+ * Recruit has only the posting's own page.
+ */
+export type Site = { kind: BoardSource | 'workday' | 'zoho'; reads: Read[] } | { kind: 'page' };
 
 /** Links whose board has a public API, and what to read. Every id is validated before it is used in a URL. */
 export function siteOf(url: URL): Site {
@@ -433,6 +482,26 @@ export function siteOf(url: URL): Site {
             url: `https://${host}/wday/cxs/${workday}/${siteName}/job/${path.join('/')}`,
             required: true,
             parse: (body) => fromWorkday(parseJson(body)),
+          },
+        ],
+      };
+  }
+  // https://acme.zohorecruit.com/jobs/Careers/837266000007382093/QA-Lead?source=CareerSite: the
+  // page itself is read, for the job data its script is drawn from.
+  const zoho = /^([a-z0-9-]+)\.zohorecruit\.(com|eu|in|com\.au|jp|ca)$/.exec(host)?.[1];
+  if (zoho && SUBDOMAIN.test(zoho) && parts[0] === 'jobs') {
+    const [, portal, id] = parts;
+    if (portal && id && SLUG.test(portal) && /^\d{6,25}$/.test(id))
+      return {
+        kind: 'zoho',
+        reads: [
+          {
+            url: `https://${host}/jobs/${portal}/${id}`,
+            required: true,
+            parse: (body) => {
+              const posting = zohoJobs(body).find((entry) => fieldOf(entry, 'id') === id);
+              return posting ? fromZoho(posting, zohoCompany(body)) : null;
+            },
           },
         ],
       };
