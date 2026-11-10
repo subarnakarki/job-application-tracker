@@ -87,6 +87,8 @@ const IdParams = z.object({ id: z.string() });
 const CronResultSchema = z.strictObject({
   started: z.number().int().min(0),
   drafted: z.number().int().min(0),
+  /** Users whose turn ended in an error (logged); the others still ran. */
+  failed: z.number().int().min(0),
 });
 
 export interface JobSearchRouteDeps {
@@ -731,15 +733,16 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
       const deadline = started + RUN_BUDGET_MS;
       let runs = 0;
       let drafted = 0;
-      for (const userId of allowedUserIds(deps.env)) {
-        if (Date.now() >= deadline) break;
+      let failed = 0;
+      /** One user's turn: the still-open check, then a due run or drafting. */
+      const forUser = async (userId: string): Promise<'stop' | undefined> => {
         const owner = await db.query<{ time_zone: string; is_demo: boolean }>(
           'select time_zone, is_demo from users where id = $1',
           [userId],
         );
         const row = owner.rows[0];
         const saved = row && !row.is_demo ? await getProfile(db, userId) : null;
-        if (!row || !saved || !(await getResumeText(db, userId))) continue;
+        if (!row || !saved || !(await getResumeText(db, userId))) return undefined;
         const { profile } = saved;
         // About once a day per job, before anything is drafted: closed jobs leave the queue.
         await checkOpenJobs(searchDeps(db, claude), userId, {
@@ -752,30 +755,40 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
         const due =
           profile.scheduleOn &&
           isRunDue(profile, row.time_zone, now, past.lastDoneDay, past.triesToday);
-        if (due) {
-          const allowedToday = await consumeRateLimit(
-            db,
-            rateLimitKey(ALL_RUNS_RULE.name, 'all'),
-            ALL_RUNS_RULE,
-            deps.clock.now(),
-          );
-          if (allowedToday.allowed) {
-            const result = await runJobSearch(
-              searchDeps(db, claude),
-              { userId, timeZone: row.time_zone },
-              profile,
-              'schedule',
-              deadline,
-            );
-            if (result.kind === 'done') runs += 1;
-            if (result.kind === 'unavailable') break;
-          }
-        } else {
+        if (!due) {
           drafted += await draftPending(searchDeps(db, claude), userId, profile, deadline);
+          return undefined;
+        }
+        const allowedToday = await consumeRateLimit(
+          db,
+          rateLimitKey(ALL_RUNS_RULE.name, 'all'),
+          ALL_RUNS_RULE,
+          deps.clock.now(),
+        );
+        if (!allowedToday.allowed) return undefined;
+        const result = await runJobSearch(
+          searchDeps(db, claude),
+          { userId, timeZone: row.time_zone },
+          profile,
+          'schedule',
+          deadline,
+        );
+        if (result.kind === 'done') runs += 1;
+        // A rejected key fails every user alike: stop here.
+        return result.kind === 'unavailable' ? 'stop' : undefined;
+      };
+      for (const userId of allowedUserIds(deps.env)) {
+        if (Date.now() >= deadline) break;
+        try {
+          if ((await forUser(userId)) === 'stop') break;
+        } catch (error) {
+          // One user's failure (its run is already marked failed) never stops the others.
+          failed += 1;
+          request.log.error({ err: error, userId }, 'job search schedule: a user failed');
         }
       }
-      request.log.info({ runs, drafted }, 'job search schedule');
-      return { started: runs, drafted };
+      request.log.info({ runs, drafted, failed }, 'job search schedule');
+      return { started: runs, drafted, failed };
     },
   );
 }

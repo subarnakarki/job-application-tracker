@@ -19,13 +19,13 @@ import {
   type TailorAnswer,
 } from '@jat/shared';
 import type { LightMyRequestResponse } from 'fastify';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { JobSearchClaude, TailorRequest } from '../jobsearch/claude';
 import { FetchError, type PageFetcher } from '../postings/fetchPage';
 import { createTestApp, SAME_ORIGIN, T0, type TestApp } from '../test/app';
 import { TEST_DATABASE_URL } from '../test/testDb';
 import { getHit } from '../repo/jobSearch';
-import { CHECK_RULE, MANUAL_RUN_RULE, TAILOR_RULE } from './jobSearch';
+import { CHECK_RULE, MANUAL_RUN_RULE, RUN_BUDGET_MS, TAILOR_RULE } from './jobSearch';
 
 const MISSING_ID = '00000000-0000-4000-8000-000000000000';
 const CRON_SECRET = 'cron-secret-for-tests-0123456789abcdef';
@@ -87,6 +87,10 @@ interface StubClaude extends JobSearchClaude {
   draftsFail: boolean;
   /** Every search throws (not an API error): the run fails. */
   searchFails: boolean;
+  /** The next this many searches throw, then they work again. */
+  searchFailuresLeft: number;
+  /** Called inside each search, with the deadline it was given. */
+  onSearch: ((deadline: number | undefined) => void) | null;
   /** The posting keywords every draft returns. */
   keywords: string[];
   /** What "Tailor my resume" answers, and what it was asked. */
@@ -100,6 +104,8 @@ const claude: StubClaude = {
   drafts: 0,
   draftsFail: false,
   searchFails: false,
+  searchFailuresLeft: 0,
+  onSearch: null,
   keywords: [],
   tailorAnswer: null,
   tailorRequests: [],
@@ -110,9 +116,19 @@ const claude: StubClaude = {
   // Lead messages are tested in leadMessages.test.ts.
   leadMessage: () => Promise.resolve(null),
   tailorPosting: () => Promise.resolve(null),
-  search(query: string, sources: SearchSource[]) {
+  search(
+    query: string,
+    sources: SearchSource[],
+    _days: number,
+    _usOnly?: boolean,
+    deadline?: number,
+  ) {
     claude.searches.push({ query, sources });
-    if (claude.searchFails) return Promise.reject(new Error('the search broke'));
+    claude.onSearch?.(deadline);
+    if (claude.searchFails || claude.searchFailuresLeft > 0) {
+      claude.searchFailuresLeft = Math.max(0, claude.searchFailuresLeft - 1);
+      return Promise.reject(new Error('the search broke'));
+    }
     return Promise.resolve({
       links: [...claude.links, 'https://job-boards.greenhouse.io/acme', 'https://evil.example/x'],
       results: {
@@ -208,6 +224,9 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
   afterAll(async () => {
     await t.close();
   });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
   beforeEach(async () => {
     claude.links = [101, 102, 103, 104].map(jobLink);
     claude.results = {};
@@ -215,6 +234,8 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
     claude.drafts = 0;
     claude.draftsFail = false;
     claude.searchFails = false;
+    claude.searchFailuresLeft = 0;
+    claude.onSearch = null;
     claude.keywords = [];
     claude.tailorAnswer = null;
     claude.tailorRequests = [];
@@ -1208,6 +1229,30 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
     });
   });
 
+  describe('the time budget', () => {
+    it('stops searching at the deadline and still finishes the run with what it found', async () => {
+      const { cookie } = await member();
+      await send('PUT', '/api/job-search/profile', cookie, {
+        ...PROFILE,
+        queries: ['"product manager"', '"engineering manager"'],
+      });
+      const deadlines: (number | undefined)[] = [];
+      claude.onSearch = (deadline) => {
+        deadlines.push(deadline);
+        // The first search uses up the whole budget.
+        vi.setSystemTime(Date.now() + RUN_BUDGET_MS + 1_000);
+      };
+      const before = Date.now();
+
+      const detail = runOf(await run(cookie));
+
+      expect(claude.searches).toHaveLength(1);
+      expect(deadlines[0]).toBeGreaterThan(before);
+      expect(deadlines[0]).toBeLessThanOrEqual(before + RUN_BUDGET_MS + 50);
+      expect(detail.run.status).toBe('done');
+    });
+  });
+
   describe('the hourly schedule', () => {
     const cron = (secret?: string) =>
       t.app.inject({
@@ -1231,8 +1276,8 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
       // 13:30 UTC is 08:30 in New York: past the 8:00 run hour.
       t.clock.set(new Date('2026-11-05T13:30:00Z'));
 
-      expect((await cron(CRON_SECRET)).json()).toEqual({ started: 1, drafted: 0 });
-      expect((await cron(CRON_SECRET)).json()).toEqual({ started: 0, drafted: 0 });
+      expect((await cron(CRON_SECRET)).json()).toEqual({ started: 1, drafted: 0, failed: 0 });
+      expect((await cron(CRON_SECRET)).json()).toEqual({ started: 0, drafted: 0, failed: 0 });
 
       const runs = await send('GET', '/api/job-search/runs', cookie);
       expect(
@@ -1264,6 +1309,22 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
       expect((await statuses())[0]).toBe('done');
     });
 
+    it('keeps going for the next user when one user’s turn fails', async () => {
+      env['JOB_SEARCH_USER_IDS'] = '';
+      await member();
+      const second = await member();
+      t.clock.set(new Date('2026-11-05T13:30:00Z')); // 08:30 in New York: both are due
+      // The default setup has one query: the first user's only search throws.
+      claude.searchFailuresLeft = 1;
+      const response = await cron(CRON_SECRET);
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ started: 1, drafted: 0, failed: 1 });
+      const runs = await send('GET', '/api/job-search/runs', second.cookie);
+      expect(runs.json<{ items: { status: string }[] }>().items.map((item) => item.status)).toEqual(
+        ['done'],
+      );
+    });
+
     it('checks waiting jobs about once a day, closing the gone ones', async () => {
       env['JOB_SEARCH_USER_IDS'] = '';
       const { cookie } = await member();
@@ -1281,11 +1342,11 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
       env['JOB_SEARCH_USER_IDS'] = '';
       const { cookie } = await member();
       t.clock.set(new Date('2026-11-05T12:30:00Z')); // 07:30 in New York
-      expect((await cron(CRON_SECRET)).json()).toEqual({ started: 0, drafted: 0 });
+      expect((await cron(CRON_SECRET)).json()).toEqual({ started: 0, drafted: 0, failed: 0 });
 
       await send('PUT', '/api/job-search/profile', cookie, { ...PROFILE, scheduleOn: false });
       t.clock.set(new Date('2026-11-05T15:00:00Z'));
-      expect((await cron(CRON_SECRET)).json()).toEqual({ started: 0, drafted: 0 });
+      expect((await cron(CRON_SECRET)).json()).toEqual({ started: 0, drafted: 0, failed: 0 });
     });
   });
 });

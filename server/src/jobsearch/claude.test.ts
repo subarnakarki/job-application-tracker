@@ -6,6 +6,7 @@ import {
   claudeJobSearch,
   renderDraftRequest,
   renderTailorRequest,
+  MIN_SEARCH_TURN_MS,
   SEARCHES_PER_QUERY,
   TAILOR_PROMPT,
   LEAD_MESSAGE_PROMPT,
@@ -15,7 +16,7 @@ import {
 } from './claude';
 
 /** The real SDK, with the network replaced by canned Messages API answers, one per request. */
-function claudeAnswering(answers: { status: number; body: unknown }[]) {
+function claudeAnswering(answers: { status: number; body: unknown }[], delayMs = 0) {
   const usage: UsageEntry[] = [];
   const record = (entry: UsageEntry) => {
     usage.push(entry);
@@ -30,12 +31,14 @@ function claudeAnswering(answers: { status: number; body: unknown }[]) {
         JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as Record<string, unknown>,
       );
       const answer = answers[requests.length - 1] ?? answers.at(-1);
-      return Promise.resolve(
+      const respond = () =>
         new Response(JSON.stringify(answer?.body), {
           status: answer?.status ?? 500,
           headers: { 'content-type': 'application/json' },
-        }),
-      );
+        });
+      return delayMs
+        ? new Promise<Response>((resolve) => setTimeout(() => resolve(respond()), delayMs))
+        : Promise.resolve(respond());
     },
   });
   return { claude: claudeJobSearch(client, record), requests, usage };
@@ -129,6 +132,27 @@ describe('claudeJobSearch.search', () => {
     expect(requests).toHaveLength(4);
     expect(outcome.searches).toBe(4);
     expect((requests[1]?.['messages'] as unknown[]).length).toBe(2);
+  });
+
+  it('starts no turn once too little time is left before the deadline', async () => {
+    const paused = message('pause_turn', [results('https://jobs.lever.co/a/1')], 1);
+    const none = claudeAnswering([{ status: 200, body: paused }]);
+    expect(await none.claude.search('SDET', ['lever'], 1, false, Date.now() + 1_000)).toMatchObject(
+      { links: [], searches: 0 },
+    );
+    expect(none.requests).toHaveLength(0);
+
+    // Time for one turn only: the paused turn is not resumed.
+    const one = claudeAnswering([{ status: 200, body: paused }], 100);
+    const outcome = await one.claude.search(
+      'SDET',
+      ['lever'],
+      1,
+      false,
+      Date.now() + MIN_SEARCH_TURN_MS + 50,
+    );
+    expect(one.requests).toHaveLength(1);
+    expect(outcome.links).toEqual(['https://jobs.lever.co/a/1']);
   });
 
   it('skips a search error result, finds nothing on an API error, and stops on a bad key', async () => {

@@ -125,11 +125,14 @@ export async function runJobSearch(
     for (const query of queries) {
       const parsed = parseQuery(query);
       queryTerms.push(...parsed.terms);
+      // Out of time: the queries left are not searched; the run keeps what it found.
+      if (Date.now() >= deadline) continue;
       const found = await deps.claude.search(
         query,
         parsed.sources,
         profile.timeframeDays,
         profile.usOnly,
+        deadline,
       );
       searches += found.searches;
       for (const [link, result] of Object.entries(found.results ?? {})) {

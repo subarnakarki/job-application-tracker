@@ -80,6 +80,8 @@ export interface JobSearchClaude {
     sources: SearchSource[],
     timeframeDays: number,
     usOnly?: boolean,
+    /** Epoch ms: no turn starts after it, and a turn never waits past it. */
+    deadline?: number,
   ): Promise<SearchOutcome>;
   draft(request: DraftRequest): Promise<ModelDraft | null>;
   /** Suggested resume edits for one job; null when the answer is unusable (refused, cut off). */
@@ -284,13 +286,16 @@ function rejectBadKey(error: unknown): never | void {
 
 /** Turns a model's server-tool loop may pause; it is resumed this many times at most. */
 const MAX_CONTINUATIONS = 3;
+/** A search turn needs at least this long; with less left before the deadline, none starts. */
+export const MIN_SEARCH_TURN_MS = 15_000;
+const SEARCH_TIMEOUT_MS = 120_000;
 
 export function claudeJobSearch(
   client: Anthropic,
   record: UsageRecorder = ignoreUsage,
 ): JobSearchClaude {
   return {
-    async search(query, sources, timeframeDays, usOnly = false) {
+    async search(query, sources, timeframeDays, usOnly = false, deadline = Infinity) {
       const allowed = [...new Set(sources.flatMap((source) => SOURCE_HOSTS[source]))];
       const messages: Anthropic.Beta.BetaMessageParam[] = [
         {
@@ -309,23 +314,32 @@ export function claudeJobSearch(
       let searches = 0;
       try {
         for (let turn = 0; turn <= MAX_CONTINUATIONS; turn += 1) {
-          const response = await client.beta.messages.create({
-            model: JOB_SEARCH_MODEL,
-            max_tokens: 16_000,
-            betas: ['server-side-fallback-2026-07-01'],
-            fallbacks: 'default',
-            output_config: { effort: 'low' },
-            system: SEARCH_PROMPT,
-            tools: [
-              {
-                type: 'web_search_20260209',
-                name: 'web_search',
-                max_uses: SEARCHES_PER_QUERY,
-                allowed_domains: allowed,
-              },
-            ],
-            messages,
-          });
+          const left = deadline - Date.now();
+          if (left < MIN_SEARCH_TURN_MS) break;
+          const response = await client.beta.messages.create(
+            {
+              model: JOB_SEARCH_MODEL,
+              max_tokens: 16_000,
+              betas: ['server-side-fallback-2026-07-01'],
+              fallbacks: 'default',
+              output_config: { effort: 'low' },
+              system: SEARCH_PROMPT,
+              tools: [
+                {
+                  type: 'web_search_20260209',
+                  name: 'web_search',
+                  max_uses: SEARCHES_PER_QUERY,
+                  allowed_domains: allowed,
+                },
+              ],
+              messages,
+            },
+            // Never wait past the deadline; with less than a full timeout left, no retry either.
+            {
+              timeout: Math.min(SEARCH_TIMEOUT_MS, left),
+              ...(left < 2 * SEARCH_TIMEOUT_MS ? { maxRetries: 0 } : {}),
+            },
+          );
           await record(usageEntry('job_search', response));
           for (const content of response.content) {
             if (content.type === 'web_search_tool_result' && Array.isArray(content.content))
