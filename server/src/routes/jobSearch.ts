@@ -41,7 +41,7 @@ import {
   getHit,
   getProfile,
   getRun,
-  lastScheduledRunDay,
+  scheduledRunState,
   listAgeSkipped,
   linkHitApplication,
   listDraftedWaiting,
@@ -747,9 +747,11 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
           deadline: Math.min(deadline, Date.now() + CHECK_BUDGET_MS),
           salaryFloor: profile.salaryFloor,
         });
+        const now = deps.clock.now();
+        const past = await scheduledRunState(db, userId, localDateIn(now, row.time_zone));
         const due =
           profile.scheduleOn &&
-          isRunDue(profile, row.time_zone, deps.clock.now(), await lastScheduledRunDay(db, userId));
+          isRunDue(profile, row.time_zone, now, past.lastDoneDay, past.triesToday);
         if (due) {
           const allowedToday = await consumeRateLimit(
             db,

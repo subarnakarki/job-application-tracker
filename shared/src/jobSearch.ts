@@ -750,18 +750,25 @@ export function localClock(now: Date, timeZone: string): { weekday: number; hour
   return { weekday, hour: hour === 24 ? 0 : hour };
 }
 
+/** Scheduled runs started on one local day, finished or not: a failing run is retried this often. */
+export const MAX_SCHEDULED_TRIES_PER_DAY = 3;
+
 /**
  * Whether a scheduled run should start now. The schedule is checked every hour, so a run is due
  * from its hour onwards on a day it applies to, once per local day (a missed hour catches up).
+ * `lastDoneDay` is the last local day a scheduled run finished; a failed run does not count, so the
+ * next knock tries again, up to MAX_SCHEDULED_TRIES_PER_DAY tries (`triesToday`) that day.
  */
 export function isRunDue(
   schedule: { cadence: Cadence; runHour: number; runWeekday: number },
   timeZone: string,
   now: Date,
-  lastScheduledRunDay: string | null,
+  lastDoneDay: string | null,
+  triesToday = 0,
 ): boolean {
   const today = localDateIn(now, timeZone);
-  if (lastScheduledRunDay === today) return false;
+  if (lastDoneDay === today) return false;
+  if (triesToday >= MAX_SCHEDULED_TRIES_PER_DAY) return false;
   const { weekday, hour } = localClock(now, timeZone);
   if (hour < schedule.runHour) return false;
   if (schedule.cadence === 'weekdays') return weekday >= 1 && weekday <= 5;

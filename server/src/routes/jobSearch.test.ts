@@ -85,6 +85,8 @@ interface StubClaude extends JobSearchClaude {
   searches: { query: string; sources: SearchSource[] }[];
   drafts: number;
   draftsFail: boolean;
+  /** Every search throws (not an API error): the run fails. */
+  searchFails: boolean;
   /** The posting keywords every draft returns. */
   keywords: string[];
   /** What "Tailor my resume" answers, and what it was asked. */
@@ -97,6 +99,7 @@ const claude: StubClaude = {
   searches: [],
   drafts: 0,
   draftsFail: false,
+  searchFails: false,
   keywords: [],
   tailorAnswer: null,
   tailorRequests: [],
@@ -109,6 +112,7 @@ const claude: StubClaude = {
   tailorPosting: () => Promise.resolve(null),
   search(query: string, sources: SearchSource[]) {
     claude.searches.push({ query, sources });
+    if (claude.searchFails) return Promise.reject(new Error('the search broke'));
     return Promise.resolve({
       links: [...claude.links, 'https://job-boards.greenhouse.io/acme', 'https://evil.example/x'],
       results: {
@@ -210,6 +214,7 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
     claude.searches = [];
     claude.drafts = 0;
     claude.draftsFail = false;
+    claude.searchFails = false;
     claude.keywords = [];
     claude.tailorAnswer = null;
     claude.tailorRequests = [];
@@ -1233,6 +1238,30 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
       expect(
         runs.json<{ items: { trigger: string }[] }>().items.map((item) => item.trigger),
       ).toEqual(['schedule']);
+    });
+
+    it('retries a failed scheduled run on later knocks, at most 3 tries a day', async () => {
+      env['JOB_SEARCH_USER_IDS'] = '';
+      const { cookie } = await member();
+      const statuses = async () =>
+        (await send('GET', '/api/job-search/runs', cookie))
+          .json<{ items: { status: string }[] }>()
+          .items.map((item) => item.status);
+      claude.searchFails = true;
+      for (const [index, at] of ['13:30', '14:17', '15:17', '16:17'].entries()) {
+        t.clock.set(new Date(`2026-11-05T${at}:00Z`));
+        await cron(CRON_SECRET);
+        expect((await statuses()).length, `knock at ${at}`).toBe(Math.min(index + 1, 3));
+      }
+      expect(await statuses()).toEqual(['failed', 'failed', 'failed']);
+
+      // The next day starts fresh, and a finished run ends that day.
+      claude.searchFails = false;
+      t.clock.set(new Date('2026-11-06T13:30:00Z'));
+      expect((await cron(CRON_SECRET)).json()).toMatchObject({ started: 1 });
+      t.clock.set(new Date('2026-11-06T14:17:00Z'));
+      expect((await cron(CRON_SECRET)).json()).toMatchObject({ started: 0 });
+      expect((await statuses())[0]).toBe('done');
     });
 
     it('checks waiting jobs about once a day, closing the gone ones', async () => {

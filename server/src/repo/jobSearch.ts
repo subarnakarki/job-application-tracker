@@ -169,13 +169,23 @@ export async function finishRun(
   );
 }
 
-export async function lastScheduledRunDay(db: Queryable, userId: string): Promise<string | null> {
-  const result = await db.query<{ day: string }>(
-    `select to_char(max(local_day), 'YYYY-MM-DD') as day from job_search_runs
-      where user_id = $1 and trigger = 'schedule'`,
-    [userId],
+/**
+ * The schedule's view of past runs: the last local day a scheduled run finished (a failed one does
+ * not count), and how many scheduled runs started on `today` whatever their outcome.
+ */
+export async function scheduledRunState(
+  db: Queryable,
+  userId: string,
+  today: string,
+): Promise<{ lastDoneDay: string | null; triesToday: number }> {
+  const result = await db.query<{ day: string | null; tries: number }>(
+    `select to_char(max(local_day) filter (where status = 'done'), 'YYYY-MM-DD') as day,
+        (count(*) filter (where local_day = $2::date))::int as tries
+      from job_search_runs where user_id = $1 and trigger = 'schedule'`,
+    [userId, today],
   );
-  return result.rows[0]?.day ?? null;
+  const row = result.rows[0];
+  return { lastDoneDay: row?.day ?? null, triesToday: row?.tries ?? 0 };
 }
 
 export async function listRuns(db: Queryable, userId: string, limit = 10): Promise<JobSearchRun[]> {

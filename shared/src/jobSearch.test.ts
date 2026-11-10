@@ -23,6 +23,7 @@ import {
   EMPTY_MORE_ANSWERS,
   googleSearchUrl,
   isRunDue,
+  MAX_SCHEDULED_TRIES_PER_DAY,
   JobSearchProfileSchema,
   jobRefOf,
   locationVerdict,
@@ -364,6 +365,27 @@ describe('isRunDue', () => {
     expect(isRunDue(schedule, 'America/New_York', new Date('2026-11-06T20:00:00Z'), null)).toBe(
       true,
     );
+  });
+
+  it('retries a failed run the same day, at most MAX_SCHEDULED_TRIES_PER_DAY tries', () => {
+    // The last finished run was yesterday; today's tries so far failed.
+    for (let tries = 0; tries < MAX_SCHEDULED_TRIES_PER_DAY; tries += 1)
+      expect(isRunDue(schedule, 'America/New_York', friday0830, '2026-11-05', tries)).toBe(true);
+    expect(
+      isRunDue(schedule, 'America/New_York', friday0830, '2026-11-05', MAX_SCHEDULED_TRIES_PER_DAY),
+    ).toBe(false);
+    // A finished run today ends the day whatever the tries.
+    expect(isRunDue(schedule, 'America/New_York', friday0830, '2026-11-06', 1)).toBe(false);
+    // The weekly run is retried on its day after a failure too.
+    expect(
+      isRunDue(
+        { ...schedule, cadence: 'weekly', runWeekday: 5 },
+        'America/New_York',
+        friday0830,
+        null,
+        2,
+      ),
+    ).toBe(true);
   });
 
   it('runs on weekdays only, or on one day a week', () => {
