@@ -1066,6 +1066,57 @@ Built as planned, each step pushed green (CI passed on the last):
 - **Not covered:** a job whose pay is only in a Workday page's description (the run reads no Workday text), and a
   range with a typo (low above high, such as P&G's "$917,000 - $116,500") is read as no pay and kept.
 
+## Phase 20 plan: a reliable scheduled search (proposed, awaiting approval)
+
+From the full review of 9 November 2026: the top four items. The scheduled search can lose a day silently,
+overrun its time limit, and retry a draft that always fails every hour. Owner's answers: up to 3 tries a day; a job
+whose draft failed 3 times goes to Needs you.
+
+### 20a. Only a finished run counts as the day's run (no migration)
+
+- `lastScheduledRunDay` counts only scheduled runs with `status = 'done'`.
+- A new `scheduledTriesToday(db, userId, localDay)` counts every scheduled run started that local day (done,
+  failed or running). `isRunDue` gains `triesToday`: not due once there are 3 (`MAX_SCHEDULED_TRIES_PER_DAY`).
+  A run still `running` is already refused by `startRun`, and a stale one is marked failed there as now.
+- Weekly cadence: unchanged rule ("not already done this week"), now with failed runs not counting.
+
+### 20b. Stop retrying a draft after 3 failures (migration 0016 goes out alone first)
+
+- Migration `0016_job_search_draft_attempts.sql`: `draft_attempts smallint not null default 0` on
+  `job_search_hits`. Applied through the Migrate workflow before the code that uses it.
+- `saveDraft` on error: `draft_attempts + 1`; at the third failure the job moves to `needs_you` with the error
+  "Couldn't draft this job after 3 tries: answer it yourself, or press Draft again". A successful draft resets the
+  count. `listUndrafted` already takes only `state = 'new'`, so the job leaves the automatic batch.
+- The queue card for a `needs_you` job with no draft shows that note and the existing Draft button (a manual
+  draft resets the count and tries once).
+
+### 20c. Respect the time budget, and isolate users (no migration)
+
+- `runJobSearch`: the query loop stops when `Date.now() >= deadline` (queries left are counted as not run, the
+  run still finishes `done` with what it found). `claude.search` takes the deadline: no continuation turn starts
+  past it, and each request's timeout is the time left (at most the current 120 s).
+- The cron handler wraps each user's work (still-open check, run, drafting) in try/catch: the error is logged with
+  the user id, the next user still runs, and the response gains `failed: number`.
+
+### 20d. Housekeeping from the hourly cron (no migration)
+
+- The cron handler calls `deleteExpiredSessions` and `deleteExpiredRateLimits` once per call, before the users,
+  inside its own try/catch; counts logged.
+
+### Order and tests
+
+20a, 20c, 20d (no migration), then migration 0016 alone, Migrate, then 20b; each a small commit, green and
+pushed. Unit: `isRunDue` with 0 to 3 tries, failed runs not counting, weekly cadence after a failure. API: a failed
+scheduled run then a later knock starts a new one; the fourth knock after 3 failures does not; a stale running run;
+the deadline reached mid-search (fake Claude, fake clock) finishes `done`; one user throwing while the next is
+due; a draft failing 3 times lands in Needs you and is not drafted again, then a manual draft succeeds; cleanup
+removes expired sessions and rate-limit windows. E2E: the Needs you card for an undraftable job (seeded via the
+API).
+
+Not in this phase (from the same review, for later): a cheaper model for the search call and caching its
+continuation turns, a "last successful run" warning on the queue page, atomic "Mark applied", the drafting N+1,
+route code-splitting and an error boundary, splitting the largest files.
+
 ## Planned but not built
 
 | Item                                  | Status                                                                                                    |
