@@ -1655,6 +1655,33 @@ describe('searchQueries', () => {
     ).toEqual(['"SDET"']);
   });
 
+  it('adds a search near home when hybrid or on-site work is wanted in a commute area', () => {
+    const base = { queries: [], includeTitles: ['SDET', 'QA lead'], sites: [...SEARCH_SOURCES] };
+    const near = { commuteArea: ['Charlotte', 'Concord'], state: 'NC' };
+    expect(searchQueries({ ...base, ...near, workModes: ['Remote', 'Hybrid'] })).toEqual([
+      '"SDET"',
+      '"QA lead"',
+      '"SDET" OR "QA lead" "Charlotte, NC"',
+    ]);
+    // Not for remote work only, and not without a commute area.
+    expect(searchQueries({ ...base, ...near, workModes: ['Remote'] })).toEqual([
+      '"SDET"',
+      '"QA lead"',
+    ]);
+    expect(
+      searchQueries({ ...base, commuteArea: [], state: 'NC', workModes: ['On-site'] }),
+    ).toEqual(['"SDET"', '"QA lead"']);
+    // At most six titles in it, after the three title searches.
+    const many = searchQueries({
+      ...base,
+      ...near,
+      includeTitles: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'],
+      workModes: ['On-site'],
+    });
+    expect(many).toHaveLength(4);
+    expect(many[3]).toBe('"a" OR "b" OR "c" OR "d" OR "e" OR "f" "Charlotte, NC"');
+  });
+
   it('limits each search to the chosen sites, every host of each', () => {
     const [first] = searchQueries({
       queries: [],

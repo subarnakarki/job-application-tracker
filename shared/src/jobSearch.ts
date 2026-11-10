@@ -2194,10 +2194,14 @@ export function sitePart(sites: readonly SearchSource[]): string {
 /**
  * The searches a run makes: the hand-written ones if any, else the titles to include, spread over
  * at most three searches ("SDET" OR "QA lead" ...); each limited to the chosen sites.
+ * With a commute area and hybrid or on-site work wanted, one more search follows them: the titles
+ * near home.
  */
 export function searchQueries(
-  profile: Pick<JobSearchProfile, 'queries' | 'includeTitles' | 'sites'>,
+  profile: Pick<JobSearchProfile, 'queries' | 'includeTitles' | 'sites'> &
+    Partial<Pick<JobSearchProfile, 'commuteArea' | 'workModes' | 'state'>>,
 ): string[] {
+  const local = localQuery(profile);
   const written = profile.queries.map(withoutSites).filter(Boolean);
   let bodies = written;
   if (bodies.length === 0) {
@@ -2212,8 +2216,33 @@ export function searchQueries(
           .join(' OR '),
       );
   }
+  if (local) bodies = [...bodies, local];
   const sites = sitePart(profile.sites);
   return bodies.map((body) => (sites ? `${sites} ${body}` : body));
+}
+
+/** Titles in the local search: a search engine reads only so many words. */
+const LOCAL_QUERY_TITLES = 6;
+
+/**
+ * The search for jobs near home: the first titles and the commute area's first place with the
+ * state ("SDET" OR "QA lead" "Charlotte, NC"). Null without a commute area, without titles, or when
+ * only remote work is wanted.
+ */
+function localQuery(
+  profile: Pick<JobSearchProfile, 'includeTitles'> &
+    Partial<Pick<JobSearchProfile, 'commuteArea' | 'workModes' | 'state'>>,
+): string | null {
+  const place = profile.commuteArea?.find((name) => name.trim())?.trim();
+  const titles = [...new Set(profile.includeTitles.map((title) => title.trim()).filter(Boolean))];
+  if (!place || titles.length === 0) return null;
+  if (!profile.workModes?.some((mode) => mode !== 'Remote')) return null;
+  const where = [place, profile.state?.trim()].filter(Boolean).join(', ').replace(/"/g, '');
+  const wanted = titles
+    .slice(0, LOCAL_QUERY_TITLES)
+    .map((title) => `"${title.replace(/"/g, '')}"`)
+    .join(' OR ');
+  return `${wanted} "${where}"`;
 }
 
 // ---------------------------------------------------------------------------------------------
