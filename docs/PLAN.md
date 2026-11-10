@@ -1148,7 +1148,7 @@ Built as planned, each step pushed green:
   `fallbacks` (both are rejected on Haiku 5.5). The trial starts when the owner sets the variable in Vercel.
 - **Not covered:** the Windows-only "tailor my resume" e2e failure is unchanged (passes on CI's Linux).
 
-## Phase 21 plan: remote anywhere, or hybrid and onsite near home (proposed, awaiting approval)
+## Phase 21 plan: remote anywhere, or hybrid and onsite near home (approved)
 
 Today the live setup accepts Remote only, so a Charlotte hybrid or onsite job is skipped, and nothing filters by
 place. The owner's rule: **Remote anywhere in the US; Hybrid or Onsite only in the commute area.** Owner's answers:
@@ -1186,6 +1186,32 @@ or "Multiple locations" skipped, a multi-place location with one area place kept
 area unchanged, an old setup; the extra query present only when hybrid or onsite is wanted. API: the setup
 round-trip with the area; a run that keeps a Concord hybrid job and skips an Austin one. E2E: the setup fills and
 saves the Charlotte core area.
+
+### 21d. Read where the job is worked from the posting (added on request)
+
+Most boards (Greenhouse among them) say only "Remote" or nothing, so a hybrid or on-site job arrives with no work
+mode. The owner asked for the posting to be read: (1) a free scan of the posting's text for a clear statement
+("this is a hybrid role", "fully remote", "5 days a week in the office"), used when sorting; (2) the draft call,
+which already reads the whole posting, also returns the work mode and location it read, and a waiting job that
+turns out to be ruled out is skipped instead of drafted. No extra model calls. A job whose mode nothing states is
+kept (the owner's choice).
+
+## Phase 21 outcome
+
+Built as planned, each step pushed green (CI passed on the last):
+
+- **21a** (`7f87ee2`): `commuteArea`, `CHARLOTTE_CORE`, `commuteVerdict`; `sortJob` skips a Hybrid or On-site job
+  outside the area or with an unclear location.
+- **21b** (`55ed8a3`): `searchQueries` adds the search near home (up to six titles plus "Charlotte, NC").
+- **21c** (`bf47acf`): the setup field with "Use the Charlotte core area"; kept only with hybrid or on-site ticked.
+- **21d** (`2c8710f`): `workModeInText`, `workModeProblem`; `ModelDraftSchema` gained `workMode` and `location`;
+  `savePostingRead` skips a waiting job the draft found ruled out, "(read in the posting)".
+- **Live setup:** Remote, Hybrid and On-site, with the Charlotte core area (set in Neon once production was on
+  `2c8710f`).
+- **Not covered:** the API test for a run drives the draft's reading, not a board's own Hybrid field (Greenhouse
+  never gives one). A job forced into the queue by hand is also skipped if the draft reads it as ruled out. Jobs
+  already waiting in the queue are not re-read. Workday, iCIMS, Taleo and SuccessFactors jobs are never drafted, so
+  only their board fields and the text scan apply (their text is not read during a run).
 
 ## Planned but not built
 

@@ -183,6 +183,14 @@ cache, and the search stops starting turns once the run's deadline is near.
 outside the US (`locationVerdict` in `shared/`); a job in several places counts when any is in the US, and one
 that only says "Remote" is kept with a note to check it. The search itself is also asked for US jobs.
 
+**Commute area** (`commuteArea` on the profile; empty means no such rule): a remote job can be anywhere, a hybrid
+or on-site job is kept only when its location names a place in the area, in the user's state or with no state
+given (`commuteVerdict`); elsewhere, or with a location that cannot be placed, it is skipped with the reason. With
+hybrid or on-site wanted, each run adds one search near home (the first titles plus "Charlotte, NC"). When the
+board does not say how a job is worked, a clear statement in the posting's text counts (`workModeInText`), and the
+draft call returns the work mode and location it read in the posting: a waiting job that turns out to be ruled out
+is skipped, "(read in the posting)", instead of drafted. A job whose mode nothing states is kept.
+
 **Who answers what.** Contact details, work authorization, sponsorship, salary, relocation, start date, how you
 heard, age and every demographic or EEO question are answered from the profile by code
 (`profileQuestionKind` in `shared/`); the model never sees them. The model drafts the rest from the resume
