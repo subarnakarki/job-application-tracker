@@ -127,47 +127,57 @@ describes the resume and includes every analysis, never the text. Logs hold only
 Open to the users in `JOB_SEARCH_USER_IDS` when `ANTHROPIC_API_KEY` is set; every route below answers 404
 `not_available` to anyone else (and to the demo account).
 
-| Method | Path                               | Auth   | Notes                                                                 |
-| ------ | ---------------------------------- | ------ | --------------------------------------------------------------------- |
-| GET    | `/api/job-search/profile`          | user   | `{ available, profile, confirmedAt, hasResume }`                      |
-| PUT    | `/api/job-search/profile`          | user   | The confirmed setup (`JobSearchProfileSchema`); fills waiting jobs    |
-| POST   | `/api/job-search/runs`             | user   | Runs now: search, read, sort, draft for up to 240 s; 201 with the run |
-|        |                                    |        | and its jobs. 409 `not_set_up`, `no_resume` or `run_in_progress`.     |
-|        |                                    |        | 10 a day by hand; 50 runs a day in total                              |
-| GET    | `/api/job-search/runs`             | user   | The latest 10 runs with counts                                        |
-| GET    | `/api/job-search/runs/:id`         | user   | One run and every job it found                                        |
-| GET    | `/api/job-search/queue`            | user   | `{ ready, needsYou, finishYourself, keywordOnly, olderMatches,`       |
-|        |                                    |        | `notDrafted, checks: { lastCheckedAt, closedThisWeek } }`             |
-|        |                                    |        | Ready and Needs you are sorted by `fit` (best first). Each job's      |
-|        |                                    |        | `fit` is `{ percent, found, missing }` against the current resume,    |
-|        |                                    |        | from the posting keywords its draft kept (null before that)           |
-| POST   | `/api/job-search/queue/check`      | user   | Reads each waiting job again (up to 60); a board that says it is gone |
-|        |                                    |        | closes it; one whose pay tops out under the salary floor is skipped.  |
-|        |                                    |        | `{ checked, closed, unknown, belowFloor }`. 6 a day; the hourly       |
-|        |                                    |        | schedule also checks each job about once a day                        |
-| POST   | `/api/job-search/hits/:id/track`   | user   | Saves a queue job in the tracker as Saved (or links the match)        |
-| POST   | `/api/job-search/hits/:id/applied` | user   | Moves its Saved application to Applied, or creates one (once)         |
-| POST   | `/api/job-search/hits/:id/blocked` | user   | `{ reason }`                                                          |
-| POST   | `/api/job-search/hits/:id/skip`    | user   |                                                                       |
-| POST   | `/api/job-search/hits/:id/closed`  | user   | The job's page says it is closed (only while it is waiting)           |
-| POST   | `/api/job-search/hits/:id/tailor`  | user   | Suggested edits of existing resume lines that add the posting's       |
-|        |                                    |        | missing keywords, checked by code (an invented line is dropped, a     |
-|        |                                    |        | number or name not in the resume is listed in `unverified`); stored   |
-|        |                                    |        | as the job's `tailoring`. 409 `no_keywords` (redraft first), 502,     |
-|        |                                    |        | 10 a day                                                              |
-| POST   | `/api/job-search/hits/:id/queue`   | user   | A keyword-only job becomes a target and is drafted (30 drafts a day)  |
-| POST   | `/api/job-search/hits/:id/redraft` | user   | Drafts again                                                          |
-| PUT    | `/api/job-search/hits/:id/draft`   | user   | `{ answers: [{ question, answer }], coverLetter }`; answers sent back |
-|        |                                    |        | count as the user's; ready once every required one has an answer      |
-| GET    | `/api/resume/text`                 | user   | The stored resume text, for forms without a file upload               |
-| POST   | `/api/cron/job-search`             | public | Needs `x-cron-secret` = `JOB_SEARCH_CRON_SECRET` (32+ characters),    |
-|        |                                    |        | else 404. Starts each due scheduled run (once per local day), then    |
-|        |                                    |        | keeps drafting. Called hourly by the "Job search schedule" workflow   |
+| Method | Path                               | Auth   | Notes                                                                  |
+| ------ | ---------------------------------- | ------ | ---------------------------------------------------------------------- |
+| GET    | `/api/job-search/profile`          | user   | `{ available, profile, confirmedAt, hasResume }`                       |
+| PUT    | `/api/job-search/profile`          | user   | The confirmed setup (`JobSearchProfileSchema`); fills waiting jobs     |
+| POST   | `/api/job-search/runs`             | user   | Runs now: search, read, sort, draft for up to 240 s; 201 with the run  |
+|        |                                    |        | and its jobs. 409 `not_set_up`, `no_resume` or `run_in_progress`.      |
+|        |                                    |        | 10 a day by hand; 50 runs a day in total                               |
+| GET    | `/api/job-search/runs`             | user   | The latest 10 runs with counts                                         |
+| GET    | `/api/job-search/runs/:id`         | user   | One run and every job it found                                         |
+| GET    | `/api/job-search/queue`            | user   | `{ ready, needsYou, finishYourself, keywordOnly, olderMatches,`        |
+|        |                                    |        | `notDrafted, checks: { lastCheckedAt, closedThisWeek } }`              |
+|        |                                    |        | Ready and Needs you are sorted by `fit` (best first). Each job's       |
+|        |                                    |        | `fit` is `{ percent, found, missing }` against the current resume,     |
+|        |                                    |        | from the posting keywords its draft kept (null before that)            |
+| POST   | `/api/job-search/queue/check`      | user   | Reads each waiting job again (up to 60); a board that says it is gone  |
+|        |                                    |        | closes it; one whose pay tops out under the salary floor is skipped.   |
+|        |                                    |        | `{ checked, closed, unknown, belowFloor }`. 6 a day; the hourly        |
+|        |                                    |        | schedule also checks each job about once a day                         |
+| POST   | `/api/job-search/hits/:id/track`   | user   | Saves a queue job in the tracker as Saved (or links the match)         |
+| POST   | `/api/job-search/hits/:id/applied` | user   | Moves its Saved application to Applied, or creates one (once)          |
+| POST   | `/api/job-search/hits/:id/blocked` | user   | `{ reason }`                                                           |
+| POST   | `/api/job-search/hits/:id/skip`    | user   |                                                                        |
+| POST   | `/api/job-search/hits/:id/closed`  | user   | The job's page says it is closed (only while it is waiting)            |
+| POST   | `/api/job-search/hits/:id/tailor`  | user   | Suggested edits of existing resume lines that add the posting's        |
+|        |                                    |        | missing keywords, checked by code (an invented line is dropped, a      |
+|        |                                    |        | number or name not in the resume is listed in `unverified`); stored    |
+|        |                                    |        | as the job's `tailoring`. 409 `no_keywords` (redraft first), 502,      |
+|        |                                    |        | 10 a day                                                               |
+| POST   | `/api/job-search/hits/:id/queue`   | user   | A keyword-only job becomes a target and is drafted (30 drafts a day)   |
+| POST   | `/api/job-search/hits/:id/redraft` | user   | Drafts again                                                           |
+| PUT    | `/api/job-search/hits/:id/draft`   | user   | `{ answers: [{ question, answer }], coverLetter }`; answers sent back  |
+|        |                                    |        | count as the user's; ready once every required one has an answer       |
+| GET    | `/api/resume/text`                 | user   | The stored resume text, for forms without a file upload                |
+| POST   | `/api/cron/job-search`             | public | Needs `x-cron-secret` = `JOB_SEARCH_CRON_SECRET` (32+ characters),     |
+|        |                                    |        | else 404. Starts each due scheduled run (once per local day; a failed  |
+|        |                                    |        | run is tried again on later knocks, at most 3 tries a day), then       |
+|        |                                    |        | keeps drafting; a job whose draft failed 3 times moves to Needs you.   |
+|        |                                    |        | Also deletes expired sessions and rate-limit windows. One user's       |
+|        |                                    |        | error is logged and the rest still run: `{ started, drafted, failed }` |
+|        |                                    |        | Called hourly by the "Job search schedule" workflow                    |
 
 **Boards.** Searched and filled: Greenhouse, Lever, Ashby, Rippling, SmartRecruiters, Breezy HR, Recruitee,
 Teamtailor, Personio, Workable and Jobvite. Searched and listed to finish by hand (they need an account): Workday,
 iCIMS, Taleo and SuccessFactors. A query without `site:` searches them all. When a job's page cannot be read
 (Workable often refuses, some pages are drawn by script), the job is kept from its search result's title and age.
+
+**Search model.** The search call uses `JOB_SEARCH_SEARCH_MODEL` when it is set to a model id (for example
+`claude-haiku-5-5`), else the job search model; a Haiku model gets the basic web search tool and no server-side
+fallback, which it does not support. `model_usage` records the model of each call, so a trial can be compared with
+the weeks before it. Each search turn is cached, so a paused turn sent again reads its search results from the
+cache, and the search stops starting turns once the run's deadline is near.
 
 **United States only** (on by default): a job is skipped when its country, or else its location, is clearly
 outside the US (`locationVerdict` in `shared/`); a job in several places counts when any is in the US, and one

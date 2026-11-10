@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { AnalyzerUnavailableError } from '../resume/analyze';
 import {
   claudeJobSearch,
+  JOB_SEARCH_MODEL,
+  searchModelFrom,
   renderDraftRequest,
   renderTailorRequest,
   MIN_SEARCH_TURN_MS,
@@ -16,7 +18,11 @@ import {
 } from './claude';
 
 /** The real SDK, with the network replaced by canned Messages API answers, one per request. */
-function claudeAnswering(answers: { status: number; body: unknown }[], delayMs = 0) {
+function claudeAnswering(
+  answers: { status: number; body: unknown }[],
+  delayMs = 0,
+  searchModel?: string,
+) {
   const usage: UsageEntry[] = [];
   const record = (entry: UsageEntry) => {
     usage.push(entry);
@@ -41,7 +47,7 @@ function claudeAnswering(answers: { status: number; body: unknown }[], delayMs =
         : Promise.resolve(respond());
     },
   });
-  return { claude: claudeJobSearch(client, record), requests, usage };
+  return { claude: claudeJobSearch(client, record, searchModel), requests, usage };
 }
 
 /** The user message sent, as its text blocks. */
@@ -112,6 +118,8 @@ describe('claudeJobSearch.search', () => {
     expect(requests[0]).toMatchObject({
       model: 'claude-opus-5-5',
       fallbacks: 'default',
+      // Cached, so a paused turn sent again reads its search results from the cache.
+      cache_control: { type: 'ephemeral' },
       tools: [
         {
           type: 'web_search_20260209',
@@ -121,6 +129,30 @@ describe('claudeJobSearch.search', () => {
         },
       ],
     });
+  });
+
+  it('uses the configured search model; a Haiku model gets the tools it supports', async () => {
+    const answer = [{ status: 200, body: message('end_turn', [], 0) }];
+    const sonnet = claudeAnswering(answer, 0, 'claude-sonnet-5-5');
+    await sonnet.claude.search('SDET', ['lever'], 1);
+    expect(sonnet.requests[0]).toMatchObject({ model: 'claude-sonnet-5-5', fallbacks: 'default' });
+
+    const haiku = claudeAnswering(answer, 0, 'claude-haiku-5-5');
+    await haiku.claude.search('SDET', ['lever'], 1);
+    expect(haiku.requests[0]).toMatchObject({
+      model: 'claude-haiku-5-5',
+      cache_control: { type: 'ephemeral' },
+      tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+    });
+    expect(haiku.requests[0]).not.toHaveProperty('fallbacks');
+  });
+
+  it('reads the search model setting, falling back to the default', () => {
+    expect(searchModelFrom(undefined)).toBe(JOB_SEARCH_MODEL);
+    expect(searchModelFrom('')).toBe(JOB_SEARCH_MODEL);
+    expect(searchModelFrom(' claude-haiku-5-5 ')).toBe('claude-haiku-5-5');
+    expect(searchModelFrom('gpt-5')).toBe(JOB_SEARCH_MODEL);
+    expect(searchModelFrom('claude-opus-5-5; drop')).toBe(JOB_SEARCH_MODEL);
   });
 
   it('resumes a paused turn, and stops after a few', async () => {
