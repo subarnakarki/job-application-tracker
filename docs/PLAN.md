@@ -1132,6 +1132,22 @@ API).
 Not in this phase (from the same review, for later): a "last successful run" warning on the queue page, atomic "Mark applied", the drafting N+1,
 route code-splitting and an error boundary, splitting the largest files.
 
+## Phase 20 outcome
+
+Built as planned, each step pushed green:
+
+- **20a** (`77bf289`): `scheduledRunState` (last finished day, tries today); `isRunDue` stops at
+  `MAX_SCHEDULED_TRIES_PER_DAY` (3).
+- **20c** (`3b96095`): the query loop and each search turn respect the deadline (no turn with under 15 s left; a
+  turn's timeout never passes it). The cron runs each user in its own try/catch; the response gained `failed`.
+- **20d** (`2a9da2d`): each knock deletes expired sessions and rate-limit windows.
+- **0016** (`a9be303`), applied through Migrate; **20b** (`43acd46`): `draft_attempts`; at 3 failures the job
+  moves to Needs you with a note on its card. Redraft still works, a finished draft resets the count.
+- **20e** (`e0b13bc`): top-level `cache_control` on the search request; the prompt no longer asks for a link list;
+  `JOB_SEARCH_SEARCH_MODEL` (unset, so nothing changed yet). A Haiku model gets `web_search_20250305` and no
+  `fallbacks` (both are rejected on Haiku 5.5). The trial starts when the owner sets the variable in Vercel.
+- **Not covered:** the Windows-only "tailor my resume" e2e failure is unchanged (passes on CI's Linux).
+
 ## Planned but not built
 
 | Item                                  | Status                                                                                                    |
