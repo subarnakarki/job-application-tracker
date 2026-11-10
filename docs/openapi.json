@@ -6460,6 +6460,11 @@
                       "minimum": 0,
                       "maximum": 9007199254740991
                     },
+                    "found": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
                     "failed": {
                       "type": "integer",
                       "minimum": 0,
@@ -6469,6 +6474,7 @@
                   "required": [
                     "started",
                     "drafted",
+                    "found",
                     "failed"
                   ],
                   "additionalProperties": false
@@ -19015,7 +19021,8 @@
                             "type": "string",
                             "enum": [
                               "schedule",
-                              "manual"
+                              "manual",
+                              "sweep"
                             ]
                           },
                           "status": {
@@ -19295,7 +19302,8 @@
                           "type": "string",
                           "enum": [
                             "schedule",
-                            "manual"
+                            "manual",
+                            "sweep"
                           ]
                         },
                         "status": {
@@ -20118,7 +20126,8 @@
                           "type": "string",
                           "enum": [
                             "schedule",
-                            "manual"
+                            "manual",
+                            "sweep"
                           ]
                         },
                         "status": {
@@ -24673,7 +24682,8 @@
                                 "type": "string",
                                 "enum": [
                                   "schedule",
-                                  "manual"
+                                  "manual",
+                                  "sweep"
                                 ]
                               },
                               "status": {

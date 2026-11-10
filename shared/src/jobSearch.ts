@@ -1982,7 +1982,7 @@ export function progressPercent(progress: RunProgress): number {
 
 export const JobSearchRunSchema = z.strictObject({
   id: z.uuid(),
-  trigger: z.enum(['schedule', 'manual']),
+  trigger: z.enum(['schedule', 'manual', 'sweep']),
   status: z.enum(['running', 'done', 'failed']),
   searches: z.number().int().min(0),
   error: z.string().nullable(),

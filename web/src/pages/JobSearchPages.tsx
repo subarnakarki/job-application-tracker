@@ -1104,7 +1104,12 @@ export function JobSearchPage() {
             <li key={run.id} className="rounded-tile bg-s2 p-3">
               <Link to={`/job-search/runs/${run.id}`} className="link font-medium">
                 {formatDateTime(run.startedAt)} (
-                {run.trigger === 'schedule' ? 'scheduled' : 'by hand'})
+                {run.trigger === 'schedule'
+                  ? 'scheduled'
+                  : run.trigger === 'sweep'
+                    ? 'hourly board check'
+                    : 'by hand'}
+                )
               </Link>
               <p className="text-sm text-fg-3">
                 {run.status === 'failed' ? `Failed: ${run.error ?? 'unknown error'}` : counts(run)}

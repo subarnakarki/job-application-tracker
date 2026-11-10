@@ -67,10 +67,15 @@ export async function sweepBoards(
   keepGoing: () => boolean,
   /** Told how many boards there are, then after each one is read. */
   onProgress: (done: number, total: number) => void = () => {},
+  /** How many boards at most, and what became of each one read (null: it worked). */
+  options: {
+    limit?: number;
+    onBoard?: (board: WatchedBoard, error: string | null) => void;
+  } = {},
 ): Promise<JobRef[]> {
   const listable = boards
     .filter((entry) => isListable(entry.source))
-    .slice(0, MAX_BOARDS_PER_SWEEP);
+    .slice(0, options.limit ?? MAX_BOARDS_PER_SWEEP);
   const found: JobRef[] = [];
   let next = 0;
   let done = 0;
@@ -86,11 +91,13 @@ export async function sweepBoards(
       let jobs: BoardJob[];
       try {
         jobs = spec.parseList((await fetchBoard(url)).text, board.board);
-      } catch {
+      } catch (error) {
+        options.onBoard?.(board, error instanceof Error ? error.message : 'Could not be read');
         done += 1;
         onProgress(done, listable.length);
         continue;
       }
+      options.onBoard?.(board, null);
       for (const job of jobs) {
         if (!worthReading(job, rules)) continue;
         const ref = refOf(job, board);

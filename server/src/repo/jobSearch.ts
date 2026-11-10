@@ -138,7 +138,7 @@ const STALE_RUN_MS = 10 * 60 * 1000;
 export async function startRun(
   db: Queryable,
   userId: string,
-  trigger: 'schedule' | 'manual',
+  trigger: 'schedule' | 'manual' | 'sweep',
   localDay: string,
   now: Date,
 ): Promise<string | null> {
@@ -453,6 +453,7 @@ export async function savePostingRead(
   await db.query(
     `update job_search_hits set work_mode = $3, location = coalesce(location, $4),
         kind = case when $5::text is null then kind else 'skipped' end,
+        state = case when $5::text is null then state else 'skipped' end,
         reason = coalesce($5, reason), updated_at = $6
       where user_id = $1 and id = $2 and state = 'new'`,
     [
@@ -564,21 +565,104 @@ export async function exportJobSearch(
   };
 }
 
+export interface WatchedBoardRow {
+  id: string;
+  source: SearchSource;
+  board: string;
+  addedBy: 'search' | 'user';
+  lastSweptAt: Date | null;
+  lastError: string | null;
+}
+
+interface BoardRow {
+  id: string;
+  source: SearchSource;
+  board: string;
+  added_by: 'search' | 'user';
+  last_swept_at: Date | null;
+  last_error: string | null;
+}
+const toBoard = (row: BoardRow): WatchedBoardRow => ({
+  id: row.id,
+  source: row.source,
+  board: row.board,
+  addedBy: row.added_by,
+  lastSweptAt: row.last_swept_at,
+  lastError: row.last_error,
+});
+const BOARD_COLUMNS = 'id, source, board, added_by, last_swept_at, last_error';
+
 /**
- * The companies' boards this user's searches have turned up, most recently seen first: the
- * watch list the sweep reads for fresh jobs.
+ * The companies' boards this user watches (found by a search, or added by hand), the ones read
+ * longest ago first (never read comes first): the next boards to sweep for fresh jobs. `sources`
+ * narrows it to the boards whose lists can be read.
  */
 export async function watchedBoards(
   db: Queryable,
   userId: string,
   limit: number,
-): Promise<{ source: SearchSource; board: string }[]> {
-  const result = await db.query<{ source: SearchSource; board: string }>(
-    `select source, board from job_search_hits where user_id = $1
-      group by source, board order by max(created_at) desc limit $2`,
-    [userId, limit],
+  sources?: readonly string[],
+): Promise<WatchedBoardRow[]> {
+  const result = await db.query<BoardRow>(
+    `select ${BOARD_COLUMNS} from job_search_boards
+      where user_id = $1 and ($3::text[] is null or source = any($3))
+      order by last_swept_at nulls first, created_at, id limit $2`,
+    [userId, limit, sources ? [...sources] : null],
   );
-  return result.rows;
+  return result.rows.map(toBoard);
+}
+
+/** Starts watching a board; one already watched stays as it is. Returns the row either way. */
+export async function watchBoard(
+  db: Queryable,
+  userId: string,
+  board: { source: SearchSource; board: string },
+  addedBy: 'search' | 'user',
+  now: Date,
+): Promise<WatchedBoardRow | null> {
+  await db.query(
+    `insert into job_search_boards (user_id, source, board, added_by, created_at)
+      values ($1, $2, $3, $4, $5) on conflict (user_id, source, board) do nothing`,
+    [userId, board.source, board.board.slice(0, 100), addedBy, now],
+  );
+  const result = await db.query<BoardRow>(
+    `select ${BOARD_COLUMNS} from job_search_boards
+      where user_id = $1 and source = $2 and board = $3`,
+    [userId, board.source, board.board.slice(0, 100)],
+  );
+  const row = result.rows[0];
+  return row ? toBoard(row) : null;
+}
+
+/** Stops watching a board. False when it is not this user's. */
+export async function unwatchBoard(db: Queryable, userId: string, id: string): Promise<boolean> {
+  const result = await db.query('delete from job_search_boards where user_id = $1 and id = $2', [
+    userId,
+    id,
+  ]);
+  return result.rowCount > 0;
+}
+
+/** Notes that boards were just read: when, and what went wrong (null when it worked). */
+export async function markBoardsSwept(
+  db: Queryable,
+  userId: string,
+  outcomes: { source: string; board: string; error: string | null }[],
+  now: Date,
+): Promise<void> {
+  if (outcomes.length === 0) return;
+  await db.query(
+    `update job_search_boards b set last_swept_at = $2, last_error = o.error
+      from unnest($3::text[], $4::text[], $5::text[]) as o(source, board, error)
+      where b.user_id = $1 and b.source = o.source and b.board = o.board`,
+    [
+      userId,
+      now,
+      outcomes.map((outcome) => outcome.source),
+      outcomes.map((outcome) => outcome.board),
+      outcomes.map((outcome) => outcome.error?.slice(0, 300) ?? null),
+    ],
+  );
 }
 
 /** Jobs skipped only for their age, newest posting first: candidates for "older matches". */

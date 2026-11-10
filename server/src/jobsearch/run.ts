@@ -17,6 +17,7 @@ import {
 } from '@jat/shared';
 import type { Clock } from '../clock';
 import type { Db } from '../db/types';
+import { BOARD_SOURCES } from '../postings/boards';
 import type { PageFetcher } from '../postings/fetchPage';
 import {
   finishRun,
@@ -24,18 +25,20 @@ import {
   insertHit,
   listTrackedApplications,
   listUndrafted,
+  markBoardsSwept,
   saveDraft,
   savePostingRead,
   seenJobKeys,
   setRunProgress,
   startRun,
+  watchBoard,
   watchedBoards,
 } from '../repo/jobSearch';
 import { getResumeText } from '../repo/resumes';
 import { AnalyzerUnavailableError } from '../resume/analyze';
 import type { JobSearchClaude } from './claude';
 import { companyFromSlug, JobReadError, readJob, type JobDetails } from './readJob';
-import { MAX_BOARDS_PER_SWEEP, sweepBoards } from './sweep';
+import { MAX_BOARDS_PER_SWEEP, sweepBoards, type WatchedBoard } from './sweep';
 
 export interface JobSearchDeps {
   db: Db;
@@ -119,7 +122,6 @@ export async function runJobSearch(
   try {
     await report({});
     const seen = await seenJobKeys(db, owner.userId);
-    const findTracked = trackedMatcher(await listTrackedApplications(db, owner.userId));
     const refs: JobRef[] = [];
     const queryTerms: string[] = [];
     /** The search result's title and age per job, for jobs whose page cannot be read. */
@@ -153,15 +155,16 @@ export async function runJobSearch(
     // Fresh jobs from the boards of every company found so far (this run's first): the search
     // finds companies, their own lists say what is open and new.
     const boardKeys = new Set<string>();
-    const boards = [
+    const boards: WatchedBoard[] = [
       ...refs.map((ref) => ({ source: ref.source, board: ref.board })),
-      ...(await watchedBoards(db, owner.userId, MAX_BOARDS_PER_SWEEP)),
+      ...(await watchedBoards(db, owner.userId, MAX_BOARDS_PER_SWEEP, BOARD_SOURCES)),
     ].filter((entry) => {
       const key = `${entry.source}:${entry.board}`;
       if (boardKeys.has(key)) return false;
       boardKeys.add(key);
       return true;
     });
+    const outcomes: { source: string; board: string; error: string | null }[] = [];
     const swept = await sweepBoards(
       boards,
       {
@@ -173,7 +176,9 @@ export async function runJobSearch(
       deps.fetchBoard,
       () => Date.now() < deadline,
       (done, total) => void report({ step: 'sweeping', boardsDone: done, boardsTotal: total }),
+      { onBoard: (board, error) => outcomes.push({ ...board, error }) },
     );
+    await markBoardsSwept(db, owner.userId, outcomes, clock.now());
     const fresh: JobRef[] = [];
     for (const ref of swept) {
       const key = `${ref.source}:${ref.board}:${ref.jobId}`;
@@ -184,98 +189,15 @@ export async function runJobSearch(
     // Fresh jobs first: they are the point of a run; search hits fill what room is left.
     refs.unshift(...fresh);
 
-    const rules = {
-      includeTitles: profile.includeTitles,
-      skipTitles: profile.skipTitles,
-      queryTerms,
-      workModes: profile.workModes,
-      timeframeDays: profile.timeframeDays,
-      usOnly: profile.usOnly,
-      salaryFloor: profile.salaryFloor,
-      commuteArea: profile.commuteArea,
-      homeState: profile.state,
-      now,
-    };
     const toRead = refs.slice(0, MAX_NEW_JOBS_PER_RUN);
     await report({ step: 'reading', jobsRead: 0, jobsTotal: toRead.length });
-    let read = 0;
-    await pool(
-      toRead,
-      READ_CONCURRENCY,
-      () => Date.now() < deadline,
-      async (ref) => {
-        try {
-          await readAndSave(ref);
-        } finally {
-          read += 1;
-          void report({ jobsRead: read });
-        }
-      },
-    );
-
-    async function readAndSave(ref: JobRef): Promise<void> {
-      let job: JobDetails;
-      let fromResult = false;
-      try {
-        job = await readJob(ref, deps.fetchPage, deps.fetchBoard);
-      } catch (error) {
-        // A job the board says is gone is closed: never kept. Only where the page cannot be read
-        // for other reasons (Workable's rate limit, account-only sites' pages) does the search
-        // result's title stand in for it.
-        const gone = !(error instanceof JobReadError) || error.gone;
-        const result = fromSearch.get(`${ref.source}:${ref.board}:${ref.jobId}`);
-        const fallback =
-          result && !gone && SEARCH_RESULT_SOURCES.includes(ref.source)
-            ? jobFromSearchResult(ref, result, now)
-            : null;
-        if (!fallback) return;
-        job = fallback;
-        fromResult = true;
-      }
-      const tracked = findTracked({
-        links: [ref.link, job.applyLink],
-        company: job.company,
-        role: job.role,
-      });
-      const sorted = sortJob(
-        {
-          source: ref.source,
-          title: job.role,
-          text: job.text,
-          workMode: job.workMode,
-          postedAt: job.postedAt,
-          postedDayOnly: job.postedDayOnly ?? false,
-          alreadyTracked: tracked !== null,
-          trackedStatus: tracked?.status ?? null,
-          location: job.location,
-          country: job.country,
-          salary: job.salary,
-        },
-        rules,
-      );
-      const reason = fromResult ? `${sorted.reason} (from the search result only)` : sorted.reason;
-      await insertHit(
-        db,
-        owner.userId,
-        {
-          runId: currentRun,
-          source: ref.source,
-          board: ref.board,
-          jobId: ref.jobId,
-          jobLink: ref.link,
-          applyLink: job.applyLink,
-          company: job.company,
-          role: job.role,
-          location: job.location,
-          workMode: job.workMode,
-          postedAt: job.postedAt,
-          kind: sorted.kind,
-          reason,
-          questions: job.questions,
-        },
-        clock.now(),
-      );
-    }
+    await readAndSaveJobs(deps, owner, profile, currentRun, toRead, {
+      queryTerms,
+      fromSearch,
+      now,
+      deadline,
+      onRead: (read) => void report({ jobsRead: read }),
+    });
 
     await report({ step: 'drafting' });
     await draftPending(
@@ -305,6 +227,211 @@ export async function runJobSearch(
     if (unavailable) return { kind: 'unavailable' };
     throw error;
   }
+}
+
+/**
+ * Reads each new job from its board, sorts it and saves it under the run, a few at a time until
+ * the jobs or the time run out. Each job's board joins the boards watched.
+ */
+async function readAndSaveJobs(
+  deps: JobSearchDeps,
+  owner: { userId: string },
+  profile: JobSearchProfile,
+  runId: string,
+  toRead: JobRef[],
+  context: {
+    queryTerms: string[];
+    /** The search result's title and age per job, for jobs whose page cannot be read. */
+    fromSearch: Map<string, { title: string; pageAge: string | null }>;
+    now: Date;
+    deadline: number;
+    onRead?: (read: number) => void;
+  },
+): Promise<void> {
+  const { db, clock } = deps;
+  const { now, fromSearch } = context;
+  const findTracked = trackedMatcher(await listTrackedApplications(db, owner.userId));
+  const rules = {
+    includeTitles: profile.includeTitles,
+    skipTitles: profile.skipTitles,
+    queryTerms: context.queryTerms,
+    workModes: profile.workModes,
+    timeframeDays: profile.timeframeDays,
+    usOnly: profile.usOnly,
+    salaryFloor: profile.salaryFloor,
+    commuteArea: profile.commuteArea,
+    homeState: profile.state,
+    now,
+  };
+  let read = 0;
+  await pool(
+    toRead,
+    READ_CONCURRENCY,
+    () => Date.now() < context.deadline,
+    async (ref) => {
+      try {
+        await readAndSave(ref);
+      } finally {
+        read += 1;
+        context.onRead?.(read);
+      }
+    },
+  );
+
+  async function readAndSave(ref: JobRef): Promise<void> {
+    let job: JobDetails;
+    let fromResult = false;
+    try {
+      job = await readJob(ref, deps.fetchPage, deps.fetchBoard);
+    } catch (error) {
+      // A job the board says is gone is closed: never kept. Only where the page cannot be read
+      // for other reasons (Workable's rate limit, account-only sites' pages) does the search
+      // result's title stand in for it.
+      const gone = !(error instanceof JobReadError) || error.gone;
+      const result = fromSearch.get(`${ref.source}:${ref.board}:${ref.jobId}`);
+      const fallback =
+        result && !gone && SEARCH_RESULT_SOURCES.includes(ref.source)
+          ? jobFromSearchResult(ref, result, now)
+          : null;
+      if (!fallback) return;
+      job = fallback;
+      fromResult = true;
+    }
+    const tracked = findTracked({
+      links: [ref.link, job.applyLink],
+      company: job.company,
+      role: job.role,
+    });
+    const sorted = sortJob(
+      {
+        source: ref.source,
+        title: job.role,
+        text: job.text,
+        workMode: job.workMode,
+        postedAt: job.postedAt,
+        postedDayOnly: job.postedDayOnly ?? false,
+        alreadyTracked: tracked !== null,
+        trackedStatus: tracked?.status ?? null,
+        location: job.location,
+        country: job.country,
+        salary: job.salary,
+      },
+      rules,
+    );
+    const reason = fromResult ? `${sorted.reason} (from the search result only)` : sorted.reason;
+    await insertHit(
+      db,
+      owner.userId,
+      {
+        runId,
+        source: ref.source,
+        board: ref.board,
+        jobId: ref.jobId,
+        jobLink: ref.link,
+        applyLink: job.applyLink,
+        company: job.company,
+        role: job.role,
+        location: job.location,
+        workMode: job.workMode,
+        postedAt: job.postedAt,
+        kind: sorted.kind,
+        reason,
+        questions: job.questions,
+      },
+      clock.now(),
+    );
+    // The company's board is watched from now on: its own list shows what it posts next.
+    await watchBoard(
+      db,
+      owner.userId,
+      { source: ref.source, board: ref.board },
+      'search',
+      clock.now(),
+    );
+  }
+}
+
+/** Boards read in one hourly sweep, and the time it may take. */
+export const MAX_BOARDS_PER_HOURLY_SWEEP = 400;
+export const SWEEP_BUDGET_MS = 60_000;
+
+/**
+ * The hourly sweep: reads the watched boards (the ones read longest ago first, as many as fit in
+ * the time), and saves the new jobs on them under a 'sweep' run. No run is recorded when nothing
+ * new is found, and no model is called here: drafting follows as for any waiting job. Returns how
+ * many new jobs were saved.
+ */
+export async function sweepNewJobs(
+  deps: JobSearchDeps,
+  owner: { userId: string; timeZone: string },
+  profile: JobSearchProfile,
+  deadline: number,
+): Promise<number> {
+  const { db, clock } = deps;
+  const now = clock.now();
+  const stopAt = Math.min(deadline, Date.now() + SWEEP_BUDGET_MS);
+  const boards = await watchedBoards(db, owner.userId, MAX_BOARDS_PER_HOURLY_SWEEP, BOARD_SOURCES);
+  if (boards.length === 0) return 0;
+  const queryTerms = searchQueries(profile).flatMap((query) => parseQuery(query).terms);
+  const outcomes: { source: string; board: string; error: string | null }[] = [];
+  const swept = await sweepBoards(
+    boards,
+    {
+      wanted: profile.includeTitles.length > 0 ? profile.includeTitles : queryTerms,
+      skipped: profile.skipTitles,
+      timeframeDays: profile.timeframeDays,
+      now,
+    },
+    deps.fetchBoard,
+    () => Date.now() < stopAt,
+    () => {},
+    {
+      limit: MAX_BOARDS_PER_HOURLY_SWEEP,
+      onBoard: (board, error) => outcomes.push({ ...board, error }),
+    },
+  );
+  await markBoardsSwept(db, owner.userId, outcomes, clock.now());
+  const seen = await seenJobKeys(db, owner.userId);
+  const fresh = uniqueJobRefs(swept.map((ref) => ref.link)).filter(
+    (ref) => !seen.has(`${ref.source}:${ref.board}:${ref.jobId}`),
+  );
+  if (fresh.length === 0) return 0;
+  const runId = await startRun(db, owner.userId, 'sweep', localDateIn(now, owner.timeZone), now);
+  if (!runId) return 0; // A search is running: it reads the boards itself.
+  const toRead = fresh.slice(0, MAX_NEW_JOBS_PER_RUN);
+  try {
+    await setRunProgress(db, runId, {
+      ...EMPTY_PROGRESS,
+      step: 'reading',
+      boardsDone: outcomes.length,
+      boardsTotal: outcomes.length,
+      jobsTotal: toRead.length,
+    });
+    await readAndSaveJobs(deps, owner, profile, runId, toRead, {
+      queryTerms,
+      fromSearch: new Map(),
+      now,
+      deadline,
+    });
+    await setRunProgress(db, runId, {
+      ...EMPTY_PROGRESS,
+      step: 'done',
+      boardsDone: outcomes.length,
+      boardsTotal: outcomes.length,
+      jobsRead: toRead.length,
+      jobsTotal: toRead.length,
+    });
+    await finishRun(db, runId, { status: 'done', searches: 0, error: null }, clock.now());
+  } catch (error) {
+    await finishRun(
+      db,
+      runId,
+      { status: 'failed', searches: 0, error: 'The board check stopped with an error' },
+      clock.now(),
+    );
+    throw error;
+  }
+  return toRead.length;
 }
 
 /** Drafts one job: profile answers by code, the rest by the model. Returns false if it failed. */

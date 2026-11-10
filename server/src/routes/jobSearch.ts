@@ -39,7 +39,7 @@ import { JOB_SEARCH_MODEL, type JobSearchClaude } from '../jobsearch/claude';
 import { readJob } from '../jobsearch/readJob';
 import { checkOpenJobs, MANUAL_CHECK_AGE_MS, SCHEDULED_CHECK_AGE_MS } from '../jobsearch/check';
 import { allowedUserIds, jobSearchAccess, NO_CLAUDE } from '../jobsearch/access';
-import { draftHit, draftPending, runJobSearch } from '../jobsearch/run';
+import { draftHit, draftPending, runJobSearch, sweepNewJobs } from '../jobsearch/run';
 import type { PageFetcher } from '../postings/fetchPage';
 import { createApplication, getApplication, updateApplication } from '../repo/applications';
 import {
@@ -93,6 +93,8 @@ const IdParams = z.object({ id: z.string() });
 const CronResultSchema = z.strictObject({
   started: z.number().int().min(0),
   drafted: z.number().int().min(0),
+  /** New jobs the hourly board sweep saved. */
+  found: z.number().int().min(0),
   /** Users whose turn ended in an error (logged); the others still ran. */
   failed: z.number().int().min(0),
 });
@@ -749,6 +751,7 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
       let runs = 0;
       let drafted = 0;
       let failed = 0;
+      let found = 0;
       /** One user's turn: the still-open check, then a due run or drafting. */
       const forUser = async (userId: string): Promise<'stop' | undefined> => {
         const owner = await db.query<{ time_zone: string; is_demo: boolean }>(
@@ -771,6 +774,14 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
           profile.scheduleOn &&
           isRunDue(profile, row.time_zone, now, past.lastDoneDay, past.triesToday);
         if (!due) {
+          // Every hour: the watched boards' own lists, for jobs posted since the last look (free:
+          // no model call), then drafting, which covers what the sweep just found.
+          found += await sweepNewJobs(
+            searchDeps(db, claude),
+            { userId, timeZone: row.time_zone },
+            profile,
+            deadline,
+          );
           drafted += await draftPending(searchDeps(db, claude), userId, profile, deadline);
           return undefined;
         }
@@ -802,8 +813,8 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
           request.log.error({ err: error, userId }, 'job search schedule: a user failed');
         }
       }
-      request.log.info({ runs, drafted, failed }, 'job search schedule');
-      return { started: runs, drafted, failed };
+      request.log.info({ runs, drafted, failed, found }, 'job search schedule');
+      return { started: runs, drafted, failed, found };
     },
   );
 }

@@ -1378,8 +1378,18 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
       // 13:30 UTC is 08:30 in New York: past the 8:00 run hour.
       t.clock.set(new Date('2026-11-05T13:30:00Z'));
 
-      expect((await cron(CRON_SECRET)).json()).toEqual({ started: 1, drafted: 0, failed: 0 });
-      expect((await cron(CRON_SECRET)).json()).toEqual({ started: 0, drafted: 0, failed: 0 });
+      expect((await cron(CRON_SECRET)).json()).toEqual({
+        started: 1,
+        drafted: 0,
+        failed: 0,
+        found: 0,
+      });
+      expect((await cron(CRON_SECRET)).json()).toEqual({
+        started: 0,
+        drafted: 0,
+        failed: 0,
+        found: 0,
+      });
 
       const runs = await send('GET', '/api/job-search/runs', cookie);
       expect(
@@ -1420,7 +1430,7 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
       claude.searchFailuresLeft = 1;
       const response = await cron(CRON_SECRET);
       expect(response.statusCode).toBe(200);
-      expect(response.json()).toEqual({ started: 1, drafted: 0, failed: 1 });
+      expect(response.json()).toEqual({ started: 1, drafted: 0, failed: 1, found: 0 });
       const runs = await send('GET', '/api/job-search/runs', second.cookie);
       expect(runs.json<{ items: { status: string }[] }>().items.map((item) => item.status)).toEqual(
         ['done'],
@@ -1456,6 +1466,91 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
       expect(windows.rows.map((row) => row.key)).toEqual(['housekeeping-test:new']);
     });
 
+    describe('the hourly board sweep', () => {
+      const LIST = 'https://boards-api.greenhouse.io/v1/boards/acme/jobs';
+      const listed = (id: number, title: string) => ({
+        ...GREENHOUSE,
+        id,
+        title,
+        absolute_url: jobLink(id),
+        first_published: new Date(T0.getTime() - HOUR).toISOString(),
+      });
+      const runsOf = async (cookie: string) =>
+        (await send('GET', '/api/job-search/runs', cookie)).json<{
+          items: { id: string; trigger: string; status: string }[];
+        }>().items;
+
+      it('reads every watched board on a knock, and saves a new job under a sweep run', async () => {
+        env['JOB_SEARCH_USER_IDS'] = '';
+        const { cookie, user } = await member();
+        await run(cookie); // The search finds Acme: its board is watched from now on.
+        const boards = await t.db.query<{ source: string; board: string; added_by: string }>(
+          'select source, board, added_by from job_search_boards where user_id = $1',
+          [user.id],
+        );
+        expect(boards.rows).toContainEqual({
+          source: 'greenhouse',
+          board: 'acme',
+          added_by: 'search',
+        });
+        try {
+          // T0 is 07:00 in New York, before the run hour: the knock sweeps. Nothing new: no run.
+          PAGES[LIST] = JSON.stringify({ jobs: [listed(101, 'Senior Product Manager')] });
+          expect((await cron(CRON_SECRET)).json()).toMatchObject({ started: 0, found: 0 });
+          expect((await runsOf(cookie)).map((entry) => entry.trigger)).toEqual(['manual']);
+
+          // A job posted since: read, sorted, saved under a sweep run, and drafted on the same knock.
+          PAGES[apiUrl(110)] = greenhouseJob('Product Manager, Risk', 1);
+          PAGES[LIST] = JSON.stringify({
+            jobs: [listed(101, 'Senior Product Manager'), listed(110, 'Product Manager, Risk')],
+          });
+          const draftsBefore = claude.drafts;
+          expect((await cron(CRON_SECRET)).json()).toMatchObject({ started: 0, found: 1 });
+          expect(claude.drafts).toBe(draftsBefore + 1);
+          expect(claude.searches).toHaveLength(1); // No web search: only the first run's.
+          const [latest] = await runsOf(cookie);
+          expect(latest).toMatchObject({ trigger: 'sweep', status: 'done' });
+          const detail = runOf(
+            await send('GET', `/api/job-search/runs/${latest?.id ?? ''}`, cookie),
+          );
+          const fresh = byRole(detail.hits, 'Product Manager, Risk');
+          expect(fresh.kind).toBe('target');
+          expect(fresh.draft).not.toBeNull();
+
+          // The same job is never saved twice.
+          expect((await cron(CRON_SECRET)).json()).toMatchObject({ found: 0 });
+          expect(await runsOf(cookie)).toHaveLength(2);
+        } finally {
+          delete PAGES[LIST];
+          delete PAGES[apiUrl(110)];
+        }
+      });
+
+      it('notes a board that cannot be read, and reads it again next time', async () => {
+        env['JOB_SEARCH_USER_IDS'] = '';
+        const { cookie, user } = await member();
+        await run(cookie);
+        const board = async () =>
+          (
+            await t.db.query<{ last_swept_at: Date | null; last_error: string | null }>(
+              "select last_swept_at, last_error from job_search_boards where user_id = $1 and board = 'acme'",
+              [user.id],
+            )
+          ).rows[0];
+        TIMING_OUT.add(LIST);
+        expect((await cron(CRON_SECRET)).statusCode).toBe(200);
+        expect((await board())?.last_error).toBe('slow board');
+        TIMING_OUT.clear();
+        try {
+          PAGES[LIST] = JSON.stringify({ jobs: [] });
+          await cron(CRON_SECRET);
+          expect(await board()).toMatchObject({ last_error: null, last_swept_at: T0 });
+        } finally {
+          delete PAGES[LIST];
+        }
+      });
+    });
+
     it('checks waiting jobs about once a day, closing the gone ones', async () => {
       env['JOB_SEARCH_USER_IDS'] = '';
       const { cookie } = await member();
@@ -1473,11 +1568,21 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
       env['JOB_SEARCH_USER_IDS'] = '';
       const { cookie } = await member();
       t.clock.set(new Date('2026-11-05T12:30:00Z')); // 07:30 in New York
-      expect((await cron(CRON_SECRET)).json()).toEqual({ started: 0, drafted: 0, failed: 0 });
+      expect((await cron(CRON_SECRET)).json()).toEqual({
+        started: 0,
+        drafted: 0,
+        failed: 0,
+        found: 0,
+      });
 
       await send('PUT', '/api/job-search/profile', cookie, { ...PROFILE, scheduleOn: false });
       t.clock.set(new Date('2026-11-05T15:00:00Z'));
-      expect((await cron(CRON_SECRET)).json()).toEqual({ started: 0, drafted: 0, failed: 0 });
+      expect((await cron(CRON_SECRET)).json()).toEqual({
+        started: 0,
+        drafted: 0,
+        failed: 0,
+        found: 0,
+      });
     });
   });
 });
