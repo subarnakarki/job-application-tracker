@@ -17,6 +17,7 @@ const PROFILE: JobSearchProfile = {
   portfolio: '',
   website: '',
   workModes: ['Remote', 'Hybrid'],
+  commuteArea: [],
   usOnly: true,
   sites: [...SEARCH_SOURCES],
   queries: ['site:job-boards.greenhouse.io "product manager"'],

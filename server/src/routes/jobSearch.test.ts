@@ -176,6 +176,7 @@ const PROFILE: JobSearchProfile = {
   portfolio: '',
   website: '',
   workModes: ['Remote', 'Hybrid'],
+  commuteArea: [],
   usOnly: true,
   sites: [...SEARCH_SOURCES],
   queries: [DEFAULT_QUERY],
@@ -477,6 +478,19 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
       claude.links = [jobLink(105)];
       const { hits } = runOf(await run(cookie));
       expect(byRole(hits, 'Product Manager, EMEA').kind).toBe('target');
+    });
+
+    it('saves a commute area with the setup', async () => {
+      const { cookie } = await member();
+      const area = ['Charlotte', 'Concord'];
+      expect(
+        (await send('PUT', '/api/job-search/profile', cookie, { ...PROFILE, commuteArea: area }))
+          .statusCode,
+      ).toBe(200);
+      const setup = parsed(JobSearchSetupSchema)(
+        await send('GET', '/api/job-search/profile', cookie),
+      );
+      expect(setup.profile?.commuteArea).toEqual(area);
     });
 
     it('skips a job whose posted pay tops out below the floor, and keeps the rest', async () => {

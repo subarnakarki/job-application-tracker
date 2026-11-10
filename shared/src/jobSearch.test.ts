@@ -23,6 +23,7 @@ import {
   EMPTY_MORE_ANSWERS,
   googleSearchUrl,
   isRunDue,
+  CHARLOTTE_CORE,
   MAX_SCHEDULED_TRIES_PER_DAY,
   JobSearchProfileSchema,
   jobRefOf,
@@ -159,6 +160,8 @@ describe('sortJob', () => {
     timeframeDays: 1,
     usOnly: true,
     salaryFloor: null,
+    commuteArea: [],
+    homeState: 'MA',
     now: NOW,
   };
   const job = (overrides: Partial<JobFacts> = {}): JobFacts => ({
@@ -171,6 +174,70 @@ describe('sortJob', () => {
     location: 'Remote, United States',
     country: null,
     ...overrides,
+  });
+
+  describe('a commute area: remote anywhere, hybrid and on-site only near home', () => {
+    const near = {
+      workModes: ['Remote', 'Hybrid', 'On-site'] as SortRules['workModes'],
+      commuteArea: [...CHARLOTTE_CORE],
+      homeState: 'NC',
+    };
+    it.each<[string, Partial<JobFacts>, string, string]>([
+      ['hybrid in Concord, NC', { workMode: 'Hybrid', location: 'Concord, NC' }, 'target', ''],
+      [
+        'on-site in Charlotte, North Carolina',
+        { workMode: 'On-site', location: 'Charlotte, North Carolina, United States' },
+        'target',
+        '',
+      ],
+      [
+        'hybrid in Charlotte with no state',
+        { workMode: 'Hybrid', location: 'Charlotte' },
+        'target',
+        '',
+      ],
+      [
+        'several places, one of them in the area',
+        { workMode: 'Hybrid', location: 'Austin, TX; Charlotte, NC' },
+        'target',
+        '',
+      ],
+      ['remote anywhere', { workMode: 'Remote', location: 'Remote - Seattle, WA' }, 'target', ''],
+      ['no work mode given', { workMode: null, location: 'Seattle, WA' }, 'target', ''],
+      [
+        'on-site in Austin',
+        { workMode: 'On-site', location: 'Austin, TX' },
+        'skipped',
+        'On-site in Austin, TX: outside your commute area',
+      ],
+      [
+        'hybrid in a Concord in another state',
+        { workMode: 'Hybrid', location: 'Concord, CA' },
+        'skipped',
+        'Hybrid in Concord, CA: outside your commute area',
+      ],
+      [
+        'hybrid with no location',
+        { workMode: 'Hybrid', location: null },
+        'skipped',
+        "Hybrid, and the location isn't clear",
+      ],
+      [
+        'hybrid in "Multiple locations"',
+        { workMode: 'Hybrid', location: 'Multiple locations' },
+        'skipped',
+        "Hybrid, and the location isn't clear",
+      ],
+    ])('%s', (_name, overrides, kind, reason) => {
+      const sorted = sortJob(job(overrides), { ...rules, ...near });
+      expect(sorted.kind).toBe(kind);
+      if (reason) expect(sorted.reason).toBe(reason);
+    });
+
+    it('changes nothing without a commute area', () => {
+      const austin = job({ workMode: 'On-site', location: 'Austin, TX' });
+      expect(sortJob(austin, { ...rules, ...near, commuteArea: [] }).kind).toBe('target');
+    });
   });
 
   it.each<[string, Partial<JobFacts>, Partial<SortRules>, string, string]>([
@@ -438,6 +505,7 @@ const PROFILE: JobSearchProfile = {
   portfolio: '',
   website: 'https://pat.example.com',
   workModes: ['Remote'],
+  commuteArea: [],
   usOnly: true,
   sites: [...SEARCH_SOURCES],
   queries: [DEFAULT_QUERY],
@@ -473,6 +541,17 @@ describe('JobSearchProfileSchema', () => {
     const older: Partial<JobSearchProfile> = { ...PROFILE };
     delete older.salaryFloor;
     expect(JobSearchProfileSchema.parse(older).salaryFloor).toBeNull();
+  });
+
+  it('keeps a commute area, and loads a setup saved before it with none', () => {
+    expect(
+      JobSearchProfileSchema.parse({ ...PROFILE, commuteArea: [...CHARLOTTE_CORE] }).commuteArea,
+    ).toEqual([...CHARLOTTE_CORE]);
+    const older: Partial<JobSearchProfile> = { ...PROFILE };
+    delete older.commuteArea;
+    expect(JobSearchProfileSchema.parse(older).commuteArea).toEqual([]);
+    const blank = JobSearchProfileSchema.safeParse({ ...PROFILE, commuteArea: ['Charlotte', ' '] });
+    expect(blank.error?.issues[0]?.path).toEqual(['commuteArea', 1]);
   });
 
   it.each([

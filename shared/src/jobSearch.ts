@@ -598,6 +598,67 @@ export function locationVerdict(location: string | null, country: string | null)
   return 'unknown';
 }
 
+/** The Charlotte core area (Mecklenburg and Cabarrus counties): a ready-made commute area. */
+export const CHARLOTTE_CORE = [
+  'Charlotte',
+  'Concord',
+  'Kannapolis',
+  'Huntersville',
+  'Cornelius',
+  'Davidson',
+  'Matthews',
+  'Mint Hill',
+  'Pineville',
+  'Harrisburg',
+  'Midland',
+  'Mount Pleasant',
+] as const;
+
+/** A state given as a code ("NC") or a name ("North Carolina"), as its code; null otherwise. */
+function stateCode(value: string): string | null {
+  const text = value.trim();
+  if (STATE_CODES.has(text.toUpperCase())) return text.toUpperCase();
+  return US_STATES.find(([, name]) => name.toLowerCase() === text.toLowerCase())?.[0] ?? null;
+}
+
+/** The states one place names: a code after a comma or dash, or a full name. */
+function statesIn(place: string): string[] {
+  const codes = [...place.matchAll(/[,\-–]\s*([A-Z]{2})\b/g)]
+    .map((match) => match[1] ?? '')
+    .filter((code) => STATE_CODES.has(code));
+  const named = US_STATES.filter(([, name]) => hasPhrase(place, name)).map(([code]) => code);
+  return [...codes, ...named];
+}
+
+export type CommuteVerdict = 'inside' | 'outside' | 'unclear';
+
+/**
+ * Whether a job's location is in the commute area: one of its places names a place in the area,
+ * in the home state or with no state given ("Concord, NC" or "Concord", not "Concord, CA"). A
+ * location that names somewhere else is outside; a blank or vague one ("Multiple locations") is
+ * unclear.
+ */
+export function commuteVerdict(
+  location: string | null,
+  area: readonly string[],
+  homeState: string | null,
+): CommuteVerdict {
+  if (!location?.trim()) return 'unclear';
+  const home = homeState ? stateCode(homeState) : null;
+  const places = location
+    .split(/[;|/•·]|\bor\b/)
+    .map((place) => place.trim())
+    .filter(Boolean);
+  for (const place of places) {
+    if (!area.some((name) => name.trim() && hasPhrase(place, name.trim()))) continue;
+    const states = statesIn(place);
+    if (states.length === 0 || home === null || states.includes(home)) return 'inside';
+  }
+  return places.some((place) => statesIn(place).length > 0 || placeVerdict(place) !== 'unknown')
+    ? 'outside'
+    : 'unclear';
+}
+
 // ---------------------------------------------------------------------------------------------
 // Sorting jobs
 
@@ -644,6 +705,10 @@ export interface SortRules {
   usOnly: boolean;
   /** Skip jobs whose posted yearly pay (USD) tops out below this. Null: no floor. */
   salaryFloor: number | null;
+  /** Places a hybrid or on-site job must be in; empty: no such rule. */
+  commuteArea: readonly string[];
+  /** The user's state, for telling "Concord, NC" from "Concord, CA". */
+  homeState: string | null;
   now: Date;
 }
 
@@ -703,6 +768,16 @@ export function sortJob(job: JobFacts, rules: SortRules): Sorted {
     };
   if (job.workMode && rules.workModes.length > 0 && !rules.workModes.includes(job.workMode))
     return { kind: 'skipped', reason: `${job.workMode}, which you don't want` };
+  if (job.workMode && job.workMode !== 'Remote' && rules.commuteArea.length > 0) {
+    const commute = commuteVerdict(job.location, rules.commuteArea, rules.homeState);
+    if (commute === 'outside')
+      return {
+        kind: 'skipped',
+        reason: `${job.workMode} in ${(job.location ?? '').slice(0, 120)}: outside your commute area`,
+      };
+    if (commute === 'unclear')
+      return { kind: 'skipped', reason: `${job.workMode}, and the location isn't clear` };
+  }
   const underFloor = belowSalaryFloor(job.salary ?? null, rules.salaryFloor);
   if (underFloor) return { kind: 'skipped', reason: underFloor };
 
@@ -869,6 +944,11 @@ export const JobSearchProfileSchema = z
     portfolio: link,
     website: link,
     workModes: z.array(z.enum(WORK_MODES)).min(1).max(3),
+    /**
+     * Places a hybrid or on-site job must be in (a remote one can be anywhere). Empty: work modes
+     * alone decide. Setups saved before it load as empty.
+     */
+    commuteArea: z.array(required(100)).max(40).default([]),
     /** Skip jobs clearly outside the United States (on unless turned off). */
     usOnly: z.boolean().default(true),
     /** The job sites to search (all of them unless narrowed). */
@@ -928,6 +1008,7 @@ export type JobSearchProfile = z.infer<typeof JobSearchProfileSchema>;
 export const PROFILE_DEFAULTS = {
   salaryFloor: null,
   workModes: ['Remote', 'Hybrid'] as WorkMode[],
+  commuteArea: [] as string[],
   usOnly: true,
   queries: [] as string[],
   sites: [...SEARCH_SOURCES],
@@ -1991,6 +2072,8 @@ export function olderMatchKind(
       timeframeDays: profile.timeframeDays,
       usOnly: profile.usOnly,
       salaryFloor: profile.salaryFloor,
+      commuteArea: profile.commuteArea,
+      homeState: profile.state,
       now,
     },
   );

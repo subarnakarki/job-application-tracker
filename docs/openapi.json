@@ -14216,6 +14216,15 @@
                                 ]
                               }
                             },
+                            "commuteArea": {
+                              "default": [],
+                              "maxItems": 40,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 100
+                              }
+                            },
                             "usOnly": {
                               "default": true,
                               "type": "boolean"
@@ -14778,6 +14787,7 @@
                             "portfolio",
                             "website",
                             "workModes",
+                            "commuteArea",
                             "usOnly",
                             "sites",
                             "queries",
@@ -14968,6 +14978,15 @@
                         "Hybrid",
                         "On-site"
                       ]
+                    }
+                  },
+                  "commuteArea": {
+                    "default": [],
+                    "maxItems": 40,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 100
                     }
                   },
                   "usOnly": {
@@ -15620,6 +15639,15 @@
                                 ]
                               }
                             },
+                            "commuteArea": {
+                              "default": [],
+                              "maxItems": 40,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 100
+                              }
+                            },
                             "usOnly": {
                               "default": true,
                               "type": "boolean"
@@ -16182,6 +16210,7 @@
                             "portfolio",
                             "website",
                             "workModes",
+                            "commuteArea",
                             "usOnly",
                             "sites",
                             "queries",
@@ -24029,6 +24058,15 @@
                                     ]
                                   }
                                 },
+                                "commuteArea": {
+                                  "default": [],
+                                  "maxItems": 40,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "maxLength": 100
+                                  }
+                                },
                                 "usOnly": {
                                   "default": true,
                                   "type": "boolean"
@@ -24591,6 +24629,7 @@
                                 "portfolio",
                                 "website",
                                 "workModes",
+                                "commuteArea",
                                 "usOnly",
                                 "sites",
                                 "queries",

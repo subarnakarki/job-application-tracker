@@ -190,6 +190,8 @@ export async function runJobSearch(
       timeframeDays: profile.timeframeDays,
       usOnly: profile.usOnly,
       salaryFloor: profile.salaryFloor,
+      commuteArea: profile.commuteArea,
+      homeState: profile.state,
       now,
     };
     const toRead = refs.slice(0, MAX_NEW_JOBS_PER_RUN);
