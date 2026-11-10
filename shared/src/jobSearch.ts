@@ -723,6 +723,27 @@ const anyIn = (terms: string[], text: string): string | undefined => {
   return terms.find((term) => term.trim() && index.has(term));
 };
 
+/** Words that carry no meaning in a job title: "engineer in test" is "engineer" and "test". */
+const TITLE_FILLERS = new Set(['in', 'of', 'the', 'and', 'for', 'a', 'an', 'to']);
+
+/**
+ * The first wanted title a job's title matches: the phrase as written, or, for a title of several
+ * words, every word of it as a whole word in any order ("QA automation engineer" matches
+ * "Automation QA Engineer - Senior"). Titles are named in many orders; a phrase alone misses them.
+ */
+export function titleMatch(wanted: readonly string[], title: string): string | undefined {
+  const index = indexText(title);
+  return wanted.find((term) => {
+    const phrase = term.trim();
+    if (!phrase) return false;
+    if (index.has(phrase)) return true;
+    const words = phrase
+      .split(/[\s,/()|–—-]+/)
+      .filter((word) => word && !TITLE_FILLERS.has(word.toLowerCase()));
+    return words.length > 1 && words.every((word) => index.has(word));
+  });
+}
+
 const dollars = (value: number) => `$${value.toLocaleString('en-US')}`;
 
 /**
@@ -818,7 +839,7 @@ export function sortJob(job: JobFacts, rules: SortRules): Sorted {
   if (underFloor) return { kind: 'skipped', reason: underFloor };
 
   const wanted = rules.includeTitles.length > 0 ? rules.includeTitles : rules.queryTerms;
-  const inTitle = wanted.length === 0 || anyIn(wanted, job.title) !== undefined;
+  const inTitle = wanted.length === 0 || titleMatch(wanted, job.title) !== undefined;
   if (!inTitle)
     return {
       kind: 'keyword_only',

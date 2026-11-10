@@ -1,4 +1,4 @@
-import { indexText, jobRefOf, type JobRef, type SearchSource } from '@jat/shared';
+import { indexText, jobRefOf, titleMatch, type JobRef, type SearchSource } from '@jat/shared';
 import { BOARD_SOURCES, BOARDS, type BoardJob, type BoardSource } from '../postings/boards';
 import type { PageFetcher } from '../postings/fetchPage';
 
@@ -48,8 +48,7 @@ function refOf(job: BoardJob, board: WatchedBoard): JobRef | null {
 export function worthReading(job: BoardJob, rules: SweepRules): boolean {
   const title = indexText(job.title);
   if (rules.skipped.some((term) => term.trim() && title.has(term))) return false;
-  if (rules.wanted.length > 0 && !rules.wanted.some((term) => term.trim() && title.has(term)))
-    return false;
+  if (rules.wanted.length > 0 && titleMatch(rules.wanted, job.title) === undefined) return false;
   const day = job.details.postedOn;
   // A list without dates cannot show what is new; those jobs are left to the search.
   if (!day) return false;

@@ -23,6 +23,7 @@ import {
   EMPTY_MORE_ANSWERS,
   googleSearchUrl,
   isRunDue,
+  titleMatch,
   workModeInText,
   CHARLOTTE_CORE,
   MAX_SCHEDULED_TRIES_PER_DAY,
@@ -444,6 +445,31 @@ describe('sortJob', () => {
     ],
   ])('%s', (_label, overrides, ruleOverrides, kind, reason) => {
     expect(sortJob(job(overrides), { ...rules, ...ruleOverrides })).toEqual({ kind, reason });
+  });
+});
+
+describe('titleMatch: wanted titles against a job title', () => {
+  it.each<[string, string, boolean]>([
+    ['QA automation engineer', 'Automation QA Engineer - Senior', true],
+    ['QA engineer', 'Lead QA Engineer, AI Automation', true],
+    ['software engineer, quality', 'Software Quality Engineer II', true],
+    ['software development engineer in test', 'Software Development Engineer, Test', true],
+    ['head of QA', 'Head of Quality and QA', true],
+    ['QA lead', 'Lead Engineer, QA Tools', true],
+    // Every word must be there, as a whole word.
+    ['QA lead', 'QA Engineer', false],
+    ['QA lead', 'Leading QA Engineer', false],
+    ['test engineer', 'Latest Engineer', false],
+    // One-word titles are as before.
+    ['SDET', 'Senior SDET', true],
+    ['Playwright', 'Software Engineer', false],
+  ])('"%s" in "%s": %s', (wanted, title, matches) => {
+    expect(titleMatch([wanted], title) !== undefined).toBe(matches);
+  });
+
+  it('gives the first title that matches, and none for blank titles', () => {
+    expect(titleMatch(['Cypress', 'QA lead', 'QA engineer'], 'Lead QA Engineer')).toBe('QA lead');
+    expect(titleMatch([' ', ''], 'Lead QA Engineer')).toBeUndefined();
   });
 });
 
