@@ -1068,7 +1068,7 @@ Built as planned, each step pushed green (CI passed on the last):
 
 ## Phase 20 plan: a reliable scheduled search (proposed, awaiting approval)
 
-From the full review of 9 November 2026: the top four items. The scheduled search can lose a day silently,
+From the full review of 9 November 2026: its top five items. The scheduled search can lose a day silently,
 overrun its time limit, and retry a draft that always fails every hour. Owner's answers: up to 3 tries a day; a job
 whose draft failed 3 times goes to Needs you.
 
@@ -1103,18 +1103,33 @@ whose draft failed 3 times goes to Needs you.
 - The cron handler calls `deleteExpiredSessions` and `deleteExpiredRateLimits` once per call, before the users,
   inside its own try/catch; counts logged.
 
+### 20e. A cheaper search call, measured (no migration)
+
+The search call (about 80% of model spend) only issues web searches; links come from the tool results and code
+does the sorting. So:
+
+- Cache the continuation turns: the search request gets top-level `cache_control: { type: 'ephemeral' }`, so a
+  `pause_turn` continuation reads the earlier turn (search results included) from cache instead of paying for it
+  again.
+- The search prompt says not to list links in the answer (they are already taken from the tool results): fewer
+  output tokens.
+- The search model becomes its own setting, `JOB_SEARCH_SEARCH_MODEL` (default: today's model, so nothing changes
+  until it is set). `model_usage` records the model per call, so a trial is measurable.
+- Trial: one week on a smaller model, compared with the week before on cost per run and on jobs found per run
+  (new hits after the sweep). The owner decides whether to keep it; switching back is one setting.
+
 ### Order and tests
 
-20a, 20c, 20d (no migration), then migration 0016 alone, Migrate, then 20b; each a small commit, green and
-pushed. Unit: `isRunDue` with 0 to 3 tries, failed runs not counting, weekly cadence after a failure. API: a failed
+20a, 20c, 20d (no migration), then migration 0016 alone, Migrate, then 20b, then 20e; each a small commit, green
+and pushed. Unit: `isRunDue` with 0 to 3 tries, failed runs not counting, weekly cadence after a failure. API: a failed
 scheduled run then a later knock starts a new one; the fourth knock after 3 failures does not; a stale running run;
 the deadline reached mid-search (fake Claude, fake clock) finishes `done`; one user throwing while the next is
 due; a draft failing 3 times lands in Needs you and is not drafted again, then a manual draft succeeds; cleanup
-removes expired sessions and rate-limit windows. E2E: the Needs you card for an undraftable job (seeded via the
+removes expired sessions and rate-limit windows; the search request carries `cache_control` and the configured
+model, and the default is unchanged when the setting is absent. E2E: the Needs you card for an undraftable job (seeded via the
 API).
 
-Not in this phase (from the same review, for later): a cheaper model for the search call and caching its
-continuation turns, a "last successful run" warning on the queue page, atomic "Mark applied", the drafting N+1,
+Not in this phase (from the same review, for later): a "last successful run" warning on the queue page, atomic "Mark applied", the drafting N+1,
 route code-splitting and an error boundary, splitting the largest files.
 
 ## Planned but not built
