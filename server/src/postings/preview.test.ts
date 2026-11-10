@@ -62,6 +62,22 @@ describe('fill from link: schema.org JobPosting on the page', () => {
     });
   });
 
+  it('takes a yearly pay range from the description when there is no salary field', async () => {
+    // As jobs.iqvia.com writes it.
+    const html = ldPage({
+      '@type': 'JobPosting',
+      title: 'Associate Dir, Software Test',
+      hiringOrganization: { name: 'IQVIA' },
+      description:
+        '<p>Leads quality strategy.</p><p>The potential base pay range for this role is $91,000.00 - $253,700.00. The actual base pay offered may vary.</p>',
+    });
+    const preview = await previewPosting(
+      'https://jobs.example.org/qa',
+      pages({ 'https://jobs.example.org/qa': html }),
+    );
+    expect(preview).toMatchObject({ salaryMin: 91000, salaryMax: 253700, salaryCurrency: 'USD' });
+  });
+
   it('finds it inside @graph, skips broken blocks, and ignores hourly pay', async () => {
     const html =
       '<script type="application/ld+json">{ not json</script>' +

@@ -5,6 +5,7 @@ import {
   dayOf,
   fieldOf,
   locationOf,
+  salaryInText,
   salaryRange,
   workModeOf,
   type Details,
@@ -78,10 +79,14 @@ export function fromJobPostingObject(posting: Record<string, unknown>): Details 
       : cleanText(fieldOf(organization, 'name'), LIMITS.company);
   const remote = asArray(posting['jobLocationType']).some((type) => workModeOf(type) === 'Remote');
   const places = asArray(posting['jobLocation']).map(placeName);
+  const description = posting['description'];
   return {
     company,
     role: cleanText(posting['title'], LIMITS.role),
-    salary: salaryOf(posting),
+    // Many postings give the pay only in their text ("The potential base pay range for this role
+    // is $91,000.00 - $253,700.00").
+    salary:
+      salaryOf(posting) ?? (typeof description === 'string' ? salaryInText(description) : null),
     location: locationOf(places),
     workMode: remote ? 'Remote' : null,
     postedOn: dayOf(posting['datePosted']),
