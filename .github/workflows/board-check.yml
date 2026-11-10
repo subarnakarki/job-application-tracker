@@ -1,0 +1,31 @@
+# Reads one open job on each job board the app knows, live (server/src/postings/liveCheck.ts). The
+# unit tests use saved responses, so only this notices a board changing its pages or API. A broken
+# board fails the run, which GitHub emails to the owner; the run summary lists what broke.
+name: Job board live check
+
+on:
+  schedule:
+    # Daily, 11:23 UTC (early morning US East); off the hour, when GitHub drops fewer scheduled runs.
+    - cron: '23 11 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: board-check
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Read one live job per board
+        run: npm run check:boards -w @jat/server
