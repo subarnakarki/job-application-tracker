@@ -17,9 +17,9 @@ import { runImport } from '../import/run';
 import { EmailVerdictSchema } from '../import/verdict';
 import { JobSearchProfileSchema, type ModelDraft } from '@jat/shared';
 import type { JobSearchClaude } from '../jobsearch/claude';
-import { runJobSearch } from '../jobsearch/run';
+import { draftPending, runJobSearch } from '../jobsearch/run';
 import { FetchError, type PageFetcher } from '../postings/fetchPage';
-import { saveProfile } from '../repo/jobSearch';
+import { MAX_DRAFT_ATTEMPTS, saveProfile } from '../repo/jobSearch';
 
 const TestLoginResponse = z.strictObject({ user: UserSchema, token: z.string() });
 const NowResponse = z.strictObject({ now: z.iso.datetime({ offset: true }) });
@@ -59,6 +59,8 @@ const JobSearchSeedBody = z.strictObject({
           .max(30),
         /** The posting keywords the draft returns (for the fit score). */
         keywords: z.array(z.string().min(1).max(100)).max(30).default([]),
+        /** Every draft of this job fails: the seed retries until it gives up (Needs you). */
+        undraftable: z.boolean().default(false),
       }),
     )
     .max(20),
@@ -302,24 +304,32 @@ export function registerTestRoutes(app: FastifyInstance, deps: TestRouteDeps): v
         tailorPosting: () => Promise.resolve(null),
         search: () =>
           Promise.resolve({ links: [...pages.values()].map((page) => page.link), searches: 1 }),
-        draft: (draftRequest): Promise<ModelDraft> =>
-          Promise.resolve({
-            answers: draftRequest.questions.map((question) => {
-              const answer = body.answers[question.label];
-              return {
-                question: question.label,
-                answer: answer ?? '',
-                needsCandidate: answer === undefined,
-              };
-            }),
-            coverLetter: `Dear ${draftRequest.company} team, I would love to join as ${draftRequest.role}.`,
-            whyInterested: 'The work matches my experience.',
-            keywords: (
-              body.jobs.find(
-                (job) => job.company === draftRequest.company && job.title === draftRequest.role,
-              )?.keywords ?? []
-            ).map((term) => ({ term, group: 'hard_skill' as const })),
-          }),
+        draft: (draftRequest): Promise<ModelDraft | null> =>
+          body.jobs.some(
+            (job) =>
+              job.undraftable &&
+              job.company === draftRequest.company &&
+              job.title === draftRequest.role,
+          )
+            ? Promise.resolve(null)
+            : Promise.resolve({
+                answers: draftRequest.questions.map((question) => {
+                  const answer = body.answers[question.label];
+                  return {
+                    question: question.label,
+                    answer: answer ?? '',
+                    needsCandidate: answer === undefined,
+                  };
+                }),
+                coverLetter: `Dear ${draftRequest.company} team, I would love to join as ${draftRequest.role}.`,
+                whyInterested: 'The work matches my experience.',
+                keywords: (
+                  body.jobs.find(
+                    (job) =>
+                      job.company === draftRequest.company && job.title === draftRequest.role,
+                  )?.keywords ?? []
+                ).map((term) => ({ term, group: 'hard_skill' as const })),
+              }),
       };
       const result = await runJobSearch(
         { db, clock: request.clock, claude, fetchPage, fetchBoard: fetchPage },
@@ -329,6 +339,15 @@ export function registerTestRoutes(app: FastifyInstance, deps: TestRouteDeps): v
         Date.now() + 60_000,
       );
       if (result.kind !== 'done') throw new ApiError(409, 'run_in_progress', 'A run is going');
+      // The scheduled retries of a job that cannot be drafted, until it gives up.
+      if (body.jobs.some((job) => job.undraftable))
+        for (let attempt = 1; attempt < MAX_DRAFT_ATTEMPTS; attempt += 1)
+          await draftPending(
+            { db, clock: request.clock, claude, fetchPage, fetchBoard: fetchPage },
+            user.id,
+            body.profile,
+            Date.now() + 60_000,
+          );
       return { runId: result.runId };
     },
   );

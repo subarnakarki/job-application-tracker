@@ -63,6 +63,8 @@ export class Api {
       questions: { label: string; required: boolean; options: string[] }[];
       /** The posting keywords its draft returns (for the fit score). */
       keywords?: string[];
+      /** Every draft of it fails, so the seed gives up on it (Needs you). */
+      undraftable?: boolean;
     }[];
     answers: Record<string, string>;
   }) {

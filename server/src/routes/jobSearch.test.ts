@@ -24,7 +24,7 @@ import type { JobSearchClaude, TailorRequest } from '../jobsearch/claude';
 import { FetchError, type PageFetcher } from '../postings/fetchPage';
 import { createTestApp, SAME_ORIGIN, T0, type TestApp } from '../test/app';
 import { TEST_DATABASE_URL } from '../test/testDb';
-import { getHit } from '../repo/jobSearch';
+import { GAVE_UP_DRAFTING, getHit } from '../repo/jobSearch';
 import { consumeRateLimit } from '../auth/rateLimit';
 import { createSession } from '../auth/sessions';
 import { CHECK_RULE, MANUAL_RUN_RULE, RUN_BUDGET_MS, TAILOR_RULE } from './jobSearch';
@@ -273,6 +273,18 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
     return login;
   }
   const run = (cookie: string) => send('POST', '/api/job-search/runs', cookie);
+  /** A knock from the hourly schedule. */
+  const cron = (secret?: string) =>
+    t.app.inject({
+      method: 'POST',
+      url: '/api/cron/job-search',
+      headers: {
+        'content-type': 'application/json',
+        ...(secret ? { 'x-cron-secret': secret } : {}),
+      },
+      payload: '{}',
+    });
+
   const byRole = (hits: JobHit[], role: string) => {
     const hit = hits.find((entry) => entry.role === role);
     if (!hit) throw new Error(`no hit for ${role}`);
@@ -584,6 +596,44 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
         state: 'new',
         draftError: 'The draft did not finish',
       });
+    });
+
+    it('stops drafting a job after 3 failed tries, moving it to Needs you until Redraft', async () => {
+      const { cookie } = await member();
+      claude.draftsFail = true;
+      const { hits } = runOf(await run(cookie)); // try 1
+      const target = byRole(hits, 'Senior Product Manager');
+      // T0 is 07:00 in New York, before the run hour: the knocks only draft (tries 2 and 3).
+      await cron(CRON_SECRET);
+      await cron(CRON_SECRET);
+      const stuck = byRole(
+        runOf(await send('GET', `/api/job-search/runs/${target.runId}`, cookie)).hits,
+        'Senior Product Manager',
+      );
+      expect(stuck).toMatchObject({
+        state: 'needs_you',
+        draft: null,
+        draftError: GAVE_UP_DRAFTING,
+      });
+      const queue = queueOf(await send('GET', '/api/job-search/queue', cookie));
+      expect(queue.needsYou.map((hit) => hit.id)).toContain(target.id);
+
+      // Not drafted again by the schedule.
+      const triesSoFar = claude.drafts;
+      await cron(CRON_SECRET);
+      expect(claude.drafts).toBe(triesSoFar);
+
+      // Redraft by hand still works, and a finished draft clears the error.
+      claude.draftsFail = false;
+      expect(
+        (await send('POST', `/api/job-search/hits/${target.id}/redraft`, cookie)).statusCode,
+      ).toBe(200);
+      const drafted = byRole(
+        runOf(await send('GET', `/api/job-search/runs/${target.runId}`, cookie)).hits,
+        'Senior Product Manager',
+      );
+      expect(drafted.draft).not.toBeNull();
+      expect(drafted.draftError).toBeNull();
     });
   });
 
@@ -1256,17 +1306,6 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
   });
 
   describe('the hourly schedule', () => {
-    const cron = (secret?: string) =>
-      t.app.inject({
-        method: 'POST',
-        url: '/api/cron/job-search',
-        headers: {
-          'content-type': 'application/json',
-          ...(secret ? { 'x-cron-secret': secret } : {}),
-        },
-        payload: '{}',
-      });
-
     it('answers 404 without the right secret', async () => {
       expect((await cron()).statusCode).toBe(404);
       expect((await cron('wrong-secret-of-a-good-length-000000')).statusCode).toBe(404);

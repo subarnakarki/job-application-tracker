@@ -438,6 +438,10 @@ export async function listUndrafted(
   return withTracked(db, userId, result.rows.map(toHit));
 }
 
+/** Failed drafts before a job stops being drafted automatically. */
+export const MAX_DRAFT_ATTEMPTS = 3;
+export const GAVE_UP_DRAFTING = `Couldn't draft this job after ${String(MAX_DRAFT_ATTEMPTS)} tries: answer it yourself, or press Redraft`;
+
 export async function saveDraft(
   db: Queryable,
   userId: string,
@@ -446,16 +450,23 @@ export async function saveDraft(
   now: Date,
 ): Promise<void> {
   if ('error' in outcome) {
+    // A job that keeps failing leaves the automatic batch: at MAX_DRAFT_ATTEMPTS it moves to Needs
+    // you, where only Redraft tries it again. One already there (no draft yet) keeps its state.
     await db.query(
-      `update job_search_hits set draft_error = $3, updated_at = $4
-        where user_id = $1 and id = $2 and state = 'new'`,
-      [userId, id, outcome.error.slice(0, 300), now],
+      `update job_search_hits set
+          draft_attempts = draft_attempts + 1,
+          state = case when state = 'new' and draft_attempts + 1 >= $5 then 'needs_you' else state end,
+          draft_error = case when state = 'new' and draft_attempts + 1 < $5 then $3 else $6 end,
+          updated_at = $4
+        where user_id = $1 and id = $2 and (state = 'new' or (state = 'needs_you' and draft is null))`,
+      [userId, id, outcome.error.slice(0, 300), now, MAX_DRAFT_ATTEMPTS, GAVE_UP_DRAFTING],
     );
     return;
   }
   // Only a job still in the queue: one marked applied or skipped meanwhile keeps its state.
   await db.query(
-    `update job_search_hits set draft = $3, state = $4, draft_error = null, updated_at = $5
+    `update job_search_hits set draft = $3, state = $4, draft_error = null, draft_attempts = 0,
+        updated_at = $5
       where user_id = $1 and id = $2 and state in ('new', 'ready', 'needs_you')`,
     [userId, id, JSON.stringify(outcome.draft), outcome.needsYou ? 'needs_you' : 'ready', now],
   );

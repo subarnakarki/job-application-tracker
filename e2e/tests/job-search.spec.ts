@@ -609,3 +609,36 @@ test("save a queue job's tailored resume: it is tracked as Saved and kept on the
     /- Planned launches in Jira\.$/,
   );
 });
+
+test('a job that could not be drafted waits in Needs you, with Redraft', async ({ page, api }) => {
+  await api.uploadResumeText('Pat Example. Senior product manager. '.repeat(10));
+  await api.seedJobSearch({
+    profile: PROFILE,
+    jobs: [
+      {
+        board: 'hooli',
+        company: 'Hooli',
+        title: 'Senior Product Manager',
+        location: 'Remote, US',
+        hoursAgo: 3,
+        content: 'Own the roadmap. '.repeat(20),
+        questions: [],
+        undraftable: true,
+      },
+    ],
+    answers: {},
+  });
+  const queue = new ApplyQueuePage(page);
+  await queue.goto();
+  await queue.openTab('Needs you');
+  const job = queue.job('Hooli: Senior Product Manager');
+
+  await expect(job).toContainText(
+    "Couldn't draft this job after 3 tries: answer it yourself, or press Redraft.",
+  );
+  await expect(
+    job.getByRole('button', {
+      name: 'Redraft with my current setup: Hooli, Senior Product Manager',
+    }),
+  ).toBeVisible();
+});

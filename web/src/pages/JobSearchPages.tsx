@@ -1673,6 +1673,7 @@ function QueueJob({
         </p>
         <FitLine hit={hit} />
       </div>
+      {!draft && hit.draftError && <p className="text-sm text-amber">{hit.draftError}.</p>}
       <p className="text-sm">
         <a
           className="link break-all underline"
