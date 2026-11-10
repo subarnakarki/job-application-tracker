@@ -722,7 +722,7 @@ test('companies watched: a found company is listed, a bad link is refused, and o
   // A link that is not a careers board is refused, with the reason.
   await section.getByLabel('Add a company').fill('https://example.com/careers');
   await section.getByRole('button', { name: 'Watch', exact: true }).click();
-  await expect(section.getByRole('alert')).toContainText('Greenhouse, Lever or Ashby');
+  await expect(section.getByRole('alert')).toContainText('Greenhouse, Lever, Ashby or Workday');
 
   await section.getByRole('button', { name: 'Stop watching Hooli' }).click();
   await expect(section.getByRole('heading', { level: 2 })).toHaveText('Companies watched (0)');

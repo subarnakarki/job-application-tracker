@@ -1528,6 +1528,55 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
         }
       });
 
+      it('reads a watched Workday site, keeping a new job from what its list says', async () => {
+        env['JOB_SEARCH_USER_IDS'] = '';
+        const { cookie, user } = await member();
+        await t.db.query(
+          "insert into job_search_boards (user_id, source, board, added_by) values ($1, 'workday', 'initech.wd5/External', 'user')",
+          [user.id],
+        );
+        const WORKDAY = 'https://initech.wd5.myworkdayjobs.com/wday/cxs/initech/External/jobs';
+        try {
+          PAGES[WORKDAY] = JSON.stringify({
+            total: 2,
+            jobPostings: [
+              {
+                title: 'Senior Product Manager',
+                externalPath: '/job/Remote-US/Senior-Product-Manager_R77',
+                postedOn: 'Posted Today',
+              },
+              {
+                title: 'Staff Accountant',
+                externalPath: '/job/Remote-US/Staff-Accountant_R78',
+                postedOn: 'Posted Today',
+              },
+            ],
+          });
+          expect((await cron(CRON_SECRET)).json()).toMatchObject({ found: 1 });
+          const [latest] = await runsOf(cookie);
+          expect(latest).toMatchObject({ trigger: 'sweep', status: 'done' });
+          const detail = runOf(
+            await send('GET', `/api/job-search/runs/${latest?.id ?? ''}`, cookie),
+          );
+          expect(detail.hits).toHaveLength(1);
+          // Workday needs an account: the job is listed to finish by hand.
+          expect(detail.hits[0]).toMatchObject({
+            source: 'workday',
+            role: 'Senior Product Manager',
+            kind: 'finish_yourself',
+            jobLink:
+              'https://initech.wd5.myworkdayjobs.com/External/job/Remote-US/Senior-Product-Manager_R77',
+          });
+          const board = await t.db.query<{ last_error: string | null; last_swept_at: Date | null }>(
+            "select last_error, last_swept_at from job_search_boards where user_id = $1 and source = 'workday'",
+            [user.id],
+          );
+          expect(board.rows).toEqual([{ last_error: null, last_swept_at: T0 }]);
+        } finally {
+          delete PAGES[WORKDAY];
+        }
+      });
+
       it('notes a board that cannot be read, and reads it again next time', async () => {
         env['JOB_SEARCH_USER_IDS'] = '';
         const { cookie, user } = await member();

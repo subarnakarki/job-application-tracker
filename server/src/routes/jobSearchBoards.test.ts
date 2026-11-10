@@ -20,6 +20,10 @@ const claude: JobSearchClaude = {
 const LISTS: Record<string, string> = {
   'https://boards-api.greenhouse.io/v1/boards/acme/jobs': JSON.stringify({ jobs: [] }),
   'https://api.lever.co/v0/postings/initech?mode=json': JSON.stringify([]),
+  'https://hooli.wd5.myworkdayjobs.com/wday/cxs/hooli/External/jobs': JSON.stringify({
+    total: 0,
+    jobPostings: [],
+  }),
 };
 const fetchPage: PageFetcher = (url) => {
   const text = LISTS[url];
@@ -115,12 +119,28 @@ describe.skipIf(!TEST_DATABASE_URL)('companies watched (real app, real database)
     expect(boards.items.map((board) => board.board).sort()).toEqual(['acme', 'initech']);
   });
 
+  it('watches a Workday site, named by its host and site', async () => {
+    const { cookie } = await member();
+    const added = await watch(
+      cookie,
+      'https://hooli.wd5.myworkdayjobs.com/en-US/External/job/Remote-US/Senior-SDET_R1',
+    );
+    expect(added.statusCode).toBe(201);
+    expect(WatchedBoardSchema.parse(added.json())).toMatchObject({
+      source: 'workday',
+      board: 'hooli.wd5/External',
+      company: 'Hooli',
+      addedBy: 'user',
+    });
+    expect((await list(cookie)).items.map((board) => board.board)).toEqual(['hooli.wd5/External']);
+  });
+
   it('refuses a link that is not a readable board, and a company whose board cannot be read', async () => {
     const { cookie } = await member();
     const other = await watch(cookie, 'https://example.com/careers');
     expect(other.statusCode).toBe(422);
     expect(other.json()).toMatchObject({ error: 'unsupported_board' });
-    // Workday boards cannot be listed.
+    // A Workday site that does not answer.
     expect(
       (await watch(cookie, 'https://acme.wd1.myworkdayjobs.com/en-US/careers/job/Remote/SDET_R1'))
         .statusCode,

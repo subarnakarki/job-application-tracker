@@ -13,6 +13,7 @@ import type { Db } from '../db/types';
 import { ApiError, parseInput } from '../http/errors';
 import { jobSearchAccess, type JobSearchAccessDeps } from '../jobsearch/access';
 import { companyFromSlug } from '../jobsearch/readJob';
+import { readWorkdayBoard, workdayBoardOf } from '../jobsearch/workday';
 import { BOARD_SOURCES, BOARDS, type BoardSource } from '../postings/boards';
 import type { PageFetcher } from '../postings/fetchPage';
 import {
@@ -40,7 +41,10 @@ const present = (row: WatchedBoardRow): WatchedBoard => ({
   id: row.id,
   source: row.source,
   board: row.board,
-  company: companyFromSlug(row.board),
+  // A Workday board is "tenant.wd5/site": the tenant is the company.
+  company: companyFromSlug(
+    row.source === 'workday' ? (row.board.split('.')[0] ?? row.board) : row.board,
+  ),
   addedBy: row.addedBy,
   lastSweptAt: row.lastSweptAt?.toISOString() ?? null,
   lastError: row.lastError,
@@ -87,7 +91,10 @@ export function registerJobSearchBoardRoutes(
     async (request) => {
       const db = requireDb();
       const { user } = await memberOf(request);
-      const rows = await watchedBoards(db, user.id, MAX_WATCHED_BOARDS, BOARD_SOURCES);
+      const rows = await watchedBoards(db, user.id, MAX_WATCHED_BOARDS, [
+        ...BOARD_SOURCES,
+        'workday',
+      ]);
       return { items: rows.map(present), total: await countWatchedBoards(db, user.id) };
     },
   );
@@ -115,12 +122,14 @@ export function registerJobSearchBoardRoutes(
       const db = requireDb();
       const { user } = await memberOf(request);
       const { link } = parseInput(WatchBoardSchema, request.body);
-      const ref = boardRefOf(link);
-      if (!ref || !isListable(ref.source))
+      // A Workday site is named by its host and site (one company may run several).
+      const workday = workdayBoardOf(link);
+      const ref = workday ? { source: 'workday' as const, board: workday } : boardRefOf(link);
+      if (!ref || !(isListable(ref.source) || workday))
         throw new ApiError(
           422,
           'unsupported_board',
-          'Paste a link to a Greenhouse, Lever or Ashby careers board, or to one of the company’s jobs',
+          'Paste a link to a Greenhouse, Lever, Ashby or Workday careers board, or to one of the company’s jobs',
         );
       const spent = await consumeRateLimit(
         db,
@@ -139,11 +148,19 @@ export function registerJobSearchBoardRoutes(
       if ((await countWatchedBoards(db, user.id)) >= MAX_WATCHED_BOARDS)
         throw new ApiError(409, 'too_many_boards', 'Remove a company before adding another');
       // Read once: a mistyped company would otherwise fail silently every hour.
-      const spec = BOARDS[ref.source];
-      const url = spec.listUrl(ref.board);
       try {
-        if (!url) throw new Error('no list');
-        spec.parseList((await deps.fetchBoard(url)).text, ref.board);
+        if (workday) {
+          await readWorkdayBoard(
+            workday,
+            { wanted: [], skipped: [], timeframeDays: 1, now: deps.clock.now() },
+            deps.fetchBoard,
+          );
+        } else if (isListable(ref.source)) {
+          const spec = BOARDS[ref.source];
+          const url = spec.listUrl(ref.board);
+          if (!url) throw new Error('no list');
+          spec.parseList((await deps.fetchBoard(url)).text, ref.board);
+        }
       } catch {
         throw new ApiError(
           422,

@@ -39,6 +39,7 @@ import { AnalyzerUnavailableError } from '../resume/analyze';
 import type { JobSearchClaude } from './claude';
 import { companyFromSlug, JobReadError, readJob, type JobDetails } from './readJob';
 import { MAX_BOARDS_PER_SWEEP, sweepBoards, type WatchedBoard } from './sweep';
+import { readWorkdayBoard, workdayAddresses, workdayBoardOf } from './workday';
 
 export interface JobSearchDeps {
   db: Db;
@@ -340,19 +341,18 @@ async function readAndSaveJobs(
       },
       clock.now(),
     );
-    // The company's board is watched from now on: its own list shows what it posts next.
-    await watchBoard(
-      db,
-      owner.userId,
-      { source: ref.source, board: ref.board },
-      'search',
-      clock.now(),
-    );
+    // The company's board is watched from now on: its own list shows what it posts next. A
+    // Workday board is named by its host and site, which only the link gives.
+    const board = ref.source === 'workday' ? workdayBoardOf(ref.link) : ref.board;
+    if (board)
+      await watchBoard(db, owner.userId, { source: ref.source, board }, 'search', clock.now());
   }
 }
 
 /** Boards read in one hourly sweep, and the time it may take. */
 export const MAX_BOARDS_PER_HOURLY_SWEEP = 400;
+export const MAX_WORKDAY_BOARDS_PER_SWEEP = 100;
+const WORKDAY_CONCURRENCY = 4;
 export const SWEEP_BUDGET_MS = 60_000;
 
 /**
@@ -371,23 +371,49 @@ export async function sweepNewJobs(
   const now = clock.now();
   const stopAt = Math.min(deadline, Date.now() + SWEEP_BUDGET_MS);
   const boards = await watchedBoards(db, owner.userId, MAX_BOARDS_PER_HOURLY_SWEEP, BOARD_SOURCES);
-  if (boards.length === 0) return 0;
   const queryTerms = searchQueries(profile).flatMap((query) => parseQuery(query).terms);
   const outcomes: { source: string; board: string; error: string | null }[] = [];
+  const rules = {
+    wanted: profile.includeTitles.length > 0 ? profile.includeTitles : queryTerms,
+    skipped: profile.skipTitles,
+    timeframeDays: profile.timeframeDays,
+    now,
+  };
   const swept = await sweepBoards(
     boards,
-    {
-      wanted: profile.includeTitles.length > 0 ? profile.includeTitles : queryTerms,
-      skipped: profile.skipTitles,
-      timeframeDays: profile.timeframeDays,
-      now,
-    },
+    rules,
     deps.fetchBoard,
     () => Date.now() < stopAt,
     () => {},
     {
       limit: MAX_BOARDS_PER_HOURLY_SWEEP,
       onBoard: (board, error) => outcomes.push({ ...board, error }),
+    },
+  );
+  // Workday sites, each asked for its newest postings; what the list says about a job stands in
+  // for its page when that cannot be read.
+  const fromSearch = new Map<string, { title: string; pageAge: string | null }>();
+  const workday = (
+    await watchedBoards(db, owner.userId, MAX_WORKDAY_BOARDS_PER_SWEEP, ['workday'])
+  ).filter((board) => workdayAddresses(board.board) !== null);
+  await pool(
+    workday,
+    WORKDAY_CONCURRENCY,
+    () => Date.now() < stopAt,
+    async (board) => {
+      try {
+        for (const { ref, result } of await readWorkdayBoard(board.board, rules, deps.fetchBoard)) {
+          swept.push(ref);
+          fromSearch.set(`${ref.source}:${ref.board}:${ref.jobId}`, result);
+        }
+        outcomes.push({ source: 'workday', board: board.board, error: null });
+      } catch (error) {
+        outcomes.push({
+          source: 'workday',
+          board: board.board,
+          error: error instanceof Error ? error.message : 'Could not be read',
+        });
+      }
     },
   );
   await markBoardsSwept(db, owner.userId, outcomes, clock.now());
@@ -409,7 +435,7 @@ export async function sweepNewJobs(
     });
     await readAndSaveJobs(deps, owner, profile, runId, toRead, {
       queryTerms,
-      fromSearch: new Map(),
+      fromSearch,
       now,
       deadline,
     });

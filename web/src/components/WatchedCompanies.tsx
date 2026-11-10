@@ -71,7 +71,8 @@ export function WatchedCompanies() {
           </button>
         </div>
         <p id={hintId} className="text-xs text-fg-3">
-          Paste a link to its Greenhouse, Lever or Ashby careers board, or to any of its jobs.
+          Paste a link to its Greenhouse, Lever, Ashby or Workday careers board, or to any of its
+          jobs.
         </p>
         {watch.isError && (
           <p role="alert" className="text-sm text-red">

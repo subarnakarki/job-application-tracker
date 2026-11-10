@@ -15,6 +15,20 @@ beforeAll(async () => {
     if (path === '/posting') {
       response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       response.end('<html><title>Posting</title></html>');
+    } else if (path === '/echo') {
+      // Answers with the method and body it was sent, as JSON.
+      const chunks: Buffer[] = [];
+      request.on('data', (chunk: Buffer) => chunks.push(chunk));
+      request.on('end', () => {
+        response.writeHead(200, { 'content-type': 'application/json' });
+        response.end(
+          JSON.stringify({
+            method: request.method,
+            contentType: request.headers['content-type'] ?? null,
+            body: Buffer.concat(chunks).toString('utf8'),
+          }),
+        );
+      });
     } else if (path === '/hop') {
       response.writeHead(302, { location: '/posting' });
       response.end();
@@ -82,6 +96,22 @@ describe('page fetcher', () => {
       url: `${base}/posting`,
       text: '<html><title>Posting</title></html>',
     });
+  });
+
+  it('sends a JSON POST when asked, and never follows a redirect with one', async () => {
+    const posted = await local()(`${base}/echo`, { json: { limit: 20, searchText: '' } });
+    expect(JSON.parse(posted.text)).toEqual({
+      method: 'POST',
+      contentType: 'application/json',
+      body: '{"limit":20,"searchText":""}',
+    });
+    expect(JSON.parse((await local()(`${base}/echo`)).text)).toMatchObject({
+      method: 'GET',
+      body: '',
+    });
+    expect(await failure(local()(`${base}/hop`, { json: {} }))).toBe('http_status');
+    // The address rules are the same for a POST.
+    expect(await failure(createPageFetcher()(`${base}/echo`, { json: {} }))).toBe('invalid_url');
   });
 
   it('decodes compressed pages', async () => {

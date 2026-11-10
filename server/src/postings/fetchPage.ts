@@ -46,7 +46,11 @@ export interface FetchOptions {
 }
 
 /** Fetches a page someone pasted, safely enough to do from the server. */
-export type PageFetcher = (url: string) => Promise<FetchedPage>;
+/**
+ * Reads a page. With `post`, the request is a POST with that value as its JSON body (a few job
+ * boards list their jobs only that way); the same address checks apply, and a redirect is refused.
+ */
+export type PageFetcher = (url: string, post?: { json: unknown }) => Promise<FetchedPage>;
 
 const REDIRECTS = new Set([301, 302, 303, 307, 308]);
 // HTML pages, JSON APIs (and JSON Feed), and the XML feeds some job boards publish.
@@ -105,7 +109,7 @@ export function createPageFetcher(options: FetchOptions = {}): PageFetcher {
     });
   };
 
-  const once = (url: URL, signal: AbortSignal): Promise<IncomingMessage> =>
+  const once = (url: URL, signal: AbortSignal, body?: string): Promise<IncomingMessage> =>
     new Promise((resolve, reject) => {
       // An address written in the link is never looked up, so it is checked here.
       const host = url.hostname.replace(/^\[|\]$/g, '');
@@ -116,10 +120,16 @@ export function createPageFetcher(options: FetchOptions = {}): PageFetcher {
       const request = (url.protocol === 'https:' ? httpsRequest : httpRequest)(
         url,
         {
-          method: 'GET',
+          method: body === undefined ? 'GET' : 'POST',
           signal,
           lookup: guardedLookup,
           headers: {
+            ...(body === undefined
+              ? {}
+              : {
+                  'content-type': 'application/json',
+                  'content-length': String(Buffer.byteLength(body)),
+                }),
             accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.1',
             'accept-encoding': 'gzip, deflate, br',
             'user-agent': 'JobApplicationTracker/1.0 (fill from link)',
@@ -128,7 +138,7 @@ export function createPageFetcher(options: FetchOptions = {}): PageFetcher {
         resolve,
       );
       request.on('error', reject);
-      request.end();
+      request.end(body);
     });
 
   const readBody = (response: IncomingMessage, signal: AbortSignal): Promise<string> =>
@@ -160,15 +170,18 @@ export function createPageFetcher(options: FetchOptions = {}): PageFetcher {
       });
     });
 
-  return async (raw) => {
+  return async (raw, post) => {
     let url = checkUrl(raw, extraPorts);
+    const body = post === undefined ? undefined : JSON.stringify(post.json);
     const deadline = AbortSignal.timeout(timeoutMs);
     try {
       for (let redirects = 0; ; redirects++) {
-        const response = await once(url, deadline);
+        const response = await once(url, deadline, body);
         const status = response.statusCode ?? 0;
         if (REDIRECTS.has(status)) {
           response.resume();
+          // A POST is never sent on to another address.
+          if (body !== undefined) throw new FetchError('http_status', `${status} to a POST`);
           const location = response.headers.location;
           if (!location) throw new FetchError('http_status', `${status} without Location`);
           if (redirects >= maxRedirects) throw new FetchError('too_many_redirects', `${redirects}`);
