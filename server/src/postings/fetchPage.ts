@@ -1,6 +1,7 @@
 import { lookup as dnsLookup, type LookupAddress } from 'node:dns';
 import { request as httpRequest, type IncomingMessage } from 'node:http';
-import { request as httpsRequest } from 'node:https';
+import { request as httpsRequest, type RequestOptions } from 'node:https';
+import type { ConnectionOptions } from 'node:tls';
 import { isIP } from 'node:net';
 import { createBrotliDecompress, createGunzip, createInflate } from 'node:zlib';
 import { isPublicAddress } from './addressGuard';
@@ -117,24 +118,29 @@ export function createPageFetcher(options: FetchOptions = {}): PageFetcher {
         reject(new FetchError('blocked', 'non-public address in URL'));
         return;
       }
+      const options: RequestOptions & Pick<ConnectionOptions, 'ALPNProtocols'> = {
+        method: body === undefined ? 'GET' : 'POST',
+        signal,
+        lookup: guardedLookup,
+        // Say which HTTP is spoken in the TLS handshake, as browsers and fetch do: Cloudflare's
+        // bot rules refuse (403) a client that does not (jobs.iqvia.com, November 2026). Passed
+        // through to tls.connect; plain http ignores it.
+        ALPNProtocols: ['http/1.1'],
+        headers: {
+          ...(body === undefined
+            ? {}
+            : {
+                'content-type': 'application/json',
+                'content-length': String(Buffer.byteLength(body)),
+              }),
+          accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.1',
+          'accept-encoding': 'gzip, deflate, br',
+          'user-agent': 'JobApplicationTracker/1.0 (fill from link)',
+        },
+      };
       const request = (url.protocol === 'https:' ? httpsRequest : httpRequest)(
         url,
-        {
-          method: body === undefined ? 'GET' : 'POST',
-          signal,
-          lookup: guardedLookup,
-          headers: {
-            ...(body === undefined
-              ? {}
-              : {
-                  'content-type': 'application/json',
-                  'content-length': String(Buffer.byteLength(body)),
-                }),
-            accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.1',
-            'accept-encoding': 'gzip, deflate, br',
-            'user-agent': 'JobApplicationTracker/1.0 (fill from link)',
-          },
-        },
+        options,
         resolve,
       );
       request.on('error', reject);
