@@ -5,6 +5,8 @@ import {
   JobHitSchema,
   JobSearchRunDetailSchema,
   JobSearchRunListSchema,
+  WatchedBoardListSchema,
+  WatchedBoardSchema,
   JobSearchSetupSchema,
   QueueCheckResultSchema,
   ResumeTextSchema,
@@ -621,6 +623,32 @@ export function useJobSearchRuns(enabled: boolean, watching = false) {
     enabled,
     refetchInterval: (query) =>
       watching || query.state.data?.items.some((run) => run.status === 'running') ? 2000 : false,
+  });
+}
+
+/** The companies whose boards are read every hour. */
+export function useWatchedBoards() {
+  return useQuery({
+    queryKey: ['job-search-boards'],
+    queryFn: () => apiRequest('/api/job-search/boards', WatchedBoardListSchema),
+  });
+}
+
+export function useWatchBoard() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (link: string) =>
+      apiRequest('/api/job-search/boards', WatchedBoardSchema, { method: 'POST', body: { link } }),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['job-search-boards'] }),
+  });
+}
+
+export function useUnwatchBoard() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiRequest(`/api/job-search/boards/${encodeURIComponent(id)}`, null, { method: 'DELETE' }),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['job-search-boards'] }),
   });
 }
 

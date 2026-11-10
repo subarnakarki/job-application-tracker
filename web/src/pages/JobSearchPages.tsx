@@ -46,6 +46,7 @@ import {
 } from '../api/hooks';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 import { useToast } from '../components/Toast';
+import { WatchedCompanies } from '../components/WatchedCompanies';
 import { Glow } from '../components/ui/Glow';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Pill } from '../components/ui/Pill';
@@ -1093,6 +1094,8 @@ export function JobSearchPage() {
           ))}
         </ul>
       </section>
+
+      <WatchedCompanies />
 
       <section aria-labelledby="runs-heading" className="flex flex-col gap-3">
         <h2 id="runs-heading" className="text-lg font-semibold tracking-[-0.02em]">

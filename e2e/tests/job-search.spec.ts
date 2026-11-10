@@ -676,3 +676,41 @@ test('commute area: filled with the Charlotte core area, confirmed, saved and ke
   await page.getByRole('checkbox', { name: 'Hybrid' }).uncheck();
   await expect(page.getByLabel('Commute area for hybrid and on-site jobs')).toHaveCount(0);
 });
+
+test('companies watched: a found company is listed, a bad link is refused, and one can be removed', async ({
+  page,
+  api,
+}) => {
+  await api.uploadResumeText('Pat Example. Senior product manager. '.repeat(10));
+  await api.seedJobSearch({
+    profile: PROFILE,
+    jobs: [
+      {
+        board: 'hooli',
+        company: 'Hooli',
+        title: 'Senior Product Manager',
+        location: 'Remote, US',
+        hoursAgo: 3,
+        content: 'Own the roadmap. '.repeat(20),
+        questions: [],
+      },
+    ],
+    answers: {},
+  });
+  await page.goto('/job-search');
+  const section = page.getByRole('region', { name: /^Companies watched/ });
+  await expect(section.getByRole('heading', { level: 2 })).toHaveText('Companies watched (1)');
+  await section.getByText('Show the companies').click();
+  const company = section.getByRole('list', { name: 'Companies watched' }).getByRole('listitem');
+  await expect(company).toContainText('Hooli');
+  await expect(company).toContainText('Greenhouse');
+
+  // A link that is not a careers board is refused, with the reason.
+  await section.getByLabel('Add a company').fill('https://example.com/careers');
+  await section.getByRole('button', { name: 'Watch', exact: true }).click();
+  await expect(section.getByRole('alert')).toContainText('Greenhouse, Lever or Ashby');
+
+  await section.getByRole('button', { name: 'Stop watching Hooli' }).click();
+  await expect(section.getByRole('heading', { level: 2 })).toHaveText('Companies watched (0)');
+  await expect(section).toContainText('None yet');
+});
