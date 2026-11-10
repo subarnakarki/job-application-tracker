@@ -91,6 +91,30 @@ describe('posting text', () => {
     expect(asked).toEqual([api]);
   });
 
+  it('never takes another job’s text from a board’s whole list (Breezy, Recruitee)', async () => {
+    const other = 'Senior SRE: you will run Kubernetes clusters and on-call rotations. '.repeat(4);
+    const breezyLink = 'https://acme.breezy.hr/p/abc123-qa-engineer';
+    const recruiteeLink = 'https://acme.recruitee.com/o/qa-engineer';
+    const { fetchPage, asked } = fetcher({
+      'https://acme.breezy.hr/json': JSON.stringify([
+        { id: 'abc123', name: 'QA Engineer', description: PROSE },
+        { id: 'def456', name: 'SRE', description: other },
+      ]),
+      [breezyLink]: `<main><p>${PROSE}</p></main>`,
+      'https://acme.recruitee.com/api/offers/': JSON.stringify({
+        offers: [
+          { id: 1, slug: 'qa-engineer', title: 'QA Engineer', description: PROSE },
+          { id: 2, slug: 'sre', title: 'SRE', description: other },
+        ],
+      }),
+      [recruiteeLink]: `<main><p>${PROSE}</p></main>`,
+    });
+
+    expect(await readPostingText(breezyLink, fetchPage)).toBe(PROSE.trim());
+    expect(await readPostingText(recruiteeLink, fetchPage)).toBe(PROSE.trim());
+    expect(asked).toContain(breezyLink);
+  });
+
   it('reads a plain careers page', async () => {
     const url = 'https://careers.example.com/jobs/sdet';
     const { fetchPage } = fetcher({ [url]: `<main><p>${PROSE}</p></main>` });

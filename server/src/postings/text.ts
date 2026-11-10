@@ -102,11 +102,14 @@ export async function readPostingText(raw: string, fetchPage: PageFetcher): Prom
   if (isSignInSite(url)) throw new PreviewError('unsupported_site', url.hostname);
 
   const site = siteOf(url);
-  // Workable's read is the account's whole job list: its text is not this posting's.
+  const page = url.toString();
+  // A board's API first, then the posting's own page. Some boards' reads are the company's whole
+  // job list (Breezy, Recruitee), whose text proseInJson drops, so the page is what has it.
+  // Workable's list is never read: it holds the company's description, not the posting's.
   const targets =
     site.kind === 'page' || site.kind === 'workable'
-      ? [url.toString()]
-      : site.reads.map((read) => read.url);
+      ? [page]
+      : [...new Set([...site.reads.map((read) => read.url), page])];
   const texts: string[] = [];
   for (const target of targets) {
     try {
