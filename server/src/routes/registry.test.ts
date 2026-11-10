@@ -75,6 +75,7 @@ const ISOLATION_COVERAGE: Record<string, string> = {
   'POST /api/job-search/hits/:id/redraft': 'server/src/routes/jobSearch.test.ts',
   'PUT /api/job-search/hits/:id/draft': 'server/src/routes/jobSearch.test.ts',
   'DELETE /api/resume/analyses/:id': 'server/src/routes/resume.test.ts',
+  'DELETE /api/job-search/boards/:id': 'server/src/routes/jobSearchBoards.test.ts',
 };
 
 const callRoute = (

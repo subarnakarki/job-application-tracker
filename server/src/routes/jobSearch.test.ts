@@ -1495,6 +1495,8 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
         });
         try {
           // T0 is 07:00 in New York, before the run hour: the knock sweeps. Nothing new: no run.
+          // A minute on, so the sweep's run is the latest (the clock is frozen otherwise).
+          t.clock.set(new Date(T0.getTime() + 60_000));
           PAGES[LIST] = JSON.stringify({ jobs: [listed(101, 'Senior Product Manager')] });
           expect((await cron(CRON_SECRET)).json()).toMatchObject({ started: 0, found: 0 });
           expect((await runsOf(cookie)).map((entry) => entry.trigger)).toEqual(['manual']);

@@ -28,6 +28,7 @@ import { gmailAuthorizerFromEnv, type GmailAuthorizer } from './import/gmailAuth
 import { registerMeRoutes } from './routes/me';
 import { registerResumeRoutes } from './routes/resume';
 import { registerJobSearchRoutes } from './routes/jobSearch';
+import { registerJobSearchBoardRoutes } from './routes/jobSearchBoards';
 import { registerLeadMessageRoutes } from './routes/leadMessages';
 import { registerTailoringRoutes } from './routes/tailoring';
 import { jobSearchClaudeFromEnv, type JobSearchClaude } from './jobsearch/claude';
@@ -144,6 +145,14 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     env,
     claude: jobSearchClaude,
     fetchPage,
+    fetchBoard,
+    openToTestUsers: testRoutes !== null,
+  });
+  registerJobSearchBoardRoutes(app, {
+    db: deps.db,
+    clock,
+    env,
+    claude: jobSearchClaude,
     fetchBoard,
     openToTestUsers: testRoutes !== null,
   });

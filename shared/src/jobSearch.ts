@@ -2382,3 +2382,55 @@ export function titleSuggestions(titles: ResumeTitle[], existing: string[]): Tit
   }
   return suggestions;
 }
+
+// ---------------------------------------------------------------------------------------------
+// Companies watched (their boards are read every hour)
+
+/**
+ * The company board a link points at: any job link the search understands, or a Greenhouse, Lever
+ * or Ashby board's own page (job-boards.greenhouse.io/acme). Null for anything else.
+ */
+export function boardRefOf(raw: string): { source: SearchSource; board: string } | null {
+  const job = jobRefOf(raw.trim());
+  if (job) return { source: job.source, board: job.board };
+  let url: URL;
+  try {
+    url = new URL(raw.trim());
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+  const host = url.hostname.toLowerCase();
+  const [first] = url.pathname.split('/').filter(Boolean);
+  if (!first || !SLUG.test(first)) return null;
+  if (/^(job-boards|boards)(\.eu)?\.greenhouse\.io$/.test(host) && first !== 'embed')
+    return { source: 'greenhouse', board: first.toLowerCase() };
+  if (/^jobs(\.eu)?\.lever\.co$/.test(host)) return { source: 'lever', board: first.toLowerCase() };
+  if (host === 'jobs.ashbyhq.com') return { source: 'ashby', board: first };
+  return null;
+}
+
+export const WatchedBoardSchema = z.strictObject({
+  id: z.uuid(),
+  source: z.enum(SEARCH_SOURCES),
+  board: z.string(),
+  /** The board's name as a company name ("acme-corp" reads "Acme Corp"). */
+  company: z.string(),
+  addedBy: z.enum(['search', 'user']),
+  lastSweptAt: instantSchema.nullable(),
+  lastError: z.string().nullable(),
+});
+export type WatchedBoard = z.infer<typeof WatchedBoardSchema>;
+
+export const WatchedBoardListSchema = z.strictObject({
+  items: z.array(WatchedBoardSchema),
+  /** Every board watched, including those whose lists cannot be read hourly. */
+  total: z.number().int().min(0),
+});
+export type WatchedBoardList = z.infer<typeof WatchedBoardListSchema>;
+
+export const WatchBoardSchema = z.strictObject({
+  /** A link to the company's careers board, or to any of its jobs. */
+  link: z.string().trim().min(1).max(LIMITS.jobLink),
+});
+export type WatchBoardInput = z.infer<typeof WatchBoardSchema>;

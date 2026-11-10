@@ -612,6 +612,15 @@ export async function watchedBoards(
   return result.rows.map(toBoard);
 }
 
+/** How many boards the user watches, of every kind. */
+export async function countWatchedBoards(db: Queryable, userId: string): Promise<number> {
+  const result = await db.query<{ count: number }>(
+    'select count(*)::int as count from job_search_boards where user_id = $1',
+    [userId],
+  );
+  return result.rows[0]?.count ?? 0;
+}
+
 /** Starts watching a board; one already watched stays as it is. Returns the row either way. */
 export async function watchBoard(
   db: Queryable,
