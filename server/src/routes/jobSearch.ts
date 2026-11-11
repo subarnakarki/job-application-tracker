@@ -59,6 +59,7 @@ import {
   saveTailoring,
   setHitState,
 } from '../repo/jobSearch';
+import { copyQueueLetter } from '../repo/coverLetters';
 import { getResume, getResumeText } from '../repo/resumes';
 import { getTailoring, saveSuggestions, saveVersion, versionEdits } from '../repo/tailorings';
 
@@ -454,6 +455,18 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
     return created.value.record.id;
   };
 
+  /** The queue's drafted letter goes with the job, unless its application has a letter already. */
+  const copyLetter = async (
+    db: Db,
+    userId: string,
+    hit: JobHit,
+    applicationId: string,
+    now: Date,
+  ): Promise<void> => {
+    if (hit.draft?.coverLetter)
+      await copyQueueLetter(db, userId, applicationId, hit.draft.coverLetter, now);
+  };
+
   /** The queue job's application: the tracked one, else a new Saved one (linked either way). */
   const trackHit = async (
     db: Db,
@@ -468,6 +481,7 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
       hit.tracked?.applicationId ?? (await createFromHit(db, user, hit, 'Saved', now));
     if (applicationId !== hit.applicationId)
       await linkHitApplication(db, user.id, hit.id, applicationId, now);
+    await copyLetter(db, user.id, hit, applicationId, now);
     return applicationId;
   };
 
@@ -537,6 +551,7 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
       }
       // Already Applied or further along: left as it is, never moved back.
       if (!existing) applicationId = await createFromHit(db, user, hit, 'Applied', now);
+      if (applicationId) await copyLetter(db, user.id, hit, applicationId, now);
       await setHitState(
         db,
         user.id,

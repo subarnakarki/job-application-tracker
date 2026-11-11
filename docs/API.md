@@ -284,6 +284,10 @@ Tones: `professional`, `warm`, `enthusiastic`, `direct`, each a fixed instructio
 the application (its `version` and follow-up clock do not change), deleted with it and included in the data
 export.
 
+Tracking a queue job (Track it, Mark applied, or saving its resume from the queue) copies the queue's drafted
+letter to the application as a saved, short, professional letter with no resume behind it, unless the
+application already has a letter (drafted or saved), which is never replaced.
+
 ## Model usage
 
 **Token efficiency.** Drafting, tailoring and lead messages send the resume as the first block of the request,

@@ -1,5 +1,7 @@
 import {
+  clipToLength,
   COVER_LETTER_LENGTHS,
+  COVER_LETTER_LIMITS,
   COVER_LETTER_TONES,
   DEFAULT_COVER_LETTER_LENGTH,
   DEFAULT_COVER_LETTER_TONE,
@@ -135,6 +137,31 @@ export async function saveLetter(
       where application_cover_letters.user_id = $1`,
     [userId, applicationId, text, DEFAULT_COVER_LETTER_LENGTH, DEFAULT_COVER_LETTER_TONE, now],
   );
+}
+
+/**
+ * A queue job's letter, copied to its application when the job is tracked (Phase 23d): stored as
+ * saved, short (queue letters are under 200 words), with no resume behind it. Never replaces a
+ * letter the application already has, drafted or saved. False when nothing was copied.
+ */
+export async function copyQueueLetter(
+  db: Queryable,
+  userId: string,
+  applicationId: string,
+  letter: string,
+  now: Date,
+): Promise<boolean> {
+  const text = clipToLength(letter, COVER_LETTER_LIMITS.letter);
+  if (!text) return false;
+  const result = await db.query(
+    `insert into application_cover_letters
+        (application_id, user_id, letter, length, tone, drafted_at, saved_at, created_at,
+         updated_at)
+      values ($2, $1, $3, 'short', $4, $5, $5, $5, $5)
+      on conflict (application_id) do nothing`,
+    [userId, applicationId, text, DEFAULT_COVER_LETTER_TONE, now],
+  );
+  return result.rowCount > 0;
 }
 
 /** Removes the letter, its stored posting included. */

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import {
+  ApplicationCoverLetterSchema,
   ApplicationDetailSchema,
   ApplicationTailoringSchema,
   ApplyQueueSchema,
@@ -1291,6 +1292,59 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
       const owner = await queued();
       const done = hitOf(await applied(owner.cookie, owner.hit.id));
       expect((await application(owner.cookie, done.applicationId ?? '')).status).toBe('Applied');
+    });
+
+    const letterOf = async (cookie: string, id: string) =>
+      parsed(ApplicationCoverLetterSchema)(
+        await send('GET', `/api/applications/${id}/cover-letter`, cookie),
+      ).coverLetter;
+
+    it("copies the queue's cover letter to the application when the job is tracked", async () => {
+      const owner = await queued();
+      expect(owner.hit.draft?.coverLetter).toBe('Dear Acme team, ...');
+
+      const id = hitOf(await track(owner.cookie, owner.hit.id)).applicationId ?? '';
+
+      expect(await letterOf(owner.cookie, id)).toMatchObject({
+        text: 'Dear Acme team, ...',
+        length: 'short',
+        tone: 'professional',
+        steer: '',
+        savedAt: T0.toISOString(),
+        resumeChanged: false,
+      });
+    });
+
+    it("copies it on Mark applied too, and never replaces the application's own letter", async () => {
+      const fresh = await queued();
+      const created = hitOf(await applied(fresh.cookie, fresh.hit.id)).applicationId ?? '';
+      expect((await letterOf(fresh.cookie, created))?.text).toBe('Dear Acme team, ...');
+
+      const owner = await queued();
+      const mine = (
+        await send('POST', '/api/applications', owner.cookie, {
+          company: 'GitLab',
+          role: 'Senior Product Manager',
+          status: 'Saved',
+        })
+      ).json<{ id: string }>().id;
+      await send('PUT', `/api/applications/${mine}/cover-letter`, owner.cookie, {
+        text: 'My own letter',
+      });
+
+      expect(hitOf(await track(owner.cookie, owner.hit.id)).applicationId).toBe(mine);
+      hitOf(await applied(owner.cookie, owner.hit.id));
+      expect((await letterOf(owner.cookie, mine))?.text).toBe('My own letter');
+    });
+
+    it('copies nothing when the queue job has no letter', async () => {
+      const owner = await queued();
+      await t.db.query(
+        `update job_search_hits set draft = jsonb_set(draft, '{coverLetter}', '""') where id = $1`,
+        [owner.hit.id],
+      );
+      const id = hitOf(await track(owner.cookie, owner.hit.id)).applicationId ?? '';
+      expect(await letterOf(owner.cookie, id)).toBeNull();
     });
 
     it('refuses a job that has left the queue', async () => {
