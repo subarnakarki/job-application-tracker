@@ -1,4 +1,4 @@
-import { SOURCES, STATUSES } from '@jat/shared';
+import { COVER_LETTER_LENGTHS, COVER_LETTER_TONES, SOURCES, STATUSES } from '@jat/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestDb, TEST_DATABASE_URL, type TestDb } from '../test/testDb';
 import { runMigrations } from './migrate';
@@ -192,6 +192,8 @@ describe.skipIf(!TEST_DATABASE_URL)('schema (real Postgres, real migrations)', (
       ['status_history_from_check', STATUSES],
       ['status_history_to_check', STATUSES],
       ['applications_source_check', SOURCES],
+      ['application_cover_letters_length_check', COVER_LETTER_LENGTHS],
+      ['application_cover_letters_tone_check', COVER_LETTER_TONES],
     ])('%s lists exactly the shared values', async (constraint, expected) => {
       expect(await listedValues(constraint)).toEqual([...expected].sort());
     });
@@ -591,6 +593,7 @@ describe.skipIf(!TEST_DATABASE_URL)('schema (real Postgres, real migrations)', (
         'identities_user_idx',
         'rate_limits_window_idx',
         'status_history_application_order_idx',
+        'application_cover_letters_user_idx',
       ]),
     );
   });
@@ -847,6 +850,110 @@ describe.skipIf(!TEST_DATABASE_URL)('schema (real Postgres, real migrations)', (
           (await sql(`select count(*)::int as n from ${table} where user_id = $1`, [owner]))
             .rows[0],
         ).toEqual({ n: 0 });
+    });
+  });
+
+  describe('application cover letters (0019)', () => {
+    const insertLetter = (
+      userId: string,
+      applicationId: string,
+      overrides: Record<string, unknown> = {},
+    ) => {
+      const values = {
+        application_id: applicationId,
+        user_id: userId,
+        letter: 'Dear Hiring Manager,',
+        length: 'standard',
+        tone: 'professional',
+        ...overrides,
+      };
+      const columns = Object.keys(values);
+      return sql(
+        `insert into application_cover_letters (${columns.join(', ')}) values (${columns.map((_, index) => `$${index + 1}`).join(', ')})`,
+        Object.values(values),
+      );
+    };
+
+    it('keeps one letter per application, with the optional parts empty', async () => {
+      const owner = await insertUser({ email: 'letter-one@example.com' });
+      const application = await insertApplication(owner);
+      await insertLetter(owner, application);
+      expect((await violation(insertLetter(owner, application))).constraint).toBe(
+        'application_cover_letters_pkey',
+      );
+      const { rows } = await sql(
+        `select steer, posting_text, resume_sha256, saved_at, drafted_at is not null as drafted
+           from application_cover_letters where application_id = $1`,
+        [application],
+      );
+      expect(rows[0]).toEqual({
+        steer: null,
+        posting_text: null,
+        resume_sha256: null,
+        saved_at: null,
+        drafted: true,
+      });
+    });
+
+    it("never stores a letter on someone else's application", async () => {
+      const owner = await insertUser({ email: 'letter-owner@example.com' });
+      const other = await insertUser({ email: 'letter-other@example.com' });
+      const theirs = await insertApplication(other);
+      expect((await violation(insertLetter(owner, theirs))).constraint).toBe(
+        'application_cover_letters_application_fk',
+      );
+    });
+
+    it.each([
+      ['empty', { letter: '' }, 'application_cover_letters_letter_check'],
+      ['long', { letter: 'x'.repeat(5001) }, 'application_cover_letters_letter_check'],
+      ['steer', { steer: 'x'.repeat(301) }, 'application_cover_letters_steer_check'],
+      [
+        'posting',
+        { posting_text: 'x'.repeat(20001) },
+        'application_cover_letters_posting_text_check',
+      ],
+      ['length', { length: 'long' }, 'application_cover_letters_length_check'],
+      ['tone', { tone: 'sarcastic' }, 'application_cover_letters_tone_check'],
+      ['hash', { resume_sha256: 'nope' }, 'application_cover_letters_resume_sha256_check'],
+    ])('rejects a bad %s', async (label, overrides, constraint) => {
+      const owner = await insertUser({ email: `letter-bad-${label}@example.com` });
+      const application = await insertApplication(owner);
+      expect((await violation(insertLetter(owner, application, overrides))).constraint).toBe(
+        constraint,
+      );
+    });
+
+    it('accepts the boundary values', async () => {
+      const owner = await insertUser({ email: 'letter-bounds@example.com' });
+      const application = await insertApplication(owner);
+      await insertLetter(owner, application, {
+        letter: 'x'.repeat(5000),
+        steer: 'x'.repeat(300),
+        posting_text: 'x'.repeat(20000),
+        resume_sha256: 'a'.repeat(64),
+        length: 'short',
+        tone: 'direct',
+      });
+    });
+
+    it('goes with its application, and with its user', async () => {
+      const owner = await insertUser({ email: 'letter-cascade@example.com' });
+      const kept = await insertApplication(owner);
+      const removed = await insertApplication(owner);
+      await insertLetter(owner, kept);
+      await insertLetter(owner, removed);
+      const count = async () =>
+        (
+          await sql('select count(*)::int as n from application_cover_letters where user_id = $1', [
+            owner,
+          ])
+        ).rows[0];
+
+      await sql('delete from applications where id = $1', [removed]);
+      expect(await count()).toEqual({ n: 1 });
+      await sql('delete from users where id = $1', [owner]);
+      expect(await count()).toEqual({ n: 0 });
     });
   });
 });

@@ -1,6 +1,7 @@
 export const APP_NAME = 'Job Application Tracker';
 
 export * from './constants';
+export * from './coverLetter';
 export * from './dates';
 export * from './followUp';
 export * from './jobSearch';

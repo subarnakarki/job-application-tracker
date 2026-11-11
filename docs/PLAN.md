@@ -1301,7 +1301,7 @@ Built as planned, each step pushed green:
   - One e2e test (`fill-from-posting`, desktop) failed once in a full local run and passed three times alone.
   - A sweep test relied on the order of two runs started at the same frozen instant; fixed in `0524416`.
 
-## Phase 23 plan: a cover letter for any application (proposed, awaiting approval)
+## Phase 23 plan: a cover letter for any application (approved)
 
 **Goal:** a **Draft cover letter** button on any application, at any status, that writes a letter from the
 posting and the resume, lets the owner steer it, edit it and draft it again, and keeps the result with the
@@ -1354,7 +1354,7 @@ Routes (all `auth: 'user'`, in `ISOLATION_COVERAGE`, contracts declared so the f
   ink tokens, print styles), titled `Cover letter - <Company> - <Role>` so the PDF takes that name.
 - Mobile-first, keyboard-reachable, live region for "Drafting..." and errors; colours from the `@theme` tokens.
 
-### 23d. From the queue
+### 23d. From the queue (owner: yes, copy it)
 
 - When a queue job is tracked (Track it or Mark applied), its drafted `coverLetter` is copied to the new or
   matched application as a saved letter, unless the application already has one. The queue's own letter is
