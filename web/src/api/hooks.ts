@@ -1,6 +1,8 @@
 import {
+  ApplicationCoverLetterSchema,
   ApplicationDetailSchema,
   ApplicationTailoringSchema,
+  type DraftCoverLetterInput,
   ApplyQueueSchema,
   JobHitSchema,
   JobSearchRunDetailSchema,
@@ -823,6 +825,63 @@ export function useSaveTailoredResume(applicationId: string) {
 export function useRemoveTailoredResume(applicationId: string) {
   return useTailoringMutation(applicationId, () => ({
     path: 'tailored-resume',
+    method: 'DELETE',
+  }));
+}
+
+/** An application's cover letter (null until drafted or written). */
+export function useApplicationCoverLetter(applicationId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['cover-letter', applicationId],
+    queryFn: () =>
+      apiRequest(
+        `/api/applications/${encodeURIComponent(applicationId)}/cover-letter`,
+        ApplicationCoverLetterSchema,
+      ),
+    enabled,
+  });
+}
+
+function useCoverLetterMutation<Input>(
+  applicationId: string,
+  request: (input: Input) => { path: string; method: 'POST' | 'PUT' | 'DELETE'; body?: unknown },
+) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Input) => {
+      const { path, method, body } = request(input);
+      return apiRequest(
+        `/api/applications/${encodeURIComponent(applicationId)}/${path}`,
+        ApplicationCoverLetterSchema,
+        { method, ...(body === undefined ? {} : { body }) },
+      );
+    },
+    onSuccess: (letter) => client.setQueryData(['cover-letter', applicationId], letter),
+  });
+}
+
+/** Drafts a cover letter (replacing the current one as an unsaved draft). */
+export function useDraftCoverLetter(applicationId: string) {
+  return useCoverLetterMutation(applicationId, (input: DraftCoverLetterInput) => ({
+    path: 'cover-letter/draft',
+    method: 'POST',
+    body: input,
+  }));
+}
+
+/** Saves the letter as edited. */
+export function useSaveCoverLetter(applicationId: string) {
+  return useCoverLetterMutation(applicationId, (text: string) => ({
+    path: 'cover-letter',
+    method: 'PUT',
+    body: { text },
+  }));
+}
+
+/** Removes the letter. */
+export function useRemoveCoverLetter(applicationId: string) {
+  return useCoverLetterMutation(applicationId, () => ({
+    path: 'cover-letter',
     method: 'DELETE',
   }));
 }

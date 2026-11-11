@@ -15,6 +15,7 @@ import { InterviewsSection } from '../components/InterviewsSection';
 import { LeadMessageSection } from '../components/LeadMessageSection';
 import { ResumeMatchSection } from '../components/ResumeMatchSection';
 import { TailoringSection } from '../components/TailoringSection';
+import { CoverLetterSection } from '../components/CoverLetterSection';
 import { Glow } from '../components/ui/Glow';
 import {
   FillFromPostingButton,
@@ -247,6 +248,7 @@ export function ApplicationDetailPage() {
           <InterviewsSection application={application} />
           <ResumeMatchSection application={application} />
           <TailoringSection application={application} />
+          <CoverLetterSection application={application} />
           <LeadMessageSection application={application} />
 
           <Glow as="section" aria-labelledby="history-heading" className="rise rise-5 p-5">

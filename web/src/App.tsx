@@ -4,6 +4,7 @@ import { BrowserRouter, Route, Routes } from 'react-router';
 import { ApiRequestError } from './api/client';
 import { Layout } from './components/Layout';
 import { TailoredResumePage } from './pages/TailoredResumePage';
+import { CoverLetterPage } from './pages/CoverLetterPage';
 import {
   ApplicationDetailPage,
   EditApplicationPage,
@@ -36,6 +37,7 @@ export function AppRoutes() {
         <Route path="applications/:id" element={<ApplicationDetailPage />} />
         <Route path="applications/:id/edit" element={<EditApplicationPage />} />
         <Route path="applications/:id/resume" element={<TailoredResumePage />} />
+        <Route path="applications/:id/cover-letter" element={<CoverLetterPage />} />
         <Route path="leads" element={<LeadsPage />} />
         <Route path="leads/new" element={<NewLeadPage />} />
         <Route path="leads/:id" element={<LeadPage />} />
