@@ -1301,6 +1301,81 @@ Built as planned, each step pushed green:
   - One e2e test (`fill-from-posting`, desktop) failed once in a full local run and passed three times alone.
   - A sweep test relied on the order of two runs started at the same frozen instant; fixed in `0524416`.
 
+## Phase 23 plan: a cover letter for any application (proposed, awaiting approval)
+
+**Goal:** a **Draft cover letter** button on any application, at any status, that writes a letter from the
+posting and the resume, lets the owner steer it, edit it and draft it again, and keeps the result with the
+application to copy or save as a PDF. Today a letter exists only inside a queue job's draft (Phase 15), is read
+only, and is lost to the tracker once the job is applied to. Phase 18 left "cover letters per application" out.
+
+**Access:** owner-only through the existing gate (`JOB_SEARCH_USER_IDS`, `server/src/jobsearch/access.ts`); the
+application page shows the button from the existing `available` flag, as Tailor my resume does. The demo account
+never sees it, so the demo seed does not change. Opening it to everyone (a resume upload for every user, per-user
+cost caps) is a later decision.
+
+### 23a. Storage (migration 0019 goes out alone first)
+
+- Migration `0019_application_cover_letters.sql`: table `application_cover_letters` (`application_id` primary
+  key, `user_id`; `posting_text` (up to 20,000), `letter` (1 to 5,000 characters), `steer` (up to 300),
+  `length` (`short` or `standard`), `resume_sha256`, `drafted_at`, `saved_at`, timestamps), foreign key
+  `(user_id, application_id)` to the application, deleted with it. Additive only. Kept apart from `applications`,
+  so drafting or saving does not touch the application's `version` or its follow-up clock (as with tailorings).
+- In the data export (`DataExportSchema`); delete-account is covered by the cascade.
+
+### 23b. Drafting (server, shared)
+
+| Area    | Decision                                                                                                                                                                                                                                                                                                               |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Posting | First found of: pasted text in the request; the text stored on this letter; the text stored by Tailor my resume for this application; read from the job link with the existing reader (SSRF guard, the 60-an-hour link budget). None: 422 "paste the posting" (up to 20,000 characters), as tailoring does             |
+| Inputs  | Company, role, the posting, the resume text, the owner's name, the application's contact (for the greeting, else "Dear Hiring Manager"), an optional steer line ("stress the API testing work"), and a length: **short** (about 150 words, for a form's text box) or **standard** (about 300 words, 3 to 4 paragraphs) |
+| Rules   | Never invent facts: employers, dates, numbers, skills, degrees or anything the resume does not state; one or two concrete achievements from the resume tied to what the posting asks for; plain text, no markdown, no placeholders like "[Company]". Posting and steer line are delimited, defused blocks (`block()`)  |
+| Model   | `claude-opus-5-5`, structured output (`{ letter }`), injected for tests; test users get a predictable stand-in. Length checked by code (code points, at most 5,000; asked once more when a standard letter runs past 450 words). Usage recorded as `cover_letter` (the kind is a pattern since 0014, so no migration)  |
+| Limits  | `COVER_LETTER_RULE`: 20 drafts a day per user, its own rule, apart from tailoring's 10                                                                                                                                                                                                                                 |
+| Stored  | A draft is stored on the row right away (letter, posting, steer, length, resume hash, `drafted_at`), replacing the last unsaved draft; nothing is lost if the page is closed. **Save** sets `saved_at`, after any hand edits                                                                                           |
+
+Routes (all `auth: 'user'`, in `ISOLATION_COVERAGE`, contracts declared so the fuzzer covers them):
+
+- `GET /api/applications/:id/cover-letter`: the letter (or null), whether it is saved, and whether the resume has
+  changed since it was drafted (`resume_sha256` against the current resume).
+- `POST /api/applications/:id/cover-letter/draft`: body `{ postingText?, steer?, length }`. 409 no resume, 422
+  no posting, 429 limit, 502 the draft did not finish, 503 key rejected.
+- `PUT /api/applications/:id/cover-letter`: save the edited text. `DELETE` removes it.
+
+### 23c. The application page (web)
+
+- A **Cover letter** section under Tailor my resume: empty state with **Draft cover letter**; a short form
+  (length, optional "what to stress" line, and **Paste the posting** when the link cannot be read).
+- The draft opens in a labelled textarea with a word and character count; **Draft again** (keeps the steer and
+  length, editable), **Save**, **Copy**, **Remove** (confirm). Unsaved edits are flagged and **Draft again** asks
+  before replacing them. A note shows when the resume changed since drafting.
+- **Print or save as PDF**: `/applications/:id/cover-letter`, the letter on the white sheet from 18d (paper and
+  ink tokens, print styles), titled `Cover letter - <Company> - <Role>` so the PDF takes that name.
+- Mobile-first, keyboard-reachable, live region for "Drafting..." and errors; colours from the `@theme` tokens.
+
+### 23d. From the queue
+
+- When a queue job is tracked (Track it or Mark applied), its drafted `coverLetter` is copied to the new or
+  matched application as a saved letter, unless the application already has one. The queue's own letter is
+  unchanged.
+
+### Order and tests
+
+23a: migration 0019 alone, pushed and applied (Migrate). Then 23b, 23c, 23d. Each a small commit, green and
+pushed, and stopped for review.
+
+- **Unit:** the posting source order; the greeting from the contact; the steer and posting blocks defused; the
+  length check (code points, word count, one retry); the stand-in's output.
+- **API (real Postgres), two allowed users for isolation:** draft from the link, from pasted text, from the
+  tailoring's stored posting; 422 without a posting; 409 without a resume; save, edit, remove; the daily limit
+  (429 with `retry-after`); a user outside `JOB_SEARCH_USER_IDS` gets 404; another user gets 404 on every id
+  route; the stale-resume flag; the export includes letters; deleting the application deletes its letter;
+  tracking a queue job copies its letter and never overwrites a saved one.
+- **E2E (model stubbed through the test-only route):** draft a letter with a steer line, edit a sentence, save,
+  reload and see it; draft again; copy; open the print page and check its title; the paste-the-posting path.
+
+Not in this phase: cover letters for users outside the job search, a .docx download, tone presets, several saved
+versions per application, and sending the letter anywhere (it is copied or saved as a PDF by the owner).
+
 ## Planned but not built
 
 | Item                                  | Status                                                                                                    |
