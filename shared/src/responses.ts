@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { SOURCES, STATUSES, WORK_MODES } from './constants';
 import { JobHitSchema, JobSearchProfileSchema, JobSearchRunSchema } from './jobSearch';
 import { ResumeAnalysisSchema, ResumeSchema } from './resume';
+import { ApplicationCoverLetterSchema } from './coverLetter';
 import { ApplicationTailoringSchema } from './tailor';
 
 /**
@@ -295,6 +296,14 @@ export const DataExportSchema = z.strictObject({
       applicationId: z.uuid(),
       postingText: z.string().nullable(),
       tailoring: ApplicationTailoringSchema,
+    }),
+  ),
+  /** Cover letters, one per application, with the posting each was drafted from. */
+  applicationCoverLetters: z.array(
+    z.strictObject({
+      applicationId: z.uuid(),
+      postingText: z.string().nullable(),
+      coverLetter: ApplicationCoverLetterSchema,
     }),
   ),
 });

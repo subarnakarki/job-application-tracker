@@ -259,6 +259,31 @@ the path or the body, gets 404.
 Stored in `application_tailorings`, deleted with the application and included in the data export (posting text
 too).
 
+## A cover letter for an application (owner only)
+
+| Method | Path                                       | Auth | Notes                                                           |
+| ------ | ------------------------------------------ | ---- | --------------------------------------------------------------- |
+| GET    | `/api/applications/:id/cover-letter`       | user | `{ coverLetter, hasPostingText }`: the letter (text, length,    |
+|        |                                            |      | tone, steer, `draftedAt`, `savedAt` null while a draft,         |
+|        |                                            |      | `resumeChanged` when the resume was replaced since), or null    |
+| POST   | `/api/applications/:id/cover-letter/draft` | user | `{ postingText?, steer?, length?, tone? }` (defaults: standard, |
+|        |                                            |      | professional): the posting is the pasted one, else the one      |
+|        |                                            |      | stored with the letter, else the one stored by Tailor my        |
+|        |                                            |      | resume, else the job link read. The greeting comes from the     |
+|        |                                            |      | contact when it starts with a name, else "Dear Hiring           |
+|        |                                            |      | Manager,". Asked once more when it runs long, then cut at 5,000 |
+|        |                                            |      | characters. Replaces the letter as an unsaved draft. 409        |
+|        |                                            |      | `no_resume`, 422 `no_job_link` or `posting_unreadable`, 20 a    |
+|        |                                            |      | day, 502 `draft_failed`                                         |
+| PUT    | `/api/applications/:id/cover-letter`       | user | `{ text }` (at most 5,000 characters): saves it as edited; also |
+|        |                                            |      | a letter written by hand with no draft                          |
+| DELETE | `/api/applications/:id/cover-letter`       | user | Removes the letter and the posting stored with it               |
+
+Tones: `professional`, `warm`, `enthusiastic`, `direct`, each a fixed instruction in the prompt; lengths: `short`
+(about 150 words) and `standard` (about 300). Stored in `application_cover_letters` (migration 0019), apart from
+the application (its `version` and follow-up clock do not change), deleted with it and included in the data
+export.
+
 ## Model usage
 
 **Token efficiency.** Drafting, tailoring and lead messages send the resume as the first block of the request,
@@ -270,7 +295,8 @@ each query finished in one turn, so nothing is resent, and caching would only ad
 search results.
 
 Every Claude call records one row in `model_usage` (migration 0013): the kind of call (`job_search`, `draft`,
-`tailor`, `classify_email`, `posting_keywords`, `resume_analysis`), the model that answered, and its input,
+`tailor`, `classify_email`, `posting_keywords`, `resume_analysis`, `lead_message`,
+`cover_letter`), the model that answered, and its input,
 cache-write, cache-read and output tokens and web searches. No user and no text are stored. A failed write is
 logged and never fails the call. Cost per kind of call, at Claude Opus 5.5 prices ($4 input, $5 cache write,
 $0.40 cache read, $20 output per million tokens; web search $10 per 1,000):

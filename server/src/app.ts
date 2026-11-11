@@ -31,6 +31,7 @@ import { registerJobSearchRoutes } from './routes/jobSearch';
 import { registerJobSearchBoardRoutes } from './routes/jobSearchBoards';
 import { registerLeadMessageRoutes } from './routes/leadMessages';
 import { registerTailoringRoutes } from './routes/tailoring';
+import { registerCoverLetterRoutes } from './routes/coverLetters';
 import { jobSearchClaudeFromEnv, type JobSearchClaude } from './jobsearch/claude';
 import { analyzerFromEnv, type ResumeAnalyzer } from './resume/analyze';
 import { registerSessionRoutes } from './routes/session';
@@ -164,6 +165,14 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     openToTestUsers: testRoutes !== null,
   });
   registerTailoringRoutes(app, {
+    db: deps.db,
+    clock,
+    env,
+    claude: jobSearchClaude,
+    fetchPage,
+    openToTestUsers: testRoutes !== null,
+  });
+  registerCoverLetterRoutes(app, {
     db: deps.db,
     clock,
     env,

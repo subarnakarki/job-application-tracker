@@ -80,6 +80,7 @@ describe('response contracts', () => {
         resumeAnalyses: [],
         jobSearch: { profile: null, runs: [], hits: [] },
         applicationTailorings: [],
+        applicationCoverLetters: [],
       }).success,
     ).toBe(true);
   });
