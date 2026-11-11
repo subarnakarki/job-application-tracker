@@ -301,6 +301,7 @@ export function registerTestRoutes(app: FastifyInstance, deps: TestRouteDeps): v
       const claude: JobSearchClaude = {
         tailor: () => Promise.resolve(null),
         leadMessage: () => Promise.resolve(null),
+        coverLetter: () => Promise.resolve(null),
         tailorPosting: () => Promise.resolve(null),
         search: () =>
           Promise.resolve({ links: [...pages.values()].map((page) => page.link), searches: 1 }),

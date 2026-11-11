@@ -21,6 +21,7 @@ const claude: JobSearchClaude = {
   draft: () => Promise.resolve(null),
   tailor: () => Promise.resolve(null),
   tailorPosting: () => Promise.resolve(null),
+  coverLetter: () => Promise.resolve(null),
   leadMessage: (request) => {
     model.requests.push(request);
     const answer = model.answers[model.requests.length - 1] ?? model.answers.at(-1) ?? null;

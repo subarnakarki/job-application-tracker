@@ -14,6 +14,7 @@ const claude: JobSearchClaude = {
   tailor: () => Promise.resolve(null),
   tailorPosting: () => Promise.resolve(null),
   leadMessage: () => Promise.resolve(null),
+  coverLetter: () => Promise.resolve(null),
 };
 
 /** Board lists the "network" answers; anything else cannot be read. */

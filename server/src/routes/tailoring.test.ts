@@ -63,6 +63,7 @@ const claude: JobSearchClaude = {
   draft: () => Promise.resolve(null),
   tailor: () => Promise.resolve(null),
   leadMessage: () => Promise.resolve(null),
+  coverLetter: () => Promise.resolve(null),
   tailorPosting: (request) => {
     model.requests.push(request);
     return Promise.resolve(model.answer);

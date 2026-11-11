@@ -88,6 +88,19 @@ export const NO_CLAUDE: JobSearchClaude = {
       ].join('\n\n'),
     });
   },
+  coverLetter: (request) => {
+    // The resume's first line is the name; the tone and the owner's line show through, so e2e
+    // tests can see each choice reach the draft.
+    const name = request.resumeText.split(/\r?\n/)[0]?.trim() || 'The candidate';
+    return Promise.resolve({
+      letter: [
+        request.greeting,
+        `I am applying for the ${request.role} role at ${request.company} (${request.tone}, ${request.length}).${request.steer ? ` ${request.steer}` : ''}`,
+        'Thank you for your time.',
+        `Sincerely,\n${name}`,
+      ].join('\n\n'),
+    });
+  },
 };
 
 /** Owner-only at first: the users listed in JOB_SEARCH_USER_IDS (comma-separated ids). */
