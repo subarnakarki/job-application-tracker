@@ -1379,6 +1379,26 @@ pushed, and stopped for review.
 Not in this phase: cover letters for users outside the job search, a .docx download, a free-text tone, several saved
 versions per application, and sending the letter anywhere (it is copied or saved as a PDF by the owner).
 
+## Phase 23 outcome
+
+Built as planned, with tone added on the owner's request, each step pushed green:
+
+- **23a** (`9c859ea`): migration **0019** (`application_cover_letters`), applied through Migrate (run 18). Tones
+  and lengths live in `shared/src/coverLetter.ts`; a schema test keeps the SQL checks in step.
+- **23b** (`93db8e7`, `a645d81`): the model call (one fixed instruction per tone and per length, the greeting
+  chosen by code from the contact, `cover_letter` usage) and the four routes, 20 drafts a day. Pushed to `main`
+  only after 0019 was applied, since the data export reads the new table.
+- **23c** (`292c31a`): the section on the application page and the printable page. Each confirm dialog now gets
+  its own title id (`e0d9226`, in the same push: the application page holds three dialogs).
+- **23d**: a queue job's letter is copied to its application on Track it, Mark applied and saving its resume
+  from the queue, stored as saved, short and professional; a letter the application already has is never
+  replaced.
+- **Decided while building:** drafting again replaces the letter (saved or not) as an unsaved draft, so the UI
+  asks first when that would lose edits or a saved letter. A letter the owner writes by hand can be saved with no
+  draft (the API allows it; the page offers editing only after a first draft).
+- **Not checked live:** real model drafts (tests and e2e use the stand-in). The e2e and database tests ran
+  against Postgres 16 in this session (Docker was not available), not 18.
+
 ## Planned but not built
 
 | Item                                  | Status                                                                                                    |
