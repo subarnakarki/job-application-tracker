@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 
 interface Props {
   open: boolean;
@@ -21,6 +21,8 @@ export function ConfirmDialog({
   onCancel,
 }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
+  // Unique per dialog: a page may hold several (the application page has three).
+  const titleId = useId();
 
   useEffect(() => {
     const dialog = ref.current;
@@ -30,8 +32,8 @@ export function ConfirmDialog({
   }, [open]);
 
   return (
-    <dialog ref={ref} aria-labelledby="confirm-title" onClose={onCancel} className="dlg">
-      <h2 id="confirm-title" className="text-[1.375rem] font-semibold tracking-[-0.035em]">
+    <dialog ref={ref} aria-labelledby={titleId} onClose={onCancel} className="dlg">
+      <h2 id={titleId} className="text-[1.375rem] font-semibold tracking-[-0.035em]">
         {title}
       </h2>
       <p className="mt-2 text-[0.9375rem] text-fg-2">{message}</p>
