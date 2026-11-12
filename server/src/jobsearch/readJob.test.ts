@@ -262,6 +262,43 @@ describe('readJob', () => {
     expect(pageAgeToDate('soon', now)).toBeNull();
   });
 
+  describe('a Workday job that is taken down (403 "permission denied", not 404)', () => {
+    const link = 'https://acme.wd5.myworkdayjobs.com/en-US/External/job/Boston-MA/QA-Engineer_R123';
+    const jobApi =
+      'https://acme.wd5.myworkdayjobs.com/wday/cxs/acme/External/job/Boston-MA/QA-Engineer_R123';
+    const listApi = 'https://acme.wd5.myworkdayjobs.com/wday/cxs/acme/External/jobs';
+    const reading = (listAnswers: boolean) => {
+      const asked: string[] = [];
+      const fetchPage: PageFetcher = (url) => {
+        asked.push(url);
+        if (url === jobApi) return Promise.reject(new FetchError('http_status', '403'));
+        if (url === listApi && listAnswers)
+          return Promise.resolve({
+            url,
+            contentType: 'application/json',
+            text: '{"total":1,"jobPostings":[]}',
+          });
+        return Promise.reject(new FetchError('http_status', '403'));
+      };
+      return { asked, read: () => readJob(ref(link), fetchPage) };
+    };
+
+    it('is gone when the same site still lists its jobs', async () => {
+      const { asked, read } = reading(true);
+      const error = await read().catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(JobReadError);
+      expect((error as JobReadError).gone).toBe(true);
+      expect(asked).toEqual([jobApi, listApi]);
+    });
+
+    it('says nothing when the site refuses us altogether', async () => {
+      const { read } = reading(false);
+      const error = await read().catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(JobReadError);
+      expect((error as JobReadError).gone).toBe(false);
+    });
+  });
+
   it('names a company from its board slug when the board does not', () => {
     expect(companyFromSlug('acme-corp_labs')).toBe('Acme Corp Labs');
   });

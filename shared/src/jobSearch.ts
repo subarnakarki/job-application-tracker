@@ -317,7 +317,13 @@ export function jobRefOf(raw: string): JobRef | null {
       : null;
   }
   if (host.endsWith('.myworkdayjobs.com')) {
-    // https://acme.wd5.myworkdayjobs.com/en-US/External/job/Boston-MA/QA-Engineer_R123
+    // https://acme.wd5.myworkdayjobs.com/en-US/External/job/Boston-MA/QA-Engineer_R123, also
+    // with "/apply" (the application's first page) after it: the job is the part before.
+    while (
+      parts.length > 0 &&
+      /^(apply|applyManually|autofillWithResume)$/i.test(parts.at(-1) ?? '')
+    )
+      parts.pop();
     const jobAt = parts.indexOf('job');
     const last = parts.at(-1);
     if (jobAt >= 0 && last && jobAt < parts.length - 1) {
@@ -326,7 +332,7 @@ export function jobRefOf(raw: string): JobRef | null {
         source: 'workday',
         board: tenant,
         jobId: last,
-        link: `https://${host}${url.pathname}`.slice(0, LIMITS.jobLink),
+        link: `https://${host}/${parts.join('/')}`.slice(0, LIMITS.jobLink),
       };
     }
     return null;
@@ -2146,10 +2152,11 @@ export const QueueCheckResultSchema = z.strictObject({
 export type QueueCheckResult = z.infer<typeof QueueCheckResultSchema>;
 
 /**
- * Jobs that can be checked again on their board: those read through a board's API or page.
- * Workday, iCIMS, Taleo and SuccessFactors are finished by hand and are not checked.
+ * Jobs that can be checked again on their board: those read through a board's API or page, and
+ * Workday's (its public job API says when a job is gone). iCIMS, Taleo and SuccessFactors are not
+ * checked: their pages cannot be read.
  */
-export const CHECKABLE_SOURCES: readonly SearchSource[] = FILLABLE_SOURCES;
+export const CHECKABLE_SOURCES: readonly SearchSource[] = [...FILLABLE_SOURCES, 'workday'];
 export const DraftEditSchema = z.strictObject({
   answers: z
     .array(z.strictObject({ question: z.string().max(1000), answer: z.string().max(4000) }))

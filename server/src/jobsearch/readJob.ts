@@ -17,6 +17,7 @@ import { asArray, cleanText, fieldOf, parseJson, salaryInText } from '../posting
 import { FetchError, type PageFetcher } from '../postings/fetchPage';
 import { readPosting } from '../postings/preview';
 import { proseInJson, POSTING_TEXT_MAX, readPostingText } from '../postings/text';
+import { workdayAddresses, workdayBoardOf } from './workday';
 
 /**
  * Reads one job a search found, from its board's public API: the exact title, company, place,
@@ -256,7 +257,25 @@ export async function readJob(
       // Workday, Rippling, SmartRecruiters, Breezy, Recruitee, Teamtailor, Personio, iCIMS, Taleo
       // and SuccessFactors: read through "Fill from link" (each board's API, else the page's
       // JobPosting data). These give the day a job was posted, not the time.
-      return readThroughPosting(ref, fetchPage);
+      return readThroughPosting(ref, fetchPage, fetchBoard);
+  }
+}
+
+/**
+ * Workday answers a job that was taken down with 403 "permission denied", not 404. A 403 could
+ * also be Workday refusing us, so it counts as gone only when the same site's job list answers.
+ */
+async function workdaySiteAnswers(link: string, fetchBoard: PageFetcher): Promise<boolean> {
+  const board = workdayBoardOf(link);
+  const addresses = board ? workdayAddresses(board) : null;
+  if (!addresses) return false;
+  try {
+    const answer = await fetchBoard(addresses.listUrl, {
+      json: { appliedFacets: {}, limit: 1, offset: 0, searchText: '' },
+    });
+    return Array.isArray((parseJson(answer.text) as { jobPostings?: unknown })?.jobPostings);
+  } catch {
+    return false;
   }
 }
 
@@ -265,11 +284,23 @@ const stringOf = (value: unknown): string | null =>
 
 const dayStart = (day: string | null) => (day ? new Date(`${day}T00:00:00Z`) : null);
 
-async function readThroughPosting(ref: JobRef, fetchPage: PageFetcher): Promise<JobDetails> {
+async function readThroughPosting(
+  ref: JobRef,
+  fetchPage: PageFetcher,
+  fetchBoard: PageFetcher,
+): Promise<JobDetails> {
   let details;
   try {
     details = await readPosting(ref.link, fetchPage);
   } catch (error) {
+    // readPosting reports a refused read as "http_status: 403" (the same text readFailure reads).
+    if (
+      ref.source === 'workday' &&
+      error instanceof Error &&
+      /http_status: 403\b/.test(error.message) &&
+      (await workdaySiteAnswers(ref.link, fetchBoard))
+    )
+      throw new JobReadError('workday: the job is no longer posted', true);
     throw readFailure(error);
   }
   if (!details.role) throw new JobReadError(`${ref.source}: no title`);

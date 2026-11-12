@@ -122,6 +122,16 @@ describe('jobRefOf', () => {
       { source: 'workday', board: 'acme', jobId: 'QA-Engineer_R123' },
       'https://acme.wd5.myworkdayjobs.com/en-US/External/job/Boston-MA/QA-Engineer_R123',
     ],
+    [
+      'https://acme.wd5.myworkdayjobs.com/careers/job/USA---Remote/SDET_R12480/apply',
+      { source: 'workday', board: 'acme', jobId: 'SDET_R12480' },
+      'https://acme.wd5.myworkdayjobs.com/careers/job/USA---Remote/SDET_R12480',
+    ],
+    [
+      'https://acme.wd5.myworkdayjobs.com/careers/job/Austin-TX/Applying-AI-Lead_R7',
+      { source: 'workday', board: 'acme', jobId: 'Applying-AI-Lead_R7' },
+      'https://acme.wd5.myworkdayjobs.com/careers/job/Austin-TX/Applying-AI-Lead_R7',
+    ],
   ])('reads %s', (raw, ref, link) => {
     expect(jobRefOf(raw)).toEqual({ ...ref, link });
   });
