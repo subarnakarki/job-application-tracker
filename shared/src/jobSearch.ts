@@ -559,6 +559,74 @@ const NOT_US = [
 ];
 const US_COUNTRY = /^(us|usa|u\.s\.a?\.?|united states( of america)?|america)$/i;
 
+/** ISO 3166 three-letter codes of countries other than the US, as Workday writes them. */
+const NOT_US_COUNTRY_CODES = new Set([
+  'ARE',
+  'ARG',
+  'AUS',
+  'AUT',
+  'BEL',
+  'BGD',
+  'BGR',
+  'BRA',
+  'CAN',
+  'CHE',
+  'CHL',
+  'CHN',
+  'COL',
+  'CRI',
+  'CZE',
+  'DEU',
+  'DNK',
+  'EGY',
+  'ESP',
+  'EST',
+  'FIN',
+  'FRA',
+  'GBR',
+  'GRC',
+  'HKG',
+  'HRV',
+  'HUN',
+  'IDN',
+  'IND',
+  'IRL',
+  'ISR',
+  'ITA',
+  'JPN',
+  'KEN',
+  'KOR',
+  'LKA',
+  'LTU',
+  'LVA',
+  'MAR',
+  'MEX',
+  'MYS',
+  'NGA',
+  'NLD',
+  'NOR',
+  'NZL',
+  'PAK',
+  'PER',
+  'PHL',
+  'POL',
+  'PRT',
+  'ROU',
+  'SAU',
+  'SGP',
+  'SRB',
+  'SVK',
+  'SVN',
+  'SWE',
+  'THA',
+  'TUR',
+  'TWN',
+  'UKR',
+  'URY',
+  'VNM',
+  'ZAF',
+]);
+
 export type LocationVerdict = 'us' | 'not_us' | 'unknown';
 
 const hasPhrase = (text: string, phrase: string) =>
@@ -580,6 +648,9 @@ function placeVerdict(place: string): LocationVerdict {
     if (!/new south wales|western australia/i.test(text)) return 'us';
   }
   if (US_CITIES.some((city) => hasPhrase(text, city))) return 'us';
+  // Workday's "BGR - SOFIA", "POL - Lodz", "IND Bangalore": a country code leading the place.
+  const code = /^([A-Z]{3})(?=\s*[-–,:]|\s+[A-Z])/.exec(text)?.[1];
+  if (code && NOT_US_COUNTRY_CODES.has(code)) return 'not_us';
   if (NOT_US.some((name) => hasPhrase(text, name))) return 'not_us';
   return 'unknown';
 }
@@ -756,17 +827,26 @@ export function belowSalaryFloor(pay: PostedPay | null, floor: number | null): s
   return `Pays up to ${dollars(pay.max)}, under your ${dollars(floor)} floor`;
 }
 
+const SAYS_REMOTE_SHORT = /\bremote\b|\bwork from home\b|\bwfh\b/i;
+
 /**
  * Why a job's work mode rules it out, or null: a mode the user does not want, or a hybrid or
- * on-site job outside the commute area (or with a location that cannot be placed). An unknown mode
- * is never a problem.
+ * on-site job outside the commute area (or with a location that cannot be placed). A job whose
+ * mode is not stated (Workday never says) is kept when its title or place says remote, or when its
+ * place is inside the commute area or cannot be told; one clearly placed outside it is not.
  */
 export function workModeProblem(
   workMode: WorkMode | null,
   location: string | null,
   rules: Pick<SortRules, 'workModes' | 'commuteArea' | 'homeState'>,
+  title = '',
 ): string | null {
-  if (!workMode) return null;
+  if (!workMode) {
+    if (rules.commuteArea.length === 0) return null;
+    if (SAYS_REMOTE_SHORT.test(`${title} ${location ?? ''}`)) return null;
+    if (commuteVerdict(location, rules.commuteArea, rules.homeState) !== 'outside') return null;
+    return `Work mode not stated, in ${(location ?? '').slice(0, 120)}: outside your commute area`;
+  }
   if (rules.workModes.length > 0 && !rules.workModes.includes(workMode))
     return `${workMode}, which you don't want`;
   if (workMode === 'Remote' || rules.commuteArea.length === 0) return null;
@@ -829,7 +909,7 @@ export function sortJob(job: JobFacts, rules: SortRules): Sorted {
     };
   // A board that does not say how the job is worked: the posting's own words, when they are clear.
   const fromText = job.workMode ? null : workModeInText(job.text);
-  const wrongPlace = workModeProblem(job.workMode ?? fromText, job.location, rules);
+  const wrongPlace = workModeProblem(job.workMode ?? fromText, job.location, rules, job.title);
   if (wrongPlace)
     return {
       kind: 'skipped',
