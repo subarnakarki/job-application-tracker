@@ -225,6 +225,12 @@ describe('sortJob', () => {
       ],
       ['no work mode and no location', { workMode: null, location: null }, 'target', ''],
       [
+        'no work mode, only the country',
+        { workMode: null, location: 'United States' },
+        'target',
+        '',
+      ],
+      [
         'no work mode, a place that cannot be told',
         { workMode: null, location: 'Multiple locations' },
         'target',

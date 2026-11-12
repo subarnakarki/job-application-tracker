@@ -833,7 +833,8 @@ const SAYS_REMOTE_SHORT = /\bremote\b|\bwork from home\b|\bwfh\b/i;
  * Why a job's work mode rules it out, or null: a mode the user does not want, or a hybrid or
  * on-site job outside the commute area (or with a location that cannot be placed). A job whose
  * mode is not stated (Workday never says) is kept when its title or place says remote, or when its
- * place is inside the commute area or cannot be told; one clearly placed outside it is not.
+ * place is inside the commute area or names no state ("United States" may well be remote); one
+ * placed in a state outside the area is not.
  */
 export function workModeProblem(
   workMode: WorkMode | null,
@@ -845,6 +846,7 @@ export function workModeProblem(
     if (rules.commuteArea.length === 0) return null;
     if (SAYS_REMOTE_SHORT.test(`${title} ${location ?? ''}`)) return null;
     if (commuteVerdict(location, rules.commuteArea, rules.homeState) !== 'outside') return null;
+    if (statesIn(location ?? '').length === 0) return null;
     return `Work mode not stated, in ${(location ?? '').slice(0, 120)}: outside your commute area`;
   }
   if (rules.workModes.length > 0 && !rules.workModes.includes(workMode))
