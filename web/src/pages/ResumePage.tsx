@@ -62,7 +62,7 @@ export function ResumePage() {
     );
 
   const isDemo = me.data?.isDemo ?? false;
-  const { resume: current, analysisAvailable } = resume.data;
+  const { resume: current, analysisAvailable, analysesPerDay } = resume.data;
 
   return (
     <div className="flex flex-col gap-6">
@@ -99,7 +99,10 @@ export function ResumePage() {
               >
                 {analyse.isPending ? 'Reading your resume…' : 'Find my best-fit titles'}
               </button>
-              <p className="text-sm text-fg-3">Up to 5 a day. Usually takes under a minute.</p>
+              <p className="text-sm text-fg-3">
+                {analysesPerDay === 1 ? 'Once a day' : `Up to ${String(analysesPerDay)} a day`},
+                shared with resume checks. Usually takes under a minute.
+              </p>
             </div>
           ) : (
             <p className="text-fg-2">Resume analysis is turned off on this server.</p>

@@ -62,6 +62,29 @@ export async function consumeRateLimit(
   };
 }
 
+/**
+ * Gives one attempt back in the window `now` falls in, for an attempt that failed through no
+ * fault of the caller (the paid call errored). Never goes below zero.
+ */
+export async function refundRateLimit(
+  db: Queryable,
+  key: string,
+  rule: RateLimitRule,
+  now: Date,
+): Promise<void> {
+  const windowStartMs = Math.floor(now.getTime() / rule.windowMs) * rule.windowMs;
+  // The table keeps count >= 1, so giving back the last attempt removes the row. Both parts see
+  // the same snapshot, so exactly one of them applies.
+  await db.query(
+    `with decremented as (
+       update rate_limits set count = count - 1
+       where key = $1 and window_start = $2 and count > 1
+     )
+     delete from rate_limits where key = $1 and window_start = $2 and count = 1`,
+    [key, new Date(windowStartMs)],
+  );
+}
+
 /** Housekeeping: drops windows older than `keepForMs` (default one day). Returns how many. */
 export async function deleteExpiredRateLimits(
   db: Queryable,
