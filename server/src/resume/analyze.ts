@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
+import { throwIfLimited } from '../anthropic/limits';
 import { ignoreUsage, usageEntry, type UsageRecorder } from '../usage/record';
 import {
   acceptAnswer,
@@ -139,8 +140,12 @@ export function claudeAnalyzer(
   };
 }
 
-/** A rejected key stops with AnalyzerUnavailableError; any other API error is a soft failure. */
+/**
+ * A rejected key stops with AnalyzerUnavailableError and an Anthropic limit with ClaudeLimitError;
+ * any other API error is a soft failure.
+ */
 function failure(error: unknown): { kind: 'failed'; reason: string } {
+  throwIfLimited(error);
   if (
     error instanceof Anthropic.AuthenticationError ||
     error instanceof Anthropic.PermissionDeniedError

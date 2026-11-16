@@ -6,6 +6,7 @@ import {
 import type { LightMyRequestResponse } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { AnalyzerUnavailableError } from '../resume/analyze';
+import { ClaudeLimitError } from '../anthropic/limits';
 import type { CoverLetterModelRequest, JobSearchClaude } from '../jobsearch/claude';
 import { FetchError, type PageFetcher } from '../postings/fetchPage';
 import { createTestApp, SAME_ORIGIN, T0, type TestApp } from '../test/app';
@@ -41,7 +42,7 @@ const LETTER =
 
 /** The model, stubbed: what it answers (one per call, the last repeated), and what it was asked. */
 const model = {
-  answers: [] as (CoverLetterAnswer | null | 'unavailable')[],
+  answers: [] as (CoverLetterAnswer | null | 'unavailable' | ClaudeLimitError)[],
   requests: [] as CoverLetterModelRequest[],
 };
 const claude: JobSearchClaude = {
@@ -54,6 +55,7 @@ const claude: JobSearchClaude = {
     model.requests.push(request);
     const answer = model.answers[Math.min(model.requests.length, model.answers.length) - 1];
     if (answer === 'unavailable') return Promise.reject(new AnalyzerUnavailableError('no key'));
+    if (answer instanceof ClaudeLimitError) return Promise.reject(answer);
     return Promise.resolve(answer ?? null);
   },
 };
@@ -251,6 +253,29 @@ describe.skipIf(!TEST_DATABASE_URL)(
       const noResume = await owner({ resume: false });
       expect((await draft(noResume.cookie, noResume.id)).json()).toMatchObject({
         error: 'no_resume',
+      });
+    });
+
+    it('answers a Claude limit with 503 and keeps the letter as it was', async () => {
+      const me = await owner();
+      letterOf(await draft(me.cookie, me.id));
+      model.requests = [];
+
+      model.answers = [new ClaudeLimitError('rate_limited', 30)];
+      const busy = await draft(me.cookie, me.id, { tone: 'warm' });
+      expect(busy.statusCode).toBe(503);
+      expect(busy.headers['retry-after']).toBe('30');
+      expect(busy.json()).toMatchObject({ error: 'claude_busy' });
+
+      model.answers = [new ClaudeLimitError('spend_limit', null)];
+      const spent = await draft(me.cookie, me.id);
+      expect(spent.statusCode).toBe(503);
+      expect(spent.headers['retry-after']).toBeUndefined();
+      expect(spent.json()).toMatchObject({ error: 'claude_limit_reached' });
+
+      expect(letterOf(await read(me.cookie, me.id)).coverLetter).toMatchObject({
+        text: LETTER,
+        tone: 'professional',
       });
     });
 

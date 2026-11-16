@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { UsageEntry } from '../usage/record';
 import { describe, expect, it } from 'vitest';
+import { ClaudeLimitError } from '../anthropic/limits';
 import { claudeClassifier, ClassifierUnavailableError, renderEmail } from './classify';
 import type { GmailMessage } from './gmail';
 
@@ -87,12 +88,21 @@ describe('claudeClassifier', () => {
     expect(await classifier.classify(email)).toEqual({ kind: 'unclassified', reason });
   });
 
-  it('leaves an email unclassified on a server error, but stops the run on a bad key', async () => {
+  it('leaves an email unclassified on a server error, but stops the run on a bad key or a limit', async () => {
     const error = (type: string) => ({ type: 'error', error: { type, message: 'x' } });
 
-    expect(
-      await classifierAnswering(529, error('overloaded_error')).classifier.classify(email),
-    ).toEqual({ kind: 'unclassified', reason: 'Classifier error 529' });
+    expect(await classifierAnswering(500, error('api_error')).classifier.classify(email)).toEqual({
+      kind: 'unclassified',
+      reason: 'Classifier error 500',
+    });
+    // A limit would leave every email unclassified: the import stops and keeps them for next time.
+    for (const [status, type] of [
+      [429, 'rate_limit_error'],
+      [529, 'overloaded_error'],
+    ] as const)
+      await expect(
+        classifierAnswering(status, error(type)).classifier.classify(email),
+      ).rejects.toBeInstanceOf(ClaudeLimitError);
     await expect(
       classifierAnswering(401, error('authentication_error')).classifier.classify(email),
     ).rejects.toBeInstanceOf(ClassifierUnavailableError);

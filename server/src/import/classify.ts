@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
+import { throwIfLimited } from '../anthropic/limits';
 import { ignoreUsage, usageEntry, type UsageRecorder } from '../usage/record';
 import type { GmailMessage } from './gmail';
 import { EmailVerdictSchema, type EmailVerdict } from './verdict';
@@ -97,6 +98,8 @@ export function claudeClassifier(
           ? { kind: 'verdict', verdict: parsed.data }
           : { kind: 'unclassified', reason: 'Unexpected answer' };
       } catch (error) {
+        // A limit stops the import (its claimed emails are released for the next one).
+        throwIfLimited(error);
         if (
           error instanceof Anthropic.AuthenticationError ||
           error instanceof Anthropic.PermissionDeniedError

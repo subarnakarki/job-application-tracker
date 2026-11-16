@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { UsageEntry } from '../usage/record';
 import { describe, expect, it } from 'vitest';
+import { ClaudeLimitError } from '../anthropic/limits';
 import { AnalyzerUnavailableError, claudeAnalyzer, renderPosting, renderResume } from './analyze';
 
 const RESUME = 'Pat Example. Senior SDET. Playwright, TypeScript, CI/CD on GitHub Actions.';
@@ -105,12 +106,24 @@ describe('claudeAnalyzer', () => {
     expect(await analyzer.analyze(RESUME)).toEqual({ kind: 'failed', reason });
   });
 
-  it('fails softly on a server error, but reports a rejected key as unavailable', async () => {
+  it('fails softly on a server error, but reports a rejected key or a limit', async () => {
     const error = (type: string) => ({ type: 'error', error: { type, message: 'x' } });
 
-    expect(
-      await analyzerAnswering(529, error('overloaded_error')).analyzer.analyze(RESUME),
-    ).toEqual({ kind: 'failed', reason: 'Analyzer error 529' });
+    expect(await analyzerAnswering(500, error('api_error')).analyzer.analyze(RESUME)).toEqual({
+      kind: 'failed',
+      reason: 'Analyzer error 500',
+    });
+    for (const [status, type] of [
+      [429, 'rate_limit_error'],
+      [529, 'overloaded_error'],
+    ] as const) {
+      await expect(
+        analyzerAnswering(status, error(type)).analyzer.analyze(RESUME),
+      ).rejects.toBeInstanceOf(ClaudeLimitError);
+      await expect(
+        analyzerAnswering(status, error(type)).analyzer.postingKeywords('Playwright. TypeScript.'),
+      ).rejects.toBeInstanceOf(ClaudeLimitError);
+    }
     await expect(
       analyzerAnswering(401, error('authentication_error')).analyzer.analyze(RESUME),
     ).rejects.toBeInstanceOf(AnalyzerUnavailableError);

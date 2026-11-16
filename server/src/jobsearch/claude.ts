@@ -22,6 +22,7 @@ import {
 } from '@jat/shared';
 import { ignoreUsage, usageEntry, type UsageRecorder } from '../usage/record';
 import { trimPostingBoilerplate } from '../postings/trim';
+import { throwIfLimited } from '../anthropic/limits';
 import { AnalyzerUnavailableError } from '../resume/analyze';
 
 export const JOB_SEARCH_MODEL = 'claude-opus-5-5';
@@ -370,7 +371,9 @@ export const renderDraftRequest = (request: DraftRequest) => joinParts(draftPart
 
 const URL_IN_TEXT = /https?:\/\/[^\s<>"')\]]+/g;
 
+/** A rejected key or an Anthropic limit stops the caller; any other API error is a soft failure. */
 function rejectBadKey(error: unknown): never | void {
+  throwIfLimited(error);
   if (
     error instanceof Anthropic.AuthenticationError ||
     error instanceof Anthropic.PermissionDeniedError

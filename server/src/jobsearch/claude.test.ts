@@ -4,6 +4,7 @@ import type { UsageEntry } from '../usage/record';
 import { describe, expect, it } from 'vitest';
 import { AnalyzerUnavailableError } from '../resume/analyze';
 import { NO_CLAUDE } from './access';
+import { ClaudeLimitError } from '../anthropic/limits';
 import {
   claudeJobSearch,
   JOB_SEARCH_MODEL,
@@ -192,7 +193,7 @@ describe('claudeJobSearch.search', () => {
     expect(outcome.links).toEqual(['https://jobs.lever.co/a/1']);
   });
 
-  it('skips a search error result, finds nothing on an API error, and stops on a bad key', async () => {
+  it('skips a search error result, finds nothing on a server error, and stops on a bad key or a limit', async () => {
     const errorResult = {
       type: 'web_search_tool_result',
       tool_use_id: 'srvtoolu_1',
@@ -206,12 +207,20 @@ describe('claudeJobSearch.search', () => {
 
     const apiError = (type: string) => ({ type: 'error', error: { type, message: 'x' } });
     expect(
-      await claudeAnswering([{ status: 529, body: apiError('overloaded_error') }]).claude.search(
+      await claudeAnswering([{ status: 500, body: apiError('api_error') }]).claude.search(
         'x',
         ['ashby'],
         1,
       ),
     ).toMatchObject({ links: [], searches: 0 });
+    // Overloaded is a limit: the run stops rather than search on and fail every draft.
+    await expect(
+      claudeAnswering([{ status: 529, body: apiError('overloaded_error') }]).claude.search(
+        'x',
+        ['ashby'],
+        1,
+      ),
+    ).rejects.toBeInstanceOf(ClaudeLimitError);
     await expect(
       claudeAnswering([{ status: 401, body: apiError('authentication_error') }]).claude.search(
         'x',
@@ -519,5 +528,60 @@ describe('the stand-in for test users', () => {
         'Sincerely,\nPat Example',
       ].join('\n\n'),
     );
+  });
+});
+
+describe('Anthropic limits', () => {
+  const job = { resumeText: 'Pat. SDET.', company: 'Acme', role: 'SDET', postingText: 'p' };
+  const letter = {
+    ...job,
+    greeting: 'Dear Hiring Manager,',
+    length: 'short' as const,
+    tone: 'direct' as const,
+    steer: '',
+  };
+  /** A canned error response from the real SDK (retries off). */
+  const failing = (status: number, error: Record<string, unknown>) =>
+    claudeAnswering([{ status, body: { type: 'error', error } }]).claude;
+
+  it('throws a rate limit from every kind of call, instead of a soft failure', async () => {
+    const claude = failing(429, { type: 'rate_limit_error', message: 'Too many requests' });
+    for (const call of [
+      () => claude.draft({ ...job, questions: [] }),
+      () => claude.tailor({ ...job, missing: [] }),
+      () => claude.tailorPosting(job),
+      () => claude.coverLetter(letter),
+      () => claude.search('"SDET"', ['greenhouse'], 7),
+    ])
+      await expect(call()).rejects.toMatchObject({
+        name: 'ClaudeLimitError',
+        kind: 'rate_limited',
+      });
+  });
+
+  it('tells the monthly spend cap and an own spend limit from a rate limit', async () => {
+    await expect(
+      failing(429, {
+        type: 'rate_limit_error',
+        message: 'You have reached your API usage limits.',
+        details: { error_code: 'enforced_spend_limit_reached' },
+      }).coverLetter(letter),
+    ).rejects.toMatchObject({ kind: 'spend_limit' });
+    await expect(
+      failing(400, {
+        type: 'invalid_request_error',
+        message:
+          'You have reached your specified API usage limits. You will regain access on 2026-12-01 at 00:00 UTC.',
+      }).coverLetter(letter),
+    ).rejects.toMatchObject({ kind: 'spend_limit' });
+  });
+
+  it('throws when overloaded, and keeps other server errors soft', async () => {
+    await expect(
+      failing(529, { type: 'overloaded_error', message: 'Overloaded' }).coverLetter(letter),
+    ).rejects.toBeInstanceOf(ClaudeLimitError);
+    expect(
+      await failing(500, { type: 'api_error', message: 'Internal' }).coverLetter(letter),
+    ).toBeNull();
   });
 });

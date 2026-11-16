@@ -4,6 +4,7 @@ import Fastify, {
   type FastifyServerOptions,
 } from 'fastify';
 import { dbUsageRecorder } from './usage/record';
+import { ClaudeLimitError, limitResponse } from './anthropic/limits';
 import { systemClock, type Clock } from './clock';
 import type { Db } from './db/types';
 import { registerContractValidation, ROUTE_NOT_FOUND } from './http/contractValidation';
@@ -78,6 +79,14 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   // Never leak internals: a 5xx returns a fixed body (details go to the log),
   // while deliberate errors keep their message.
   app.setErrorHandler((error: FastifyError, request, reply) => {
+    // Anthropic declined for capacity or money: a 503 the web app can tell apart, never a 500.
+    if (error instanceof ClaudeLimitError) {
+      const answer = limitResponse(error);
+      request.log.warn({ limit: error.kind, retryAfter: error.retryAfterSeconds }, 'claude limit');
+      if (answer.retryAfterSeconds !== null)
+        void reply.header('retry-after', String(answer.retryAfterSeconds));
+      return reply.code(answer.statusCode).send({ error: answer.code, message: answer.message });
+    }
     if (error instanceof ApiError) {
       return reply.code(error.statusCode).send({
         error: error.code,
