@@ -19,7 +19,12 @@ import {
 } from '../resume/analyze';
 import { createTestApp, SAME_ORIGIN, type TestApp } from '../test/app';
 import { TEST_DATABASE_URL } from '../test/testDb';
-import { ANALYSIS_GLOBAL_RULE, ANALYSIS_RULE, UPLOAD_BODY_LIMIT } from './resume';
+import {
+  ANALYSIS_GLOBAL_RULE,
+  ANALYSIS_RULE,
+  OWNER_ANALYSIS_RULE,
+  UPLOAD_BODY_LIMIT,
+} from './resume';
 
 const MISSING_ID = '00000000-0000-4000-8000-000000000000';
 const HOUR = 60 * 60 * 1000;
@@ -94,14 +99,17 @@ const fetchPage: PageFetcher = (url) =>
 
 describe.skipIf(!TEST_DATABASE_URL)('resume API (real app, real database)', () => {
   let t: TestApp;
+  /** Read on every request, so a test can make a user the owner after signing in. */
+  const env: Record<string, string | undefined> = { JOB_SEARCH_USER_IDS: '' };
 
   beforeAll(async () => {
-    t = await createTestApp({ resumeAnalyzer: analyzer, fetchPage });
+    t = await createTestApp({ resumeAnalyzer: analyzer, fetchPage, env });
   });
   afterAll(async () => {
     await t.close();
   });
   beforeEach(() => {
+    env['JOB_SEARCH_USER_IDS'] = '';
     analyzer.texts = [];
     analyzer.postings = [];
     analyzer.next = 'ok';
@@ -130,6 +138,7 @@ describe.skipIf(!TEST_DATABASE_URL)('resume API (real app, real database)', () =
       expect(parsed(ResumeEnvelopeSchema)(await send('GET', '/api/resume', cookie))).toEqual({
         resume: null,
         analysisAvailable: true,
+        analysesPerDay: ANALYSIS_RULE.limit,
       });
 
       const uploaded = await uploadFile(cookie, 'resume.pdf', 'Pat CV.pdf');
@@ -266,17 +275,41 @@ describe.skipIf(!TEST_DATABASE_URL)('resume API (real app, real database)', () =
       expect(analysisOf(later).id).not.toBe(first.id);
     });
 
-    it('allows 5 analyses a day per user', async () => {
+    it('allows one analysis a day for most users', async () => {
+      expect(ANALYSIS_RULE.limit).toBe(1);
       const { cookie } = await t.login();
-      for (let index = 0; index < ANALYSIS_RULE.limit; index += 1) {
-        await upload(cookie, { kind: 'text', text: pasted(`day ${String(index)}`) });
-        expect((await analyse(cookie)).statusCode).toBe(201);
-      }
+      await upload(cookie, { kind: 'text', text: pasted('day one') });
+      expect((await analyse(cookie)).statusCode).toBe(201);
+
       await upload(cookie, { kind: 'text', text: pasted('one too many') });
       const refused = await analyse(cookie);
       expect(refused.statusCode).toBe(429);
+      expect(refused.json()).toMatchObject({ message: 'You can run 1 resume analysis a day.' });
       expect(Number(refused.headers['retry-after'])).toBeGreaterThan(0);
-      expect(analyzer.texts).toHaveLength(ANALYSIS_RULE.limit);
+      expect(analyzer.texts).toHaveLength(1);
+
+      // The next day it works again.
+      t.clock.advance(25 * HOUR);
+      expect((await analyse(cookie)).statusCode).toBe(201);
+    });
+
+    it('allows the owner 5 analyses a day, and says so', async () => {
+      const owner = await t.login();
+      env['JOB_SEARCH_USER_IDS'] = owner.user.id.toUpperCase();
+      expect(parsed(ResumeEnvelopeSchema)(await send('GET', '/api/resume', owner.cookie))).toEqual({
+        resume: null,
+        analysisAvailable: true,
+        analysesPerDay: OWNER_ANALYSIS_RULE.limit,
+      });
+      for (let index = 0; index < OWNER_ANALYSIS_RULE.limit; index += 1) {
+        await upload(owner.cookie, { kind: 'text', text: pasted(`owner ${String(index)}`) });
+        expect((await analyse(owner.cookie)).statusCode).toBe(201);
+      }
+      await upload(owner.cookie, { kind: 'text', text: pasted('owner one too many') });
+      const refused = await analyse(owner.cookie);
+      expect(refused.statusCode).toBe(429);
+      expect(refused.json()).toMatchObject({ message: 'You can run 5 resume analyses a day.' });
+      expect(analyzer.texts).toHaveLength(OWNER_ANALYSIS_RULE.limit);
     });
 
     it('keeps only the 5 newest analyses', async () => {
@@ -317,6 +350,20 @@ describe.skipIf(!TEST_DATABASE_URL)('resume API (real app, real database)', () =
           rateLimitKey(ANALYSIS_GLOBAL_RULE.name, 'all'),
         ]);
       }
+    });
+
+    it('gives the daily attempt back when the analysis fails, so the user can try again', async () => {
+      const { cookie } = await t.login();
+      await upload(cookie, { kind: 'text', text: pasted('retry after failure') });
+      analyzer.next = 'failed';
+      expect((await analyse(cookie)).statusCode).toBe(502);
+      analyzer.next = 'unavailable';
+      expect((await analyse(cookie)).statusCode).toBe(503);
+
+      analyzer.next = 'ok';
+      expect((await analyse(cookie)).statusCode).toBe(201);
+      await upload(cookie, { kind: 'text', text: pasted('now the day is used') });
+      expect((await analyse(cookie)).statusCode).toBe(429);
     });
 
     it('saves nothing when the analysis fails, and says when the key is rejected', async () => {

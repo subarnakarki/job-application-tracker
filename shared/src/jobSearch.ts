@@ -317,7 +317,13 @@ export function jobRefOf(raw: string): JobRef | null {
       : null;
   }
   if (host.endsWith('.myworkdayjobs.com')) {
-    // https://acme.wd5.myworkdayjobs.com/en-US/External/job/Boston-MA/QA-Engineer_R123
+    // https://acme.wd5.myworkdayjobs.com/en-US/External/job/Boston-MA/QA-Engineer_R123, also
+    // with "/apply" (the application's first page) after it: the job is the part before.
+    while (
+      parts.length > 0 &&
+      /^(apply|applyManually|autofillWithResume)$/i.test(parts.at(-1) ?? '')
+    )
+      parts.pop();
     const jobAt = parts.indexOf('job');
     const last = parts.at(-1);
     if (jobAt >= 0 && last && jobAt < parts.length - 1) {
@@ -326,7 +332,7 @@ export function jobRefOf(raw: string): JobRef | null {
         source: 'workday',
         board: tenant,
         jobId: last,
-        link: `https://${host}${url.pathname}`.slice(0, LIMITS.jobLink),
+        link: `https://${host}/${parts.join('/')}`.slice(0, LIMITS.jobLink),
       };
     }
     return null;
@@ -559,6 +565,74 @@ const NOT_US = [
 ];
 const US_COUNTRY = /^(us|usa|u\.s\.a?\.?|united states( of america)?|america)$/i;
 
+/** ISO 3166 three-letter codes of countries other than the US, as Workday writes them. */
+const NOT_US_COUNTRY_CODES = new Set([
+  'ARE',
+  'ARG',
+  'AUS',
+  'AUT',
+  'BEL',
+  'BGD',
+  'BGR',
+  'BRA',
+  'CAN',
+  'CHE',
+  'CHL',
+  'CHN',
+  'COL',
+  'CRI',
+  'CZE',
+  'DEU',
+  'DNK',
+  'EGY',
+  'ESP',
+  'EST',
+  'FIN',
+  'FRA',
+  'GBR',
+  'GRC',
+  'HKG',
+  'HRV',
+  'HUN',
+  'IDN',
+  'IND',
+  'IRL',
+  'ISR',
+  'ITA',
+  'JPN',
+  'KEN',
+  'KOR',
+  'LKA',
+  'LTU',
+  'LVA',
+  'MAR',
+  'MEX',
+  'MYS',
+  'NGA',
+  'NLD',
+  'NOR',
+  'NZL',
+  'PAK',
+  'PER',
+  'PHL',
+  'POL',
+  'PRT',
+  'ROU',
+  'SAU',
+  'SGP',
+  'SRB',
+  'SVK',
+  'SVN',
+  'SWE',
+  'THA',
+  'TUR',
+  'TWN',
+  'UKR',
+  'URY',
+  'VNM',
+  'ZAF',
+]);
+
 export type LocationVerdict = 'us' | 'not_us' | 'unknown';
 
 const hasPhrase = (text: string, phrase: string) =>
@@ -580,6 +654,9 @@ function placeVerdict(place: string): LocationVerdict {
     if (!/new south wales|western australia/i.test(text)) return 'us';
   }
   if (US_CITIES.some((city) => hasPhrase(text, city))) return 'us';
+  // Workday's "BGR - SOFIA", "POL - Lodz", "IND Bangalore": a country code leading the place.
+  const code = /^([A-Z]{3})(?=\s*[-–,:]|\s+[A-Z])/.exec(text)?.[1];
+  if (code && NOT_US_COUNTRY_CODES.has(code)) return 'not_us';
   if (NOT_US.some((name) => hasPhrase(text, name))) return 'not_us';
   return 'unknown';
 }
@@ -756,17 +833,28 @@ export function belowSalaryFloor(pay: PostedPay | null, floor: number | null): s
   return `Pays up to ${dollars(pay.max)}, under your ${dollars(floor)} floor`;
 }
 
+const SAYS_REMOTE_SHORT = /\bremote\b|\bwork from home\b|\bwfh\b/i;
+
 /**
  * Why a job's work mode rules it out, or null: a mode the user does not want, or a hybrid or
- * on-site job outside the commute area (or with a location that cannot be placed). An unknown mode
- * is never a problem.
+ * on-site job outside the commute area (or with a location that cannot be placed). A job whose
+ * mode is not stated (Workday never says) is kept when its title or place says remote, or when its
+ * place is inside the commute area or names no state ("United States" may well be remote); one
+ * placed in a state outside the area is not.
  */
 export function workModeProblem(
   workMode: WorkMode | null,
   location: string | null,
   rules: Pick<SortRules, 'workModes' | 'commuteArea' | 'homeState'>,
+  title = '',
 ): string | null {
-  if (!workMode) return null;
+  if (!workMode) {
+    if (rules.commuteArea.length === 0) return null;
+    if (SAYS_REMOTE_SHORT.test(`${title} ${location ?? ''}`)) return null;
+    if (commuteVerdict(location, rules.commuteArea, rules.homeState) !== 'outside') return null;
+    if (statesIn(location ?? '').length === 0) return null;
+    return `Work mode not stated, in ${(location ?? '').slice(0, 120)}: outside your commute area`;
+  }
   if (rules.workModes.length > 0 && !rules.workModes.includes(workMode))
     return `${workMode}, which you don't want`;
   if (workMode === 'Remote' || rules.commuteArea.length === 0) return null;
@@ -829,7 +917,7 @@ export function sortJob(job: JobFacts, rules: SortRules): Sorted {
     };
   // A board that does not say how the job is worked: the posting's own words, when they are clear.
   const fromText = job.workMode ? null : workModeInText(job.text);
-  const wrongPlace = workModeProblem(job.workMode ?? fromText, job.location, rules);
+  const wrongPlace = workModeProblem(job.workMode ?? fromText, job.location, rules, job.title);
   if (wrongPlace)
     return {
       kind: 'skipped',
@@ -2064,10 +2152,11 @@ export const QueueCheckResultSchema = z.strictObject({
 export type QueueCheckResult = z.infer<typeof QueueCheckResultSchema>;
 
 /**
- * Jobs that can be checked again on their board: those read through a board's API or page.
- * Workday, iCIMS, Taleo and SuccessFactors are finished by hand and are not checked.
+ * Jobs that can be checked again on their board: those read through a board's API or page, and
+ * Workday's (its public job API says when a job is gone). iCIMS, Taleo and SuccessFactors are not
+ * checked: their pages cannot be read.
  */
-export const CHECKABLE_SOURCES: readonly SearchSource[] = FILLABLE_SOURCES;
+export const CHECKABLE_SOURCES: readonly SearchSource[] = [...FILLABLE_SOURCES, 'workday'];
 export const DraftEditSchema = z.strictObject({
   answers: z
     .array(z.strictObject({ question: z.string().max(1000), answer: z.string().max(4000) }))

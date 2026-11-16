@@ -122,6 +122,16 @@ describe('jobRefOf', () => {
       { source: 'workday', board: 'acme', jobId: 'QA-Engineer_R123' },
       'https://acme.wd5.myworkdayjobs.com/en-US/External/job/Boston-MA/QA-Engineer_R123',
     ],
+    [
+      'https://acme.wd5.myworkdayjobs.com/careers/job/USA---Remote/SDET_R12480/apply',
+      { source: 'workday', board: 'acme', jobId: 'SDET_R12480' },
+      'https://acme.wd5.myworkdayjobs.com/careers/job/USA---Remote/SDET_R12480',
+    ],
+    [
+      'https://acme.wd5.myworkdayjobs.com/careers/job/Austin-TX/Applying-AI-Lead_R7',
+      { source: 'workday', board: 'acme', jobId: 'Applying-AI-Lead_R7' },
+      'https://acme.wd5.myworkdayjobs.com/careers/job/Austin-TX/Applying-AI-Lead_R7',
+    ],
   ])('reads %s', (raw, ref, link) => {
     expect(jobRefOf(raw)).toEqual({ ...ref, link });
   });
@@ -205,7 +215,49 @@ describe('sortJob', () => {
         '',
       ],
       ['remote anywhere', { workMode: 'Remote', location: 'Remote - Seattle, WA' }, 'target', ''],
-      ['no work mode given', { workMode: null, location: 'Seattle, WA' }, 'target', ''],
+      [
+        'no work mode given, placed outside the area',
+        { workMode: null, location: 'Melbourne, FL' },
+        'skipped',
+        'Work mode not stated, in Melbourne, FL: outside your commute area',
+      ],
+      [
+        'no work mode given, Workday style',
+        { workMode: null, location: 'United States - Ohio - Columbus' },
+        'skipped',
+        'Work mode not stated, in United States - Ohio - Columbus: outside your commute area',
+      ],
+      [
+        'no work mode given, inside the area',
+        { workMode: null, location: 'Charlotte, NC; Atlanta, GA' },
+        'target',
+        '',
+      ],
+      ['no work mode and no location', { workMode: null, location: null }, 'target', ''],
+      [
+        'no work mode, only the country',
+        { workMode: null, location: 'United States' },
+        'target',
+        '',
+      ],
+      [
+        'no work mode, a place that cannot be told',
+        { workMode: null, location: 'Multiple locations' },
+        'target',
+        '',
+      ],
+      [
+        'no work mode, the place says remote',
+        { workMode: null, location: 'USA - Remote' },
+        'target',
+        '',
+      ],
+      [
+        'no work mode, the title says remote',
+        { workMode: null, location: 'Reston, VA', title: 'Product Manager - Remote USA' },
+        'target',
+        '',
+      ],
       [
         'on-site in Austin',
         { workMode: 'On-site', location: 'Austin, TX' },
@@ -1497,6 +1549,14 @@ describe('locationVerdict', () => {
     ['Toronto, ON, Canada', 'not_us'],
     ['Sydney, New South Wales, Australia', 'not_us'],
     ['Bengaluru, India', 'not_us'],
+    // Workday leads with a three-letter country code.
+    ['BGR - SOFIA; BGR - VARNA', 'not_us'],
+    ['POL - Lodz', 'not_us'],
+    ['GBR - LDN - LONDON', 'not_us'],
+    ['IND Bangalore', 'not_us'],
+    ['USA - DE - ANY CITY', 'us'],
+    ['AUS - Austin, TX', 'us'],
+    ['HQ - Atlanta, GA', 'us'],
     ['Remote', 'unknown'],
     ['Anywhere', 'unknown'],
     ['Join us remotely', 'unknown'],

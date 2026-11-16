@@ -7,6 +7,11 @@ interface Props {
   disabled?: boolean;
   /** Classes for the wrapper; the default gives the menu room for its longest stage name. */
   className?: string;
+  /**
+   * Without the stage bars, for narrow places that already show the stage (a board column), so the
+   * longest stage name ("Interviewing") still fits.
+   */
+  compact?: boolean;
   onMove: (to: Status) => void;
 }
 
@@ -14,15 +19,26 @@ interface Props {
  * "Move to…": changes an application's stage in one step. A native select, so it works the same
  * with a mouse, a finger, the keyboard and a screen reader; the stage bars and chevron are decoration.
  */
-export function StatusMenu({ company, status, disabled, className = 'min-w-40', onMove }: Props) {
+export function StatusMenu({
+  company,
+  status,
+  disabled,
+  className = 'min-w-40',
+  compact = false,
+  onMove,
+}: Props) {
   return (
     <span className={`relative inline-flex items-center ${className}`}>
-      <span className="pointer-events-none absolute left-3.5 flex">
-        <StageBars status={status} />
-      </span>
+      {!compact && (
+        <span data-testid="stage-bars" className="pointer-events-none absolute left-3.5 flex">
+          <StageBars status={status} />
+        </span>
+      )}
       <select
         aria-label={`Move ${company} to`}
-        className="inp w-full cursor-pointer appearance-none py-1 pr-9 pl-[3.25rem] text-sm"
+        className={`inp w-full cursor-pointer appearance-none py-1 text-sm ${
+          compact ? 'pr-6 pl-2.5' : 'pr-9 pl-[3.25rem]'
+        }`}
         value={status}
         disabled={disabled}
         onChange={(event) => {
@@ -39,7 +55,7 @@ export function StatusMenu({ company, status, disabled, className = 'min-w-40', 
       <svg
         aria-hidden="true"
         viewBox="0 0 12 12"
-        className="pointer-events-none absolute right-3 size-3 text-fg-3"
+        className={`pointer-events-none absolute size-3 text-fg-3 ${compact ? 'right-2' : 'right-3'}`}
       >
         <path
           d="M2.5 4.5 6 8l3.5-3.5"

@@ -516,8 +516,14 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
         commuteArea: ['Charlotte', 'Concord'],
         state: 'NC',
       });
-      // The board gives a city and no work mode; the draft reads the posting.
-      PAGES[apiUrl(108)] = greenhouseJob('Product Manager, Payments', 2, undefined, 'Austin, TX');
+      // The board gives only the country and no work mode (a city in another state would be
+      // skipped before any posting is read); the draft reads the posting.
+      PAGES[apiUrl(108)] = greenhouseJob(
+        'Product Manager, Payments',
+        2,
+        undefined,
+        'United States',
+      );
       claude.links = [jobLink(108)];
       try {
         claude.reads = { workMode: 'On-site', location: 'Austin, TX' };

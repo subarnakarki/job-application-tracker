@@ -12,7 +12,12 @@ import {
 } from '@jat/shared';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { consumeRateLimit, rateLimitKey, type RateLimitRule } from '../auth/rateLimit';
+import {
+  consumeRateLimit,
+  rateLimitKey,
+  refundRateLimit,
+  type RateLimitRule,
+} from '../auth/rateLimit';
 import type { Clock } from '../clock';
 import type { Db } from '../db/types';
 import { ApiError, parseInput } from '../http/errors';
@@ -44,8 +49,12 @@ import {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** Each analysis is a paid model call, and signup is open: a cap per user and one for everyone. */
-export const ANALYSIS_RULE: RateLimitRule = { name: 'resume-analysis', limit: 5, windowMs: DAY_MS };
+/**
+ * Each analysis is a paid model call, and signup is open: a cap per user and one for everyone.
+ * Owners (`ownerIds`) get a few a day; anyone else gets one. Both count on the same key.
+ */
+export const ANALYSIS_RULE: RateLimitRule = { name: 'resume-analysis', limit: 1, windowMs: DAY_MS };
+export const OWNER_ANALYSIS_RULE: RateLimitRule = { ...ANALYSIS_RULE, limit: 5 };
 export const ANALYSIS_GLOBAL_RULE: RateLimitRule = {
   name: 'resume-analysis-all',
   limit: 200,
@@ -89,7 +98,12 @@ export interface ResumeRouteDeps {
   analyzer: ResumeAnalyzer | null;
   /** Reads job postings for "Check my resume" (the guarded fetcher). */
   fetchPage: PageFetcher;
+  /** Whether this user is the owner: they get OWNER_ANALYSIS_RULE instead of ANALYSIS_RULE. */
+  isOwner: (userId: string) => boolean;
 }
+
+const perDay = (limit: number, one: string, many: string) =>
+  `You can run ${String(limit)} ${limit === 1 ? one : many} a day.`;
 
 const POSTING_MESSAGES: Record<PreviewFailure, string> = {
   unsupported_site:
@@ -118,6 +132,9 @@ export function registerResumeRoutes(app: FastifyInstance, deps: ResumeRouteDeps
     if (!id || !UUID.test(id)) throw notFound();
     return id.toLowerCase();
   };
+  /** The daily analysis limit for one user. */
+  const analysisRuleFor = (user: { id: string }): RateLimitRule =>
+    deps.isOwner(user.id) ? OWNER_ANALYSIS_RULE : ANALYSIS_RULE;
   const spend = async (
     db: Db,
     rule: RateLimitRule,
@@ -136,6 +153,16 @@ export function registerResumeRoutes(app: FastifyInstance, deps: ResumeRouteDeps
       throw new ApiError(429, 'rate_limited', message);
     }
   };
+  /** A paid call that failed (not the user's doing) gives back their attempt and the shared one. */
+  const refundAnalysis = async (db: Db, rule: RateLimitRule, userId: string, at: Date) => {
+    await refundRateLimit(db, rateLimitKey(rule.name, userId), rule, at);
+    await refundRateLimit(
+      db,
+      rateLimitKey(ANALYSIS_GLOBAL_RULE.name, 'all'),
+      ANALYSIS_GLOBAL_RULE,
+      at,
+    );
+  };
 
   app.get(
     '/api/resume',
@@ -153,6 +180,7 @@ export function registerResumeRoutes(app: FastifyInstance, deps: ResumeRouteDeps
       return {
         resume: await getResume(requireDb(), user.id),
         analysisAvailable: deps.analyzer !== null,
+        analysesPerDay: analysisRuleFor(user).limit,
       };
     },
   );
@@ -326,7 +354,14 @@ export function registerResumeRoutes(app: FastifyInstance, deps: ResumeRouteDeps
       );
       if (recent) return reply.code(200).send(recent);
 
-      await spend(db, ANALYSIS_RULE, user.id, reply, 'You can analyse 5 resumes a day.');
+      const rule = analysisRuleFor(user);
+      await spend(
+        db,
+        rule,
+        user.id,
+        reply,
+        perDay(rule.limit, 'resume analysis', 'resume analyses'),
+      );
       await spend(
         db,
         ANALYSIS_GLOBAL_RULE,
@@ -342,6 +377,7 @@ export function registerResumeRoutes(app: FastifyInstance, deps: ResumeRouteDeps
       } catch (error) {
         if (error instanceof AnalyzerUnavailableError) {
           request.log.error({ outcome: 'unavailable' }, 'resume analysis');
+          await refundAnalysis(db, rule, user.id, now);
           throw new ApiError(503, 'unavailable', 'Resume analysis is not available right now');
         }
         throw error;
@@ -349,6 +385,7 @@ export function registerResumeRoutes(app: FastifyInstance, deps: ResumeRouteDeps
       const ms = Date.now() - started;
       if (outcome.kind === 'failed') {
         request.log.warn({ outcome: 'failed', reason: outcome.reason, ms }, 'resume analysis');
+        await refundAnalysis(db, rule, user.id, now);
         throw new ApiError(
           502,
           'analysis_failed',
@@ -485,7 +522,9 @@ export function registerResumeRoutes(app: FastifyInstance, deps: ResumeRouteDeps
         throw new ApiError(422, error.code, POSTING_MESSAGES[error.code]);
       }
 
-      await spend(db, ANALYSIS_RULE, user.id, reply, 'You can run 5 resume checks a day.');
+      const rule = analysisRuleFor(user);
+      const spentAt = deps.clock.now();
+      await spend(db, rule, user.id, reply, perDay(rule.limit, 'resume check', 'resume checks'));
       await spend(
         db,
         ANALYSIS_GLOBAL_RULE,
@@ -497,8 +536,10 @@ export function registerResumeRoutes(app: FastifyInstance, deps: ResumeRouteDeps
       try {
         outcome = await deps.analyzer.postingKeywords(postingText);
       } catch (error) {
-        if (error instanceof AnalyzerUnavailableError)
+        if (error instanceof AnalyzerUnavailableError) {
+          await refundAnalysis(db, rule, user.id, spentAt);
           throw new ApiError(503, 'unavailable', 'Resume analysis is not available right now');
+        }
         throw error;
       }
       const match = outcome.kind === 'keywords' ? matchPosting(outcome.answer, resume.text) : null;
@@ -507,6 +548,7 @@ export function registerResumeRoutes(app: FastifyInstance, deps: ResumeRouteDeps
           { host, outcome: 'failed', reason: outcome.kind === 'failed' ? outcome.reason : 'few' },
           'resume match',
         );
+        await refundAnalysis(db, rule, user.id, spentAt);
         throw new ApiError(
           502,
           'analysis_failed',

@@ -6,6 +6,7 @@ import {
   consumeRateLimit,
   deleteExpiredRateLimits,
   rateLimitKey,
+  refundRateLimit,
   type RateLimitRule,
 } from './rateLimit';
 
@@ -149,6 +150,33 @@ describe.skipIf(!TEST_DATABASE_URL)('consumeRateLimit (real Postgres)', () => {
     await expect(consumeRateLimit(db(), key, { ...RULE, windowMs: 10 }, T0)).rejects.toThrow(
       RangeError,
     );
+  });
+
+  it('gives back one attempt in the same window, never below zero', async () => {
+    const key = freshKey();
+    for (let index = 0; index < RULE.limit; index += 1) await consumeRateLimit(db(), key, RULE, T0);
+    expect((await consumeRateLimit(db(), key, RULE, at(1000))).allowed).toBe(false);
+
+    // Two refunds: the denied attempt and one allowed one.
+    await refundRateLimit(db(), key, RULE, at(2000));
+    await refundRateLimit(db(), key, RULE, at(2000));
+    expect((await consumeRateLimit(db(), key, RULE, at(3000))).allowed).toBe(true);
+
+    // Giving back the only attempt clears the window entirely.
+    const single = freshKey();
+    await consumeRateLimit(db(), single, RULE, T0);
+    await refundRateLimit(db(), single, RULE, T0);
+    expect((await db().query('select 1 from rate_limits where key = $1', [single])).rowCount).toBe(
+      0,
+    );
+
+    // Refunding an empty or unknown window does nothing.
+    const unused = freshKey();
+    for (let index = 0; index < 3; index += 1) await refundRateLimit(db(), unused, RULE, T0);
+    const counts = await db().query('select count from rate_limits where key = $1', [unused]);
+    expect(counts.rowCount).toBe(0);
+    const first = await consumeRateLimit(db(), unused, RULE, T0);
+    expect(first.remaining).toBe(RULE.limit - 1);
   });
 
   it('cleans up old windows and keeps recent ones', async () => {

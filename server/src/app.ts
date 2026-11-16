@@ -33,6 +33,7 @@ import { registerJobSearchBoardRoutes } from './routes/jobSearchBoards';
 import { registerLeadMessageRoutes } from './routes/leadMessages';
 import { registerTailoringRoutes } from './routes/tailoring';
 import { registerCoverLetterRoutes } from './routes/coverLetters';
+import { allowedUserIds } from './jobsearch/access';
 import { jobSearchClaudeFromEnv, type JobSearchClaude } from './jobsearch/claude';
 import { analyzerFromEnv, type ResumeAnalyzer } from './resume/analyze';
 import { registerSessionRoutes } from './routes/session';
@@ -144,6 +145,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     analyzer:
       deps.resumeAnalyzer === undefined ? analyzerFromEnv(env, recordUsage) : deps.resumeAnalyzer,
     fetchPage,
+    // The owner is whoever the job search is open to.
+    isOwner: (userId) => allowedUserIds(env).has(userId.toLowerCase()),
   });
   const jobSearchClaude =
     deps.jobSearchClaude === undefined

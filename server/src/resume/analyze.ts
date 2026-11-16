@@ -10,7 +10,8 @@ import {
   type ResumeResult,
 } from '@jat/shared';
 
-export const ANALYZER_MODEL = 'claude-opus-5-5';
+/** Sonnet, not Opus: about half the cost, and reading one resume or posting does not need more. */
+export const ANALYZER_MODEL = 'claude-sonnet-5-5';
 
 export type AnalyzeOutcome =
   | { kind: 'result'; result: ResumeResult; model: string }

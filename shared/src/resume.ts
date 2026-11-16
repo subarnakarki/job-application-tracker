@@ -316,6 +316,8 @@ export const ResumeEnvelopeSchema = z.strictObject({
   resume: ResumeSchema.nullable(),
   /** False when the server has no Anthropic key: the page says the feature is off. */
   analysisAvailable: z.boolean(),
+  /** How many analyses and resume checks this user may run a day (together). */
+  analysesPerDay: z.number().int().positive(),
 });
 export type ResumeEnvelope = z.infer<typeof ResumeEnvelopeSchema>;
 

@@ -110,7 +110,8 @@ and saves a match as a suggestion. Imported changes are recorded with actor `gma
 |        |                                      |      | titles, each with keywords marked `found` by code. The same text within |
 |        |                                      |      | a day answers 200 with the saved analysis. 409 `no_resume`, 404         |
 |        |                                      |      | `not_available` (no Anthropic key), 502 `analysis_failed` (nothing      |
-|        |                                      |      | saved). 5 a day per user, 200 a day in total                            |
+|        |                                      |      | saved). 1 a day per user (5 for the owner, `JOB_SEARCH_USER_IDS`),      |
+|        |                                      |      | shared with resume checks; 200 a day in total                           |
 | GET    | `/api/resume/analyses`               | user | The newest 5, each with its top three titles                            |
 | GET    | `/api/resume/analyses/:id`           | user | One analysis                                                            |
 | DELETE | `/api/resume/analyses/:id`           | user | 204                                                                     |
