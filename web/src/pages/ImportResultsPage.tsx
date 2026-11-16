@@ -11,6 +11,9 @@ const CHANGED = new Set<ImportItem['outcome']>(['created', 'status_changed', 'un
 const REVIEW = new Set<ImportItem['outcome']>(['needs_review', 'dismissed']);
 
 function headline(item: ImportItem): string {
+  // An email Claude could not read (an error, not a verdict) has no company: name it by its subject.
+  if (!item.company && item.outcome === 'needs_review' && !item.verdictKind)
+    return `Not read by Claude: "${item.emailSubject || '(no subject)'}"`;
   const company = item.company ?? 'Unknown company';
   switch (item.outcome) {
     case 'created':

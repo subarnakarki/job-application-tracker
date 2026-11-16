@@ -1,3 +1,4 @@
+import { ClaudeLimitError } from '../anthropic/limits';
 import { ImportItemSchema, ImportRunDetailSchema, ImportRunListSchema } from '@jat/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Classification, EmailClassifier } from '../import/classify';
@@ -164,6 +165,37 @@ describe.skipIf(!TEST_DATABASE_URL)(
       const response = await runImport(cookie, user.id);
 
       expect(response.headers.location).toBe('/account?import=gmail_not_granted');
+    });
+
+    it('stops at a Claude limit: back to the Account page, run failed, emails kept for next time', async () => {
+      const { cookie, user } = await importer();
+      const classify = inbox.classify.bind(inbox);
+      inbox.classify = () => Promise.reject(new ClaudeLimitError('spend_limit', null));
+      let stopped;
+      try {
+        stopped = await runImport(cookie, user.id);
+      } finally {
+        inbox.classify = classify;
+      }
+
+      expect(stopped.statusCode).toBe(302);
+      expect(stopped.headers.location).toBe('/account?import=claude_limit_reached');
+      const runs = (await get('/api/import/runs', cookie)).json<{ items: { status: string }[] }>()
+        .items;
+      expect(runs.map((run) => run.status)).toEqual(['failed']);
+
+      // With Claude back, the next import reads the same email and handles it.
+      const done = await runImport(cookie, user.id);
+      expect(done.headers.location).toMatch(/^\/import\//);
+      const detail = ImportRunDetailSchema.parse(
+        (
+          await get(
+            `/api/${String(done.headers.location).slice(1).replace('import/', 'import/runs/')}`,
+            cookie,
+          )
+        ).json(),
+      );
+      expect(detail.items).toMatchObject([{ outcome: 'created', company: 'Acme' }]);
     });
 
     it('does not start a second import while one is running', async () => {

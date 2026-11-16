@@ -12,6 +12,7 @@ import type { Clock } from '../clock';
 import type { Db } from '../db/types';
 import { ApiError } from '../http/errors';
 import { applyItem, dismissItem, undoItem, type ActionResult } from '../import/actions';
+import { ClaudeLimitError } from '../anthropic/limits';
 import { ClassifierUnavailableError, type EmailClassifier } from '../import/classify';
 import { GmailError, type GmailClient } from '../import/gmail';
 import {
@@ -257,6 +258,14 @@ export function registerImportRoutes(app: FastifyInstance, deps: ImportRouteDeps
         if (error instanceof ClassifierUnavailableError) {
           request.log.error({ reason: error.message }, 'Classifier unavailable');
           return reply.redirect(failTo('classifier_unavailable'), 302);
+        }
+        // The run is already marked failed and its emails released for the next import.
+        if (error instanceof ClaudeLimitError) {
+          request.log.warn({ limit: error.kind }, 'Gmail import stopped: claude limit');
+          return reply.redirect(
+            failTo(error.kind === 'spend_limit' ? 'claude_limit_reached' : 'claude_busy'),
+            302,
+          );
         }
         throw error;
       }

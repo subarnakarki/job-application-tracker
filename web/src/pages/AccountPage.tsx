@@ -22,6 +22,10 @@ const IMPORT_MESSAGES: Record<string, string> = {
   import_running: 'An import is already running. Wait for it to finish, then check the results.',
   google_failed: 'Google did not confirm the access. Try again.',
   classifier_unavailable: 'The email classifier is unavailable right now. Nothing was changed.',
+  claude_limit_reached:
+    'The import stopped: the app is out of Claude credits or has reached its usage limit. Nothing was changed, and the emails will be read by the next import once credits are added.',
+  claude_busy:
+    'The import stopped because Claude is busy right now. Nothing was changed; try again in a few minutes and the same emails will be read.',
 };
 
 function deviceTimeZone(): string {
