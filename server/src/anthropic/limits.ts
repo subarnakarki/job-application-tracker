@@ -5,8 +5,9 @@ import Anthropic from '@anthropic-ai/sdk';
  * - `rate_limited`: a per-minute rate limit or a ramp limit (429 with `retry-after`); seconds.
  * - `overloaded`: the API is overloaded for everyone (529); minutes.
  * - `spend_limit`: the organization's monthly spend cap (429 `enforced_spend_limit_reached`), a
- *   spend limit the owner set (400 "You have reached your specified ... API usage limits"), or a
- *   billing problem (402 `billing_error`); until the limit resets or is raised.
+ *   spend limit the owner set (400 "You have reached your specified ... API usage limits"), prepaid
+ *   credits run out (400 "Your credit balance is too low"), or a billing problem (402
+ *   `billing_error`); until credits are added or the limit resets or is raised.
  * Retrying the same call now cannot help, so callers stop instead of recording a failed answer
  * (a failed draft would count against the job's draft attempts).
  */
@@ -23,8 +24,15 @@ export class ClaudeLimitError extends Error {
   }
 }
 
-/** The documented start of the 400 sent when a spend limit the owner set is reached. */
-const OWN_SPEND_LIMIT = /^You have reached your specified (?:workspace )?API usage limits/;
+/**
+ * 400s that mean the account cannot pay for any call, with no error code to tell them by: a spend
+ * limit the owner set (its documented start), and prepaid credits run out ("Your credit balance is
+ * too low to access the Anthropic API", sent as invalid_request_error, not as a 402).
+ */
+const OUT_OF_MONEY = [
+  /^You have reached your specified (?:workspace )?API usage limits/,
+  /credit balance is too low/i,
+];
 
 /** Seconds from a `retry-after` header (seconds or an HTTP date), kept to 1 s .. 1 h. */
 export function retryAfterSeconds(
@@ -56,9 +64,21 @@ export function claudeLimitOf(error: unknown): ClaudeLimitError | null {
   }
   if (error.type === 'overloaded_error' || error.status === 529)
     return new ClaudeLimitError('overloaded', retryAfter());
-  if (error.status === 400 && OWN_SPEND_LIMIT.test(error.apiMessage ?? ''))
+  if (error.status === 400 && OUT_OF_MONEY.some((pattern) => pattern.test(error.apiMessage ?? '')))
     return new ClaudeLimitError('spend_limit', null);
   return null;
+}
+
+/**
+ * A soft failure's reason with Anthropic's own words, so the cause shows where the reason is shown
+ * (a bare "error 400" hid an empty credit balance for a day). Kept to `max` characters.
+ */
+export function apiFailureReason(prefix: string, error: unknown, max = 200): string {
+  const status =
+    error instanceof Anthropic.APIError ? ((error.status as number | undefined) ?? null) : null;
+  const message = error instanceof Anthropic.APIError ? error.apiMessage : null;
+  const reason = `${prefix} ${status === null ? 'network' : String(status)}${message ? `: ${message}` : ''}`;
+  return [...reason].slice(0, max).join('');
 }
 
 /** Rethrows a limit as ClaudeLimitError; any other error is left to the caller. */
@@ -72,7 +92,7 @@ export const LIMIT_MESSAGES: Record<ClaudeLimitKind, string> = {
   rate_limited: 'Claude is handling too many requests right now. Try again in a minute.',
   overloaded: 'Claude is overloaded right now. Try again in a few minutes.',
   spend_limit:
-    'This app has reached its Claude usage limit, so Claude features are paused until it resets or the limit is raised. Nothing you saved is affected.',
+    'This app is out of Claude credits or has reached its usage limit, so Claude features are paused until credits are added or the limit resets. Nothing you saved is affected.',
 };
 
 /** The API's answer for a limit: 503, with a code the web app can tell apart. */

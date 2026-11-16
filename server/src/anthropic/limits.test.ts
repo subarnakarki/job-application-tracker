@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it } from 'vitest';
 import {
+  apiFailureReason,
   claudeLimitOf,
   ClaudeLimitError,
   limitResponse,
@@ -76,6 +77,18 @@ describe('claudeLimitOf', () => {
     });
   });
 
+  it('reads prepaid credits run out (a 400 with no error code) as a spend limit', () => {
+    expect(
+      claudeLimitOf(
+        apiError(400, {
+          type: 'invalid_request_error',
+          message:
+            'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.',
+        }),
+      ),
+    ).toMatchObject({ kind: 'spend_limit', retryAfterSeconds: null });
+  });
+
   it('reads a billing problem as a spend limit', () => {
     expect(
       claudeLimitOf(apiError(402, { type: 'billing_error', message: 'Payment required' })),
@@ -145,5 +158,28 @@ describe('limitResponse', () => {
       retryAfterSeconds: null,
     });
     expect(answer.message).toContain('usage limit');
+  });
+});
+
+describe('apiFailureReason', () => {
+  it("keeps Anthropic's own words, so the cause is visible", () => {
+    expect(
+      apiFailureReason(
+        'Classifier error',
+        apiError(400, { type: 'invalid_request_error', message: 'messages: text is empty' }),
+      ),
+    ).toBe('Classifier error 400: messages: text is empty');
+  });
+
+  it('says network for a dropped connection, and stays within the limit', () => {
+    expect(
+      apiFailureReason('Classifier error', new Anthropic.APIConnectionError({ message: 'reset' })),
+    ).toBe('Classifier error network');
+    expect(
+      apiFailureReason(
+        'Classifier error',
+        apiError(400, { type: 'invalid_request_error', message: 'é'.repeat(500) }),
+      ),
+    ).toHaveLength(200);
   });
 });

@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
-import { throwIfLimited } from '../anthropic/limits';
+import { apiFailureReason, throwIfLimited } from '../anthropic/limits';
 import { ignoreUsage, usageEntry, type UsageRecorder } from '../usage/record';
 import {
   acceptAnswer,
@@ -153,7 +153,7 @@ function failure(error: unknown): { kind: 'failed'; reason: string } {
   )
     throw new AnalyzerUnavailableError('The Anthropic API key was rejected');
   if (error instanceof Anthropic.APIError)
-    return { kind: 'failed', reason: `Analyzer error ${String(error.status)}` };
+    return { kind: 'failed', reason: apiFailureReason('Analyzer error', error) };
   throw error;
 }
 

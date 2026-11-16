@@ -111,7 +111,7 @@ describe('claudeAnalyzer', () => {
 
     expect(await analyzerAnswering(500, error('api_error')).analyzer.analyze(RESUME)).toEqual({
       kind: 'failed',
-      reason: 'Analyzer error 500',
+      reason: 'Analyzer error 500: x',
     });
     for (const [status, type] of [
       [429, 'rate_limit_error'],

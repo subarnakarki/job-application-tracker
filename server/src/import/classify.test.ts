@@ -93,7 +93,7 @@ describe('claudeClassifier', () => {
 
     expect(await classifierAnswering(500, error('api_error')).classifier.classify(email)).toEqual({
       kind: 'unclassified',
-      reason: 'Classifier error 500',
+      reason: 'Classifier error 500: x',
     });
     // A limit would leave every email unclassified: the import stops and keeps them for next time.
     for (const [status, type] of [

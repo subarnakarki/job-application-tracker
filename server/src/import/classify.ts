@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
-import { throwIfLimited } from '../anthropic/limits';
+import { apiFailureReason, throwIfLimited } from '../anthropic/limits';
 import { ignoreUsage, usageEntry, type UsageRecorder } from '../usage/record';
 import type { GmailMessage } from './gmail';
 import { EmailVerdictSchema, type EmailVerdict } from './verdict';
@@ -107,7 +107,7 @@ export function claudeClassifier(
           throw new ClassifierUnavailableError('The Anthropic API key was rejected');
         }
         if (error instanceof Anthropic.APIError) {
-          return { kind: 'unclassified', reason: `Classifier error ${String(error.status)}` };
+          return { kind: 'unclassified', reason: apiFailureReason('Classifier error', error) };
         }
         throw error;
       }
