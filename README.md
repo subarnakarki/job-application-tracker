@@ -1,13 +1,15 @@
 # Job Application Tracker
 
-Track job applications through a hiring pipeline: counts per stage, status history, a "needs follow-up"
-flag, search, filters and CSV export. Match your resume to the roles you fit best, and (owner only for now)
-let a scheduled job search find, check and draft applications, with a fit score and a tailored resume for
-each job. Sign in with Google, or try the shared demo account.
+I built this to keep my own job search organized. It shows where every application sits in the pipeline,
+keeps the status history, flags the ones I haven't followed up on, and exports to CSV. It also matches my
+resume to the roles I fit best, and (just for me, for now) runs a scheduled job search that finds jobs, checks
+them and drafts the applications, with a fit score and a tailored resume for each one. You can sign in with
+Google or try the shared demo account.
 
 **Live:** https://job-application-tracker-eta-one.vercel.app
 
-Built by an SDET as a portfolio project, so the tests matter as much as the features.
+And since I'm an SDET, of course it has tests: 1,800+ unit and API tests, and 50 Playwright tests, all running
+on every change.
 
 ## Features
 
@@ -73,7 +75,7 @@ Built by an SDET as a portfolio project, so the tests matter as much as the feat
 
 ## How it is tested
 
-About 1,470 unit and API tests and 70 end-to-end runs (desktop and phone viewports), all on every push.
+1,800+ unit and API tests and 50 Playwright tests (desktop and phone viewports), all running on every change.
 
 - **API tests against real Postgres.** Every test gets a fresh, migrated schema; no mocks of the database.
 - **Contract checks on every response.** Each route declares its inputs and responses; in tests every response
