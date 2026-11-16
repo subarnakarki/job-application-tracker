@@ -35,6 +35,7 @@ import {
   watchedBoards,
 } from '../repo/jobSearch';
 import { getResumeText } from '../repo/resumes';
+import { ClaudeLimitError, type ClaudeLimitKind } from '../anthropic/limits';
 import { AnalyzerUnavailableError } from '../resume/analyze';
 import type { JobSearchClaude } from './claude';
 import { companyFromSlug, JobReadError, readJob, type JobDetails } from './readJob';
@@ -78,15 +79,37 @@ export async function pool<T>(
   work: (item: T) => Promise<void>,
 ): Promise<void> {
   let next = 0;
+  // The first error stops every worker from starting another item (a Claude limit would fail
+  // them all alike); the items already started finish, then the error is thrown.
+  let failure: { error: unknown } | null = null;
   const worker = async () => {
-    while (next < items.length && keepGoing()) {
+    while (!failure && next < items.length && keepGoing()) {
       const item = items[next];
       next += 1;
-      if (item !== undefined) await work(item);
+      if (item === undefined) continue;
+      try {
+        await work(item);
+      } catch (error) {
+        failure ??= { error };
+      }
     }
   };
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  if (failure) throw (failure as { error: unknown }).error;
 }
+
+/**
+ * Why a run stopped at a Claude limit, as the runs list shows it. The jobs found so far are kept,
+ * and the jobs not drafted yet lose no draft attempt: the next run or hourly knock drafts them.
+ */
+export const RUN_STOPPED_BY_LIMIT: Record<ClaudeLimitKind, string> = {
+  rate_limited:
+    'Stopped: Claude was handling too many requests. The jobs found are kept; the rest are drafted on the next run.',
+  overloaded:
+    'Stopped: Claude was overloaded. The jobs found are kept; the rest are drafted on the next run.',
+  spend_limit:
+    'Stopped: the Claude usage limit is reached. The jobs found are kept; drafting resumes when the limit resets or is raised.',
+};
 
 export type RunResult =
   { kind: 'done'; runId: string } | { kind: 'already_running' } | { kind: 'unavailable' };
@@ -221,11 +244,14 @@ export async function runJobSearch(
         searches,
         error: unavailable
           ? 'The Anthropic API key was rejected'
-          : 'The search stopped with an error',
+          : error instanceof ClaudeLimitError
+            ? RUN_STOPPED_BY_LIMIT[error.kind]
+            : 'The search stopped with an error',
       },
       clock.now(),
     );
     if (unavailable) return { kind: 'unavailable' };
+    // A Claude limit is thrown on: the caller answers 503 (a manual run) or stops (the schedule).
     throw error;
   }
 }

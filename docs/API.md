@@ -288,6 +288,23 @@ Tracking a queue job (Track it, Mark applied, or saving its resume from the queu
 letter to the application as a saved, short, professional letter with no resume behind it, unless the
 application already has a letter (drafted or saved), which is never replaced.
 
+## When Anthropic's limits are reached
+
+Any route that calls Claude answers **503** when Anthropic declines for capacity or money rather than for the
+request (`server/src/anthropic/limits.ts`, told apart by the SDK's error type and `error.details.error_code`):
+
+| Anthropic says                                                                                    | Code                   | `retry-after`                         |
+| ------------------------------------------------------------------------------------------------- | ---------------------- | ------------------------------------- |
+| 429 rate or ramp limit                                                                            | `claude_busy`          | Anthropic's, else 60 s                |
+| 529 overloaded                                                                                    | `claude_busy`          | Anthropic's, else 120 s               |
+| 429 `enforced_spend_limit_reached`, 400 "You have reached your specified … API usage limits", 402 | `claude_limit_reached` | None: it lasts until the limit resets |
+
+A scheduled or manual job search stops at the first one: the run is marked failed with the reason, the jobs it
+found are kept, and no job loses a draft attempt (the next run or hourly knock drafts them). The hourly knock
+stops for every user, since the limit is the whole account's. A Gmail import stops and leaves its emails for the
+next import. Any other API error (a 500, a dropped connection) stays a soft failure, as before. The app's own
+daily allowances are still spent by a call Anthropic declines.
+
 ## Model usage
 
 **Token efficiency.** Drafting, tailoring and lead messages send the resume as the first block of the request,

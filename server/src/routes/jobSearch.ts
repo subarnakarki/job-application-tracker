@@ -59,6 +59,7 @@ import {
   saveTailoring,
   setHitState,
 } from '../repo/jobSearch';
+import { ClaudeLimitError, type ClaudeLimitKind } from '../anthropic/limits';
 import { copyQueueLetter } from '../repo/coverLetters';
 import { getResume, getResumeText } from '../repo/resumes';
 import { getTailoring, saveSuggestions, saveVersion, versionEdits } from '../repo/tailorings';
@@ -767,6 +768,7 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
       let drafted = 0;
       let failed = 0;
       let found = 0;
+      let limited: ClaudeLimitKind | null = null;
       /** One user's turn: the still-open check, then a due run or drafting. */
       const forUser = async (userId: string): Promise<'stop' | undefined> => {
         const owner = await db.query<{ time_zone: string; is_demo: boolean }>(
@@ -823,12 +825,18 @@ export function registerJobSearchRoutes(app: FastifyInstance, deps: JobSearchRou
         try {
           if ((await forUser(userId)) === 'stop') break;
         } catch (error) {
-          // One user's failure (its run is already marked failed) never stops the others.
           failed += 1;
+          // A Claude limit is the whole organization's: every later user would hit it too.
+          if (error instanceof ClaudeLimitError) {
+            limited = error.kind;
+            request.log.warn({ limit: error.kind, userId }, 'job search schedule: claude limit');
+            break;
+          }
+          // One user's failure (its run is already marked failed) never stops the others.
           request.log.error({ err: error, userId }, 'job search schedule: a user failed');
         }
       }
-      request.log.info({ runs, drafted, failed, found }, 'job search schedule');
+      request.log.info({ runs, drafted, failed, found, limited }, 'job search schedule');
       return { started: runs, drafted, failed, found };
     },
   );

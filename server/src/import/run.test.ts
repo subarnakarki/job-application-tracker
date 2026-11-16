@@ -18,6 +18,7 @@ import { mutableClock, T0 } from '../test/app';
 import { insertUser } from '../test/factories';
 import { createTestDb, TEST_DATABASE_URL, type TestDb } from '../test/testDb';
 import { applyItem, dismissItem, undoItem } from './actions';
+import { ClaudeLimitError } from '../anthropic/limits';
 import { ClassifierUnavailableError, type Classification, type EmailClassifier } from './classify';
 import { GmailError, type GmailClient, type GmailMessage } from './gmail';
 import { FetchError, type PageFetcher } from '../postings/fetchPage';
@@ -441,6 +442,16 @@ describe.skipIf(!TEST_DATABASE_URL)('Gmail import (real Postgres, fake Gmail and
       outcome: 'needs_review',
       reason: 'Could not read the email',
     });
+  });
+
+  it('stops at a Claude limit and leaves the emails for next time', async () => {
+    inbox.add(email('limited', 1), new ClaudeLimitError('spend_limit', null));
+
+    await expect(runImport(deps, owner, 'token')).rejects.toBeInstanceOf(ClaudeLimitError);
+    inbox.verdicts.set('limited', verdict({ kind: 'application_confirmation', company: 'Later' }));
+    const items = await itemsOf(await runImport(deps, owner, 'token'));
+
+    expect(items.get('limited')?.outcome).toBe('created');
   });
 
   it('stops on a rejected API key, records the failure, and leaves the emails for next time', async () => {

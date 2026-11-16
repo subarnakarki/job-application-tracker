@@ -26,6 +26,8 @@ import { FetchError, type PageFetcher } from '../postings/fetchPage';
 import { createTestApp, SAME_ORIGIN, T0, type TestApp } from '../test/app';
 import { TEST_DATABASE_URL } from '../test/testDb';
 import { GAVE_UP_DRAFTING, getHit } from '../repo/jobSearch';
+import { ClaudeLimitError } from '../anthropic/limits';
+import { RUN_STOPPED_BY_LIMIT } from '../jobsearch/run';
 import { consumeRateLimit } from '../auth/rateLimit';
 import { createSession } from '../auth/sessions';
 import { CHECK_RULE, MANUAL_RUN_RULE, RUN_BUDGET_MS, TAILOR_RULE } from './jobSearch';
@@ -88,6 +90,8 @@ interface StubClaude extends JobSearchClaude {
   searches: { query: string; sources: SearchSource[] }[];
   drafts: number;
   draftsFail: boolean;
+  /** Every draft hits this Anthropic limit (thrown, as the real client throws it). */
+  draftLimit: ClaudeLimitError | null;
   /** Every search throws (not an API error): the run fails. */
   searchFails: boolean;
   /** The next this many searches throw, then they work again. */
@@ -108,6 +112,7 @@ const claude: StubClaude = {
   searches: [],
   drafts: 0,
   draftsFail: false,
+  draftLimit: null,
   searchFails: false,
   searchFailuresLeft: 0,
   onSearch: null,
@@ -151,6 +156,7 @@ const claude: StubClaude = {
   },
   draft(request: { questions: { label: string }[] }): Promise<ModelDraft | null> {
     claude.drafts += 1;
+    if (claude.draftLimit) return Promise.reject(claude.draftLimit);
     if (claude.draftsFail) return Promise.resolve(null);
     return Promise.resolve({
       // A country the trimmed option list does not have, so that question needs the candidate.
@@ -243,6 +249,7 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
     claude.searches = [];
     claude.drafts = 0;
     claude.draftsFail = false;
+    claude.draftLimit = null;
     claude.searchFails = false;
     claude.searchFailuresLeft = 0;
     claude.onSearch = null;
@@ -659,6 +666,66 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
         state: 'new',
         draftError: 'The draft did not finish',
       });
+    });
+
+    /** A hit's draft bookkeeping, straight from the table. */
+    const attemptsOf = async (id: string) =>
+      (
+        await t.db.query<{ draft_attempts: number; draft_error: string | null; state: string }>(
+          'select draft_attempts, draft_error, state from job_search_hits where id = $1',
+          [id],
+        )
+      ).rows[0];
+
+    it('stops a run at a Claude limit: 503, the reason on the run, no draft attempt lost', async () => {
+      const { cookie } = await member();
+      claude.draftLimit = new ClaudeLimitError('spend_limit', null);
+
+      const response = await run(cookie);
+
+      expect(response.statusCode).toBe(503);
+      expect(response.headers['retry-after']).toBeUndefined();
+      expect(response.json()).toMatchObject({ error: 'claude_limit_reached' });
+      const runs = (await send('GET', '/api/job-search/runs', cookie)).json<{
+        items: { id: string; status: string; error: string | null }[];
+      }>().items;
+      expect(runs[0]).toMatchObject({
+        status: 'failed',
+        error: RUN_STOPPED_BY_LIMIT.spend_limit,
+      });
+      // The jobs found are kept, and none of them counts a failed try.
+      const { hits } = runOf(
+        await send('GET', `/api/job-search/runs/${runs[0]?.id ?? ''}`, cookie),
+      );
+      expect(hits.length).toBeGreaterThan(0);
+      const target = byRole(hits, 'Senior Product Manager');
+      expect(await attemptsOf(target.id)).toEqual({
+        draft_attempts: 0,
+        draft_error: null,
+        state: 'new',
+      });
+      // The first refusal stops the others: no more drafts start after it.
+      expect(claude.drafts).toBeLessThanOrEqual(2);
+
+      // Once the limit is gone, the next knock drafts it.
+      claude.draftLimit = null;
+      await cron(CRON_SECRET);
+      expect((await attemptsOf(target.id))?.state).not.toBe('new');
+    });
+
+    it('answers a busy Claude with 503 and its retry-after on Redraft', async () => {
+      const { cookie } = await member();
+      claude.draftsFail = true;
+      const target = byRole(runOf(await run(cookie)).hits, 'Senior Product Manager');
+      claude.draftLimit = new ClaudeLimitError('rate_limited', 17);
+
+      const response = await send('POST', `/api/job-search/hits/${target.id}/redraft`, cookie);
+
+      expect(response.statusCode).toBe(503);
+      expect(response.headers['retry-after']).toBe('17');
+      expect(response.json()).toMatchObject({ error: 'claude_busy' });
+      // Only the try from the run counts.
+      expect((await attemptsOf(target.id))?.draft_attempts).toBe(1);
     });
 
     it('stops drafting a job after 3 failed tries, moving it to Needs you until Redraft', async () => {
@@ -1450,6 +1517,23 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
       expect(
         runs.json<{ items: { trigger: string }[] }>().items.map((item) => item.trigger),
       ).toEqual(['schedule']);
+    });
+
+    it("stops the knock for every user at a Claude limit, which is the whole account's", async () => {
+      env['JOB_SEARCH_USER_IDS'] = '';
+      claude.draftsFail = true;
+      // Two users, each with a job waiting to be drafted (their runs' drafts failed once).
+      for (let index = 0; index < 2; index += 1) runOf(await run((await member()).cookie));
+      claude.draftsFail = false;
+      claude.draftLimit = new ClaudeLimitError('overloaded', null);
+      claude.drafts = 0;
+
+      // 07:00 in New York is before the run hour: the knock only drafts.
+      const answer = (await cron(CRON_SECRET)).json<{ failed: number }>();
+
+      // The first user's drafting hits the limit; the second is not tried at all.
+      expect(answer.failed).toBe(1);
+      expect(claude.drafts).toBeLessThanOrEqual(2);
     });
 
     it('retries a failed scheduled run on later knocks, at most 3 tries a day', async () => {

@@ -93,13 +93,21 @@ const CONCURRENCY = 5;
 async function mapLimit<T, R>(items: T[], limit: number, work: (item: T) => Promise<R>) {
   const results: R[] = new Array<R>(items.length);
   let next = 0;
+  // The first error stops every worker from starting another item (a Claude limit would fail
+  // them all alike); the items already started finish, then the error is thrown.
+  let failure: { error: unknown } | null = null;
   const worker = async () => {
-    while (next < items.length) {
+    while (!failure && next < items.length) {
       const index = next++;
-      results[index] = await work(items[index] as T);
+      try {
+        results[index] = await work(items[index] as T);
+      } catch (error) {
+        failure ??= { error };
+      }
     }
   };
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  if (failure) throw (failure as { error: unknown }).error;
   return results;
 }
 
