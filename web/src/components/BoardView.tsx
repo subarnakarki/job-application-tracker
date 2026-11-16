@@ -427,6 +427,7 @@ function CardBody({
           status={application.status}
           onMove={(to) => onMove(application, to)}
           className="mt-1 w-full"
+          compact
         />
       )}
     </div>
