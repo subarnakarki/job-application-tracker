@@ -15,6 +15,8 @@ postings run one subagent per posting (see "Several postings").
   `.claude/settings.local.json`. Text boxes are not supported, and tracked changes must be accepted or rejected
   in Word first.
 - Optional voice rules: `resumes/voice.md`, your style preferences and phrases to avoid. Applied to every rewrite.
+- `resumes/base-notes.md` is created and kept up to date by the skill (see "Base resume notes"); you can edit it
+  by hand too.
 - Requires Python 3 (standard library only) and, for the tailored PDF, Microsoft Word on Windows.
 
 `resume.sh` is in `.claude/skills/resume-audit/`; run it with `bash` from the repo root. Its header documents
@@ -26,6 +28,8 @@ every command and the edits format.
   Do not open the `.docx` with the Read tool, and do not use a resume from memory or a tailored company copy. If
   the script fails, stop and show the user its message (it explains how to set the path).
 - Voice rules: read `resumes/voice.md` if it exists.
+- Base notes: read `resumes/base-notes.md` if it exists. Its "Confirmed facts" count as confirmed by the user, so
+  use them in rewrites and don't ask about them again.
 - The target job description. If the user pastes it, use it as is. If they give a URL, use WebFetch with a prompt
   asking for only the company, title, responsibilities, and requirements (verbatim, no page chrome, benefits, or
   boilerplate). With no posting, use the user's target role profile and say so.
@@ -55,12 +59,48 @@ but drop noise such as location, "remote", team names in brackets and requisitio
   headline, etc.). If prompt 3 flags experience or summary, name the issue in one line and point to the prompt 2
   or 4 rewrite (adjusting that rewrite if needed) instead of writing a second version.
 - Rewrites are proposals. Never invent metrics, dates, tools, or experience; where a rewrite needs a number the
-  resume lacks, flag it and ask.
+  resume lacks (and `resumes/base-notes.md` doesn't confirm), flag it and ask.
 - Follow `resumes/voice.md` on every rewrite. Without it: plain verbs, real numbers, named tools, no filler.
 - The prompt 3 score is a model judgment, not a real ATS result. Say so and give the top reasons.
 - Rewrite only the sections that change; don't reprint unchanged resume text back to the user.
 - Privacy: never modify the base resume, never `git add` anything under `resumes/`, and never send resume text to
-  WebFetch or any other external tool (a job posting fetch sends only the URL).
+  WebFetch or any other external tool (a job posting fetch sends only the URL). Resume facts are stored only in
+  `resumes/base-notes.md`, never in Claude's memory directory.
+
+## Base resume notes
+
+`resumes/base-notes.md` is the skill's memory about the base resume. It collects what audits learn, so the base
+resume gets better over time instead of every tailored copy fixing the same things. Keep it short and in this
+shape (create it on first use):
+
+```markdown
+# Base resume notes
+
+## Confirmed facts
+
+- <fact the user confirmed, e.g. "Cut regression suite from 4h to 40m at Acme (2024)"> (confirmed <date>)
+
+## Suggested changes
+
+- [open] <base resume line, quoted briefly> → <proposed text>. Why: <reason>. Seen in: <slugs>. (<date>)
+- [applied] ... / [declined] ...
+```
+
+- Confirmed facts: add every fact the user confirms in a round of questions (numbers, dates, tools, scope),
+  whatever posting it came from. Only facts the user stated; never a guess or a rewrite's wording.
+- Suggested changes are for the base resume, so they must help for most target roles, not one posting: a confirmed
+  fact the base resume lacks, a wording-problem red flag, a generic phrase, a skill the user has that keeps coming
+  up in postings. Posting-specific keyword tuning belongs in the tailored copy, not here.
+- When the same suggestion comes up again, add the slug to "Seen in" instead of a new entry; the more postings, the
+  stronger the case. Keep at most about 10 open entries; merge or drop the weakest.
+- Before suggesting, compare with the current `resume.sh text` output: mark an entry `[applied]` if the base
+  resume now has it, and don't re-suggest `[declined]` ones unless the user asks.
+- Present suggestions as "Base resume suggestions" (at most 3 new or strengthened ones per run, one line each,
+  with "Seen in" counts). Never edit the base resume. If the user wants them applied, offer to build an updated
+  copy with `resume.sh tailor base-update` (same edits format and steps as "After the audit", folder
+  `resumes/base-update/`, `--overwrite` if it exists) for them to review and swap in by hand; mark the entries they
+  accept `[applied]` and the ones they reject `[declined]`.
+- Only the main session writes this file. Subagents read it and report ideas in their reply.
 
 ## Several postings
 
@@ -81,26 +121,32 @@ When the user gives two or more postings (links or pasted descriptions) in one r
    > `audit.md`). Start the file with the company, role, posting link and today's date. Do not print resume text in
    > your reply. Reply with only these lines:
    > `company:` / `role:` / `slug:` / `score:` (0-100) / `top red flag:` (one line) /
-   > `open questions:` (each unconfirmed fact on one line, or "none") / `audit:` (full path to audit.md).
+   > `open questions:` (each unconfirmed fact on one line, or "none") / `base ideas:` (changes to the base resume
+   > that would help for most roles, not just this one, each on one line, or "none"; don't write
+   > `resumes/base-notes.md`) / `audit:` (full path to audit.md).
    > If the posting can't be read (login wall, expired, blocked), reply `failed:` with the reason and stop.
 
 3. When every batch is done, show one table sorted by score, highest first: company, role, score, top red flag,
    number of open questions, and the `audit.md` path. List failed postings under it with the reason, and ask the
    user to paste those descriptions to retry. Don't print the full audits; the user opens the files, or asks you
-   to show one.
+   to show one. Then merge every subagent's `base ideas:` into `resumes/base-notes.md` and show the "Base resume
+   suggestions" (see "Base resume notes"); ideas raised by several postings come first.
 4. Tailoring: ask which postings to tailor for (AskUserQuestion, multiSelect, up to 4 options per question; with
    more than 4 audited postings, split them across questions). Include "none".
 5. For the chosen postings, merge their open questions (the same fact often comes up in several) and settle them
-   in one round. Then follow "After the audit" from step 3 for each chosen posting, using its `audit.md` for the
+   in one round and record the answers under "Confirmed facts". Then follow "After the audit" from step 3 for each chosen posting, using its `audit.md` for the
    rewrites. You may show all previews together and get approval in one go. Run `resume.sh tailor` one posting
    at a time (it drives Word), never in parallel.
 
 ## After the audit: tailored resume
 
-For a single posting, ask (AskUserQuestion, yes/no) whether to build a resume for this posting. If no, stop. If
-yes:
+For a single posting, first update `resumes/base-notes.md` from this audit and show the "Base resume suggestions"
+(see "Base resume notes"). Then ask (AskUserQuestion, yes/no) whether to build a resume for this posting. If no,
+stop. If yes:
 
 1. Settle every open fact (unconfirmed numbers, dates, tools) in one round of questions; drop what isn't confirmed.
+   Record the confirmed ones under "Confirmed facts" in `resumes/base-notes.md`, and add a suggested change for
+   any the base resume lacks.
 2. Use the posting's slug (see "Folder per posting"). If `resumes/<slug>/` already holds a tailored `.docx` or
    `.pdf`, ask before overwriting (then pass `--overwrite`).
 3. Show a text preview of only the changed lines and get approval.
