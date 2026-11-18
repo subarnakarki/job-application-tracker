@@ -1,11 +1,12 @@
 ---
 name: resume-audit
-description: Audit the user's resume against a job posting (recruiter red flags, XYZ rewrite, ATS score, summary) and optionally build a tailored copy. Use when the user shares a job posting or URL and asks to review, score, tailor or rewrite their resume, check ATS fit, or whether their resume fits a job.
+description: Audit the user's resume against one or several job postings (recruiter red flags, XYZ rewrite, ATS score, summary) and optionally build tailored copies. Use when the user shares job postings or URLs and asks to review, score, tailor or rewrite their resume, check ATS fit, or whether their resume fits a job.
 ---
 
 # Resume Audit
 
-Four prompts, run in order, each against the resume and one job description.
+Four prompts, run in order, each against the resume and one job description. One posting runs inline; several
+postings run one subagent per posting (see "Several postings").
 
 ## Setup (per user, all under the gitignored `resumes/` folder)
 
@@ -28,6 +29,13 @@ every command and the edits format.
 - The target job description. If the user pastes it, use it as is. If they give a URL, use WebFetch with a prompt
   asking for only the company, title, responsibilities, and requirements (verbatim, no page chrome, benefits, or
   boilerplate). With no posting, use the user's target role profile and say so.
+
+## Folder per posting
+
+Each posting gets `resumes/<slug>/`, where the slug is `<company>-<role>` in kebab-case, so two roles at one
+company never share a folder: `Acme Corp`, `Senior SDET (Remote)` → `acme-corp-senior-sdet`. Keep the seniority
+but drop noise such as location, "remote", team names in brackets and requisition numbers; keep it under about
+50 characters. If two postings in one run would get the same slug, add `-2`, `-3`.
 
 ## The four prompts
 
@@ -54,13 +62,47 @@ every command and the edits format.
 - Privacy: never modify the base resume, never `git add` anything under `resumes/`, and never send resume text to
   WebFetch or any other external tool (a job posting fetch sends only the URL).
 
+## Several postings
+
+When the user gives two or more postings (links or pasted descriptions) in one request:
+
+1. Drop exact duplicate links. Launch one `general-purpose` subagent per posting with the Agent tool, with
+   `model: "sonnet"` unless the user asks for another model for this run, at most 5 at a time: launch a batch,
+   wait for all of it to finish, then launch the next. Don't fetch the postings or read the
+   resume yourself first; each subagent does that.
+2. Give each subagent this brief, filled in (it starts with no context, so the brief must stand alone):
+
+   > Run the resume-audit skill's audit for one job posting, without asking the user anything and without
+   > tailoring. Posting: `<URL, or the pasted description>`. Read `.claude/skills/resume-audit/SKILL.md` and follow
+   > its "Inputs", "Folder per posting", "The four prompts" and "Rules" sections (repo root:
+   > `<absolute repo path>`). Where the rules say to ask about a missing number, list it under open questions
+   > instead. Write the full audit to `resumes/<slug>/audit.md` (create the folder; first confirm
+   > `git check-ignore -q resumes/<slug>/audit.md` succeeds, or stop and report it; replace an existing
+   > `audit.md`). Start the file with the company, role, posting link and today's date. Do not print resume text in
+   > your reply. Reply with only these lines:
+   > `company:` / `role:` / `slug:` / `score:` (0-100) / `top red flag:` (one line) /
+   > `open questions:` (each unconfirmed fact on one line, or "none") / `audit:` (full path to audit.md).
+   > If the posting can't be read (login wall, expired, blocked), reply `failed:` with the reason and stop.
+
+3. When every batch is done, show one table sorted by score, highest first: company, role, score, top red flag,
+   number of open questions, and the `audit.md` path. List failed postings under it with the reason, and ask the
+   user to paste those descriptions to retry. Don't print the full audits; the user opens the files, or asks you
+   to show one.
+4. Tailoring: ask which postings to tailor for (AskUserQuestion, multiSelect, up to 4 options per question; with
+   more than 4 audited postings, split them across questions). Include "none".
+5. For the chosen postings, merge their open questions (the same fact often comes up in several) and settle them
+   in one round. Then follow "After the audit" from step 3 for each chosen posting, using its `audit.md` for the
+   rewrites. You may show all previews together and get approval in one go. Run `resume.sh tailor` one posting
+   at a time (it drives Word), never in parallel.
+
 ## After the audit: tailored resume
 
-Ask (AskUserQuestion, yes/no) whether to build a resume for this company. If no, stop. If yes:
+For a single posting, ask (AskUserQuestion, yes/no) whether to build a resume for this posting. If no, stop. If
+yes:
 
 1. Settle every open fact (unconfirmed numbers, dates, tools) in one round of questions; drop what isn't confirmed.
-2. Slug: the company name in kebab-case (`Acme Corp` → `acme-corp`). If `resumes/<slug>/` already holds a tailored
-   `.docx` or `.pdf`, ask before overwriting (then pass `--overwrite`).
+2. Use the posting's slug (see "Folder per posting"). If `resumes/<slug>/` already holds a tailored `.docx` or
+   `.pdf`, ask before overwriting (then pass `--overwrite`).
 3. Show a text preview of only the changed lines and get approval.
 4. Write the approved changes to `resumes/<slug>/edits.json` (format in the `resume.sh` header):
    - `{"old": ..., "new": ...}` replaces text. Copy `old` exactly from the `resume.sh text` output; use the
