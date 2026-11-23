@@ -427,12 +427,14 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
         kind: 'skipped',
         reason: 'Outside the United States (London, UK)',
       });
-      // iCIMS needs an account, and its page could not be read: listed to finish by hand.
+      // iCIMS needs an account, and its page could not be read: listed to finish by hand, with
+      // a reminder that nothing says where it is.
       expect(byRole(hits, 'Senior Product Manager')).toMatchObject({
         source: 'icims',
         company: 'Initech',
         kind: 'finish_yourself',
-        reason: 'iCIMS needs an account at each company (from the search result only)',
+        reason:
+          "iCIMS needs an account at each company; the location doesn't name a country, so check it is in the US (from the search result only)",
         jobLink: ICIMS,
       });
     });

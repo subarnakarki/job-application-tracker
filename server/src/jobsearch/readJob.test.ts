@@ -262,6 +262,20 @@ describe('readJob', () => {
     expect(pageAgeToDate('soon', now)).toBeNull();
   });
 
+  it('takes the place from a Workday link when the page cannot be read', () => {
+    const now = new Date('2026-11-20T12:00:00Z');
+    const result = { title: 'ASIC Engineer', pageAge: null };
+    const cisco = ref(
+      'https://cisco.wd5.myworkdayjobs.com/Cisco_Careers/job/Hsinchu-Taiwan/ASIC-Engineer_2020152',
+    );
+    expect(jobFromSearchResult(cisco, result, now)?.location).toBe('Hsinchu Taiwan');
+    // No place in the link, and other boards' links never carry one.
+    const noPlace = ref('https://acme.wd3.myworkdayjobs.com/en-US/1/job/QA-Engineer_R0047310-1');
+    expect(jobFromSearchResult(noPlace, result, now)?.location).toBeNull();
+    const icims = ref('https://careers-acme.icims.com/jobs/4321/sdet/job');
+    expect(jobFromSearchResult(icims, result, now)?.location).toBeNull();
+  });
+
   describe('a Workday job that is taken down (403 "permission denied", not 404)', () => {
     const link = 'https://acme.wd5.myworkdayjobs.com/en-US/External/job/Boston-MA/QA-Engineer_R123';
     const jobApi =

@@ -355,6 +355,40 @@ export function uniqueJobRefs(links: string[]): JobRef[] {
   return refs;
 }
 
+/**
+ * The place a Workday job link names, as location text: ".../job/Hsinchu-Taiwan/ASIC-Engineer_1"
+ * gives "Hsinchu Taiwan" and ".../job/Texas-United-States/..." gives "Texas United States". A
+ * two-letter code in capitals gets a comma before it, so ".../job/Boston-MA/..." gives
+ * "Boston, MA" and the state reads as one. Null when the link has no place part
+ * (".../job/QA-Engineer_R1").
+ */
+export function workdayPlaceOf(link: string): string | null {
+  let parts: string[];
+  try {
+    parts = new URL(link).pathname.split('/').filter(Boolean);
+  } catch {
+    return null;
+  }
+  const jobAt = parts.indexOf('job');
+  // The place sits between "job" and the job's own name, which is always last.
+  if (jobAt < 0 || parts.length - jobAt < 3) return null;
+  let place: string;
+  try {
+    place = decodeURIComponent(parts[jobAt + 1] ?? '');
+  } catch {
+    return null;
+  }
+  const words = place
+    .split(/-+/)
+    .map((word) => word.trim())
+    .filter(Boolean);
+  const text = words
+    .map((word, i) => (i > 0 && /^[A-Z]{2}$/.test(word) ? `, ${word}` : ` ${word}`))
+    .join('')
+    .trim();
+  return text ? text.slice(0, LIMITS.location) : null;
+}
+
 // ---------------------------------------------------------------------------------------------
 // Where a job is: the United States or not
 
@@ -938,7 +972,10 @@ export function sortJob(job: JobFacts, rules: SortRules): Sorted {
   if (!FILLABLE_SOURCES.includes(job.source))
     return {
       kind: 'finish_yourself',
-      reason: `${SOURCE_LABELS[job.source]} needs an account at each company`,
+      reason:
+        where === 'unknown'
+          ? `${SOURCE_LABELS[job.source]} needs an account at each company; the location doesn't name a country, so check it is in the US`
+          : `${SOURCE_LABELS[job.source]} needs an account at each company`,
     };
   return {
     kind: 'target',

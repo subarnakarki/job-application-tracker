@@ -43,6 +43,7 @@ import {
   questionsForModel,
   sortJob,
   uniqueJobRefs,
+  workdayPlaceOf,
   type ApplicationDraft,
   type ApplicationQuestion,
   type JobFacts,
@@ -382,6 +383,20 @@ describe('sortJob', () => {
       {},
       'finish_yourself',
       'Workday needs an account at each company',
+    ],
+    [
+      'a Workday target whose location names no country',
+      { source: 'workday', location: null },
+      {},
+      'finish_yourself',
+      "Workday needs an account at each company; the location doesn't name a country, so check it is in the US",
+    ],
+    [
+      'a Workday target outside the US',
+      { source: 'workday', location: 'Hsinchu, Taiwan' },
+      {},
+      'skipped',
+      'Outside the United States (Hsinchu, Taiwan)',
     ],
     [
       'an 11-day-old posting with a 30-day window',
@@ -1569,6 +1584,46 @@ describe('locationVerdict', () => {
     expect(locationVerdict('Remote', 'United States')).toBe('us');
     expect(locationVerdict('Boston', 'France')).toBe('not_us');
     expect(locationVerdict(null, null)).toBe('unknown');
+  });
+});
+
+describe('workdayPlaceOf', () => {
+  const wd = (path: string) => `https://acme.wd5.myworkdayjobs.com${path}`;
+  it.each<[string, string | null, string]>([
+    // Real links from search results whose pages could not be read.
+    [wd('/AspenTech/job/Pune/Principal-Release-Train-Engineer_R9756'), 'Pune', 'not_us'],
+    [wd('/AspenTech/job/Pune-EMR/Senior-Automation-QE-Engineer_R9688-1'), 'Pune EMR', 'not_us'],
+    [wd('/Cisco_Careers/job/Hsinchu-Taiwan/ASIC-Engineer_2020152'), 'Hsinchu Taiwan', 'not_us'],
+    [
+      wd('/1/job/Remote-Pune-Baroda-India/Sr-Software-Engineer_R1'),
+      'Remote Pune Baroda India',
+      'not_us',
+    ],
+    [
+      wd('/c/job/NL---Netherlands-Waalwijk---Office/QA_R1'),
+      'NL Netherlands Waalwijk Office',
+      'not_us',
+    ],
+    [
+      wd('/Agilent_Careers/job/US-DE-Wilmington/R-D-Test-Engineer_4040156-1'),
+      'US, DE Wilmington',
+      'us',
+    ],
+    [wd('/en-US/External/job/Boston-MA/QA-Engineer_R123'), 'Boston, MA', 'us'],
+    [wd('/c/job/New-York-NY/QA_R1'), 'New York, NY', 'us'],
+    [wd('/1/job/Texas-United-States/Quality-Assurance-Analyst_R1'), 'Texas United States', 'us'],
+    [wd('/c/job/Remote-United-States/QA_R1'), 'Remote United States', 'us'],
+    [wd('/c/job/S%C3%A3o-Paulo/QA_R1'), 'São Paulo', 'unknown'],
+    // No place part: the job's own name follows "job".
+    [wd('/en-US/1/job/QA-Engineer_R0047310-1'), null, 'unknown'],
+  ])('%s -> %s', (link, place, verdict) => {
+    expect(workdayPlaceOf(link)).toBe(place);
+    expect(locationVerdict(workdayPlaceOf(link), null)).toBe(verdict);
+  });
+
+  it('gives null for a link it cannot read', () => {
+    expect(workdayPlaceOf('not a link')).toBeNull();
+    expect(workdayPlaceOf(wd('/c/job/%E0%A4/QA_R1'))).toBeNull();
   });
 });
 

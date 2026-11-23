@@ -10,6 +10,7 @@ import {
   questionsForModel,
   sortJob,
   uniqueJobRefs,
+  workdayPlaceOf,
   workModeProblem,
   type JobRef,
   type JobSearchProfile,
@@ -587,8 +588,9 @@ export async function draftPending(
 
 /**
  * A job from its search result alone: the title as the role (without "Job Application for" and
- * the site's name after a dash or bar), the company from the board name, and the age when the
- * search engine gave one.
+ * the site's name after a dash or bar), the company from the board name, the age when the
+ * search engine gave one, and the place when the link names it (Workday's do), so a job outside
+ * the US is still skipped.
  */
 export function jobFromSearchResult(
   ref: JobRef,
@@ -604,7 +606,7 @@ export function jobFromSearchResult(
   return {
     company: companyFromSlug(ref.board),
     role,
-    location: null,
+    location: ref.source === 'workday' ? workdayPlaceOf(ref.link) : null,
     workMode: null,
     postedAt: pageAgeToDate(result.pageAge, now),
     postedDayOnly: true,
