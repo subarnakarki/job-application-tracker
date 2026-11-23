@@ -42,7 +42,7 @@ test('move a card with the keyboard on the board', async ({
   await applicationsPage.dragHandle('Initech').focus();
   await page.keyboard.press('Space');
   // dnd-kit attaches its arrow-key listener in a setTimeout(0) after Space; keys sent with no gap
-  // can arrive first and be lost (a person can never type that fast). See docs/PLAN.md.
+  // can arrive first and be lost (a person can never type that fast). See plans/PLAN.md.
   await page.waitForTimeout(100);
   await page.keyboard.press('ArrowRight');
   await page.waitForTimeout(100);

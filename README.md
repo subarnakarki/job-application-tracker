@@ -100,7 +100,7 @@ on every change.
 - Test-only routes exist only when explicitly enabled outside production, behind a secret.
 
 Details: [docs/AUTH.md](docs/AUTH.md). API reference: [docs/API.md](docs/API.md). Domain rules:
-[docs/DOMAIN.md](docs/DOMAIN.md). Plan and decisions: [docs/PLAN.md](docs/PLAN.md).
+[docs/DOMAIN.md](docs/DOMAIN.md). Plan and decisions: [plans/PLAN.md](plans/PLAN.md).
 
 ## Running locally
 

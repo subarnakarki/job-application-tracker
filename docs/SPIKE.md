@@ -80,7 +80,7 @@ Next steps:
 3. Re-run the checks in the table above against the deployed URL, including `POST /api/spike/db/ping`
    and the cookie round trip (use a curl cookie jar), and record cold vs warm `queryMs`.
 4. Confirm the function region and Node 24 from `/api/spike/info`.
-5. Delete the spike code and write up the outcome in `docs/PLAN.md`; then Phase 1.
+5. Delete the spike code and write up the outcome in `plans/PLAN.md`; then Phase 1.
 
 Environment notes: the cloud session's network policy must allow
 `job-application-tracker-eta-one.vercel.app` (Settings of the cloud environment, Network access),
