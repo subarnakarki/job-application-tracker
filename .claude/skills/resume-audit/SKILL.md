@@ -154,7 +154,7 @@ stop. If yes:
    - `{"old": ..., "new": ...}` replaces text. Copy `old` exactly from the `resume.sh text` output; use the
      smallest span that is unique (e.g. a bullet's text without its leading label) so surrounding formatting such
      as a bold company name is kept. `"new": ""` with a whole line deletes it.
-   - `{"after": ..., "new": ...}` adds a line after the line containing `after`, with its formatting (bullets).
+   - `{"after": ..., "new": ...}` adds a line after the line containing `after`, with its formatting (bullets). `{"before": ..., "new": ...}` inserts before that line instead (several on one line keep their order). Add `"like": <text>` to copy the formatting of another line (e.g. a section heading to start a new section), and `"label": <text>` for a bold-label line such as `Projects: ...` (label in the first run's font, new text in the last run's).
    - Edits apply in order, so prefer one edit per line. A second edit to the same line must match the text as the
      first edit left it.
    - New text is one plain line: no tabs or line breaks (add separate lines with `after`). An edit can't span a

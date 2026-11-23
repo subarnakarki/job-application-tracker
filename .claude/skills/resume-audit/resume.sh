@@ -15,9 +15,20 @@
 # order, so a later edit to the same line must match that line as already edited.
 #   {"old": "text", "new": "text"}    replace text within one paragraph; the new text keeps the formatting of the
 #                                     run where the old text starts. "new": "" with a whole paragraph deletes it
-#                                     (in a table cell its text is cleared instead).
+#                                     (in a table cell its text is cleared instead); a bullet typed as text in
+#                                     front of it ("•  ") counts as part of the paragraph and goes with it.
 #   {"after": "text", "new": "text"}  add a paragraph after the one containing "after", with that paragraph's
-#                                     settings (bullet, indent, spacing) and the font of its first text run.
+#                                     settings (bullet, indent, spacing) and font. A bullet typed as text ("•  ")
+#                                     is copied too, so leave it out of the new text.
+#   {"before": "text", "new": "text"} the same, but the new paragraph goes before the one containing "before".
+#                                     Several "before" edits on one line insert in order (each lands just above it).
+#   Optional on "after"/"before":
+#     "like": "text"                  copy the paragraph settings and font from the paragraph containing "like"
+#                                     instead (e.g. a section heading, or a skills line in another section).
+#     "label": "text"                 start the new paragraph with this text in the font of the copied
+#                                     paragraph's first text, then "new" in the font of its last text: copying a
+#                                     "Languages: ..." line gives a bold label and plain text. Put the separator
+#                                     and space in the label or new text yourself ("label": "Tools:", "new": " ...").
 # New text is plain: no tabs, line breaks or other control characters.
 #
 # Nothing is written if any edit fails. If Word fails or hangs, the edited copy is kept as <name>.failed.docx.
@@ -79,6 +90,9 @@ TOKEN_RE = re.compile(
     r'|<w:softHyphen/>'
     r'|<w:sym\b[^>]*/>', re.S)
 SYM = '□'  # stands in for a Word symbol character in the text output
+# A bullet typed as text at the start of a paragraph: one to three symbol characters, then spaces or tabs
+# (e.g. "•  " or "•\t").
+BULLET_RE = re.compile(r'^[^\w\s]{1,3}[ \t ]+')
 
 def token_text(t):
     s = t.group(0)
@@ -170,7 +184,8 @@ def delete_paragraph(xml, start, end, label):
 def replace(xml, op, label):
     old, new = op['old'], op['new']
     start, end, text, chars, i = find_one(xml, old, label)
-    if new == '' and text.strip() == old.strip():
+    # Deleting a whole line also removes a typed bullet in front of it, so no empty bullet is left behind.
+    if new == '' and old.strip() in (text.strip(), BULLET_RE.sub('', text).strip()):
         return delete_paragraph(xml, start, end, label)
     span = chars[i:i + len(old)]
     if any(c is None for c in span):
@@ -197,22 +212,47 @@ def replace(xml, op, label):
     out.append(para[pos:])
     return xml[:start] + ''.join(out) + xml[end:]
 
-def insert_after(xml, op, label):
-    start, end, _, _, _ = find_one(xml, op['after'], label)
-    para = xml[start:end]
+def insert(xml, op, label):
+    where = 'after' if isinstance(op.get('after'), str) else 'before'
+    start, end, _, _, _ = find_one(xml, op[where], f'{label} ({where})')
+    src = op['like'] if isinstance(op.get('like'), str) else op[where]
+    s_start, s_end, s_text, s_chars, _ = find_one(xml, src, f'{label} (like)')
+    copy = new_paragraph(xml[s_start:s_end], s_text, s_chars, op, label)
+    pos = end if where == 'after' else start
+    return xml[:pos] + copy + xml[pos:]
+
+def new_paragraph(para, text, chars, op, label):
     tokens = text_tokens(para)
     if not tokens:
         sys.exit(f'Edit {label}: that paragraph has no text to copy formatting from.')
-    # Build the new paragraph from the paragraph settings and the first text run's formatting only, so nothing
-    # else (section breaks, pictures, symbols, fields, bookmarks, ids) is copied.
+    # Build the new paragraph from the paragraph settings and run formatting only, so nothing else (section
+    # breaks, pictures, symbols, fields, bookmarks, ids) is copied.
     ppr = re.search(r'<w:pPr>.*?</w:pPr>', para, re.S)
     ppr = re.sub(r'<w:sectPr\b.*?</w:sectPr>', '', ppr.group(0), flags=re.S) if ppr else ''
-    head = para[:tokens[0].start()]
-    runs = list(re.finditer(r'<w:r(?:\s[^>]*?)?(?<!/)>', head))
-    rpr = re.match(r'\s*(<w:rPr>.*?</w:rPr>)', head[runs[-1].end():], re.S) if runs else None
-    rpr = rpr.group(1) if rpr else ''
-    copy = f'<w:p>{ppr}<w:r>{rpr}{set_t("<w:t>", op["new"])}</w:r></w:p>'
-    return xml[:end] + copy + xml[end:]
+
+    def run_props(token):
+        runs = list(re.finditer(r'<w:r(?:\s[^>]*?)?(?<!/)>', para[:token.start()]))
+        m = re.match(r'\s*(<w:rPr>.*?</w:rPr>)', para[runs[-1].end():], re.S) if runs else None
+        return m.group(1) if m else ''
+
+    # A typed bullet ("•" then a tab) is copied too, in its own formatting; the text gets the formatting of the
+    # first text after the bullet.
+    bullet = ''
+    body = tokens[0]
+    m = BULLET_RE.match(text)
+    if m:
+        after = next((c[0] for c in chars[m.end():] if c is not None), None)
+        if after is not None:
+            body = after
+            parts = re.split(r'(\t)', m.group(0))
+            mark = ''.join('<w:tab/>' if p == '\t' else f'<w:t xml:space="preserve">{esc(p)}</w:t>'
+                           for p in parts if p)
+            bullet = f'<w:r>{run_props(tokens[0])}{mark}</w:r>'
+    runs = f'<w:r>{run_props(body)}{set_t("<w:t>", op["new"])}</w:r>'
+    if op.get('label'):
+        runs = (f'<w:r>{run_props(body)}{set_t("<w:t>", op["label"])}</w:r>'
+                f'<w:r>{run_props(tokens[-1])}{set_t("<w:t>", op["new"])}</w:r>')
+    return f'<w:p>{ppr}{bullet}{runs}</w:p>'
 
 cmd = sys.argv[1]
 if cmd == 'text':
@@ -230,19 +270,24 @@ elif cmd == 'tailor':
             sys.exit(f'Edit #{n}: must be an object with a string "new".')
         if re.search(r'[\x00-\x1f￾￿]', op['new']):
             sys.exit(f'Edit #{n}: new text has a tab, line break or control character; use one edit per line.')
-        if isinstance(op.get('after'), str):
+        if isinstance(op.get('after'), str) or isinstance(op.get('before'), str):
+            if isinstance(op.get('after'), str) and isinstance(op.get('before'), str):
+                sys.exit(f'Edit #{n}: use "after" or "before", not both.')
             if not op['new']:
-                sys.exit(f'Edit #{n}: "after" needs non-empty new text.')
-            xml = insert_after(xml, op, f'#{n} (after)')
+                sys.exit(f'Edit #{n}: "after"/"before" needs non-empty new text.')
+            for k in ('like', 'label'):
+                if k in op and (not isinstance(op[k], str) or not op[k] or re.search(r'[\x00-\x1f]', op[k])):
+                    sys.exit(f'Edit #{n}: "{k}" must be non-empty plain text.')
+            xml = insert(xml, op, f'#{n}')
         elif isinstance(op.get('old'), str):
             xml = replace(xml, op, f'#{n}')
         else:
-            sys.exit(f"Edit #{n}: needs 'old' or 'after'.")
+            sys.exit(f"Edit #{n}: needs 'old', 'after' or 'before'.")
     final = text_of(xml)
     news = [op['new'] for op in ops]
     for n, op in enumerate(ops, 1):
         new, old = op['new'], op.get('old')
-        if new and new not in final:
+        if new and (op.get('label') or '') + new not in final:
             sys.exit(f'Edit #{n}: new text not found after editing.')
         # Skip when any edit's new text contains this old text: then it is expected to still be there.
         if old and not any(old in s for s in news) and old.strip() and old in final:

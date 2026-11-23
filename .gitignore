@@ -11,3 +11,4 @@ test-results
 .vercel
 build
 /resumes/
+.playwright-mcp/
