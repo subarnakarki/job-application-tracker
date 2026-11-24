@@ -6,7 +6,7 @@ import { dbUsageRecorder, MODEL_CALLS, usageEntry, type UsageEntry } from './rec
 
 const ENTRY: UsageEntry = {
   call: 'draft',
-  model: 'claude-opus-5-5',
+  model: 'claude-haiku-5-5',
   inputTokens: 9000,
   cacheWriteTokens: 0,
   cacheReadTokens: 3000,
@@ -18,7 +18,7 @@ describe('usageEntry', () => {
   it('takes the counts from a response, missing ones as zero', () => {
     expect(
       usageEntry('job_search', {
-        model: 'claude-opus-5-5',
+        model: 'claude-haiku-5-5',
         usage: {
           input_tokens: 12000,
           output_tokens: 800,
@@ -28,7 +28,7 @@ describe('usageEntry', () => {
       }),
     ).toEqual({
       call: 'job_search',
-      model: 'claude-opus-5-5',
+      model: 'claude-haiku-5-5',
       inputTokens: 12000,
       cacheWriteTokens: 0,
       cacheReadTokens: 0,
@@ -71,7 +71,7 @@ describe.skipIf(!TEST_DATABASE_URL)('model_usage (real Postgres)', () => {
     expect(rows).toEqual([
       {
         call: 'draft',
-        model: 'claude-opus-5-5',
+        model: 'claude-haiku-5-5',
         input_tokens: 9000,
         cache_write_tokens: 0,
         cache_read_tokens: 3000,

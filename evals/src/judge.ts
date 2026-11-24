@@ -3,7 +3,7 @@ import { DeepEvalBaseLLM, type GenerationResult } from 'deepeval/models';
 import { GEval, type GEvalMetricOptions } from 'deepeval/metrics';
 import type { ZodType } from 'zod';
 
-/** Grades the app's `claude-opus-5-5` answers: cheaper, and not the same model. See the plan on bias. */
+/** Grades the app's `claude-haiku-5-5` answers: a larger model, and not the one being graded. See the plan on bias. */
 export const JUDGE_MODEL = 'claude-sonnet-5-5';
 
 const JUDGE_MAX_TOKENS = 4000;

@@ -10,7 +10,7 @@ const fixture = (name: string) =>
 const ANALYSIS: ResumeAnalysis = {
   id: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
   fileName: 'resume.pdf',
-  model: 'claude-opus-5-5',
+  model: 'claude-haiku-5-5',
   createdAt: '2026-11-05T12:00:00.000Z',
   summary: 'A senior SDET with eight years of Playwright and TypeScript automation.',
   gaps: ['Add numbers to the Northwind role.'],
@@ -110,7 +110,7 @@ test("check my resume against an application's posting", async ({ page, api, det
       status: 200,
       json: {
         jobLink: 'https://careers.example.com/jobs/sdet',
-        model: 'claude-opus-5-5',
+        model: 'claude-haiku-5-5',
         keywords: [
           { term: 'Playwright', group: 'tool', found: true },
           { term: 'TypeScript', group: 'hard_skill', found: true },

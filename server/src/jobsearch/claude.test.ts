@@ -65,7 +65,7 @@ const message = (stopReason: string, content: unknown[], searches = 0) => ({
   id: 'msg_1',
   type: 'message',
   role: 'assistant',
-  model: 'claude-opus-5-5',
+  model: 'claude-haiku-5-5',
   content,
   stop_reason: stopReason,
   stop_sequence: null,
@@ -122,13 +122,12 @@ describe('claudeJobSearch.search', () => {
       pageAge: null,
     });
     expect(requests[0]).toMatchObject({
-      model: 'claude-opus-5-5',
-      fallbacks: 'default',
+      model: 'claude-haiku-5-5',
       // Cached, so a paused turn sent again reads its search results from the cache.
       cache_control: { type: 'ephemeral' },
       tools: [
         {
-          type: 'web_search_20260209',
+          type: 'web_search_20250305',
           name: 'web_search',
           max_uses: SEARCHES_PER_QUERY,
           allowed_domains: ['job-boards.greenhouse.io', 'boards.greenhouse.io'],
@@ -158,7 +157,7 @@ describe('claudeJobSearch.search', () => {
     expect(searchModelFrom('')).toBe(JOB_SEARCH_MODEL);
     expect(searchModelFrom(' claude-haiku-5-5 ')).toBe('claude-haiku-5-5');
     expect(searchModelFrom('gpt-5')).toBe(JOB_SEARCH_MODEL);
-    expect(searchModelFrom('claude-opus-5-5; drop')).toBe(JOB_SEARCH_MODEL);
+    expect(searchModelFrom('claude-haiku-5-5; drop')).toBe(JOB_SEARCH_MODEL);
   });
 
   it('resumes a paused turn, and stops after a few', async () => {
@@ -363,7 +362,11 @@ describe('token usage', () => {
       ['draft', 0],
       ['tailor', 0],
     ]);
-    expect(usage[0]).toMatchObject({ model: 'claude-opus-5-5', inputTokens: 10, outputTokens: 10 });
+    expect(usage[0]).toMatchObject({
+      model: 'claude-haiku-5-5',
+      inputTokens: 10,
+      outputTokens: 10,
+    });
   });
 });
 
@@ -466,7 +469,7 @@ describe('cover letter', () => {
     expect(text).toContain('Too long last time: it was 500 words (aim for about 300).');
   });
 
-  it('returns the letter with the fallback and effort set, caches the resume, and records the call', async () => {
+  it('returns the letter with the effort set, caches the resume, and records the call', async () => {
     const answer = { letter: 'Dear Jane Doe,\n\nHello.\n\nWarm regards,\nPat Example' };
     const { claude, requests, usage } = claudeAnswering([
       { status: 200, body: message('end_turn', [{ type: 'text', text: JSON.stringify(answer) }]) },
@@ -475,7 +478,6 @@ describe('cover letter', () => {
     expect(requests[0]).toMatchObject({
       model: JOB_SEARCH_MODEL,
       system: COVER_LETTER_PROMPT,
-      fallbacks: 'default',
       output_config: { effort: 'medium' },
     });
     expect(sentBlocks(requests[0])[0]).toMatchObject({ cache_control: { type: 'ephemeral' } });

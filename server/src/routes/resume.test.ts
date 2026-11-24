@@ -73,7 +73,7 @@ const analyzer = {
     if (this.next === 'failed') return Promise.resolve({ kind: 'failed', reason: 'Declined' });
     const result = acceptAnswer(answer, text);
     if (!result) throw new Error('fixture answer was refused');
-    return Promise.resolve({ kind: 'result', result, model: 'claude-opus-5-5' });
+    return Promise.resolve({ kind: 'result', result, model: 'claude-haiku-5-5' });
   },
   postings: [] as string[],
   postingKeywords(text: string): Promise<PostingKeywordsOutcome> {
@@ -84,7 +84,7 @@ const analyzer = {
     return Promise.resolve({
       kind: 'keywords',
       answer: { keywords: terms.map((term) => ({ term, group: 'tool' as const })) },
-      model: 'claude-opus-5-5',
+      model: 'claude-haiku-5-5',
     });
   },
 };
@@ -416,7 +416,7 @@ describe.skipIf(!TEST_DATABASE_URL)('resume API (real app, real database)', () =
       expect(response.statusCode).toBe(200);
       expect(parsed(ResumeMatchSchema)(response)).toEqual({
         jobLink: POSTING_URL,
-        model: 'claude-opus-5-5',
+        model: 'claude-haiku-5-5',
         // The resume has Playwright, TypeScript, Kubernetes and Selenium, not ISTQB.
         keywords: [
           { term: 'Playwright', group: 'tool', found: true },

@@ -22,10 +22,11 @@ import {
 } from '@jat/shared';
 import { ignoreUsage, usageEntry, type UsageRecorder } from '../usage/record';
 import { trimPostingBoilerplate } from '../postings/trim';
+import { fallbackFor, isHaiku } from '../anthropic/fallback';
 import { throwIfLimited } from '../anthropic/limits';
 import { AnalyzerUnavailableError } from '../resume/analyze';
 
-export const JOB_SEARCH_MODEL = 'claude-opus-5-5';
+export const JOB_SEARCH_MODEL = 'claude-haiku-5-5';
 
 /**
  * The model for the search call alone (`JOB_SEARCH_SEARCH_MODEL`): it only issues web searches,
@@ -36,9 +37,6 @@ export function searchModelFrom(value: string | undefined): string {
   const model = value?.trim() ?? '';
   return /^claude-[a-z0-9.-]{1,60}$/.test(model) ? model : JOB_SEARCH_MODEL;
 }
-
-/** Haiku models take neither server-side fallback nor the dynamic-filtering web search tool. */
-const isHaiku = (model: string) => model.startsWith('claude-haiku');
 
 /** Searches per query: enough phrasings to find a day's postings, few enough to stay cheap. */
 export const SEARCHES_PER_QUERY = 5;
@@ -274,7 +272,7 @@ const block = (tag: string, text: string) =>
 /**
  * A request's blocks, the resume first. The resume is the same in every request a user makes, so
  * with the system prompt before it, it is a cacheable prefix: marked with `cache_control`, the next
- * request within five minutes (the next draft in a run) reads it at a twentieth of the price.
+ * request within five minutes (the next draft in a run) reads it at a tenth of the price.
  */
 type RequestParts = [resume: string, ...rest: string[]];
 
@@ -418,9 +416,7 @@ export function claudeJobSearch(
             {
               model: searchModel,
               max_tokens: 16_000,
-              ...(isHaiku(searchModel)
-                ? {}
-                : { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const }),
+              ...fallbackFor(searchModel),
               output_config: { effort: 'low' },
               // A paused turn is sent again with its search results: cached, they cost a tenth.
               cache_control: { type: 'ephemeral' },
@@ -468,8 +464,7 @@ export function claudeJobSearch(
         const response = await client.beta.messages.create({
           model: JOB_SEARCH_MODEL,
           max_tokens: 16_000,
-          betas: ['server-side-fallback-2026-07-01'],
-          fallbacks: 'default',
+          ...fallbackFor(JOB_SEARCH_MODEL),
           output_config: { effort: 'medium', format: betaZodOutputFormat(ModelDraftSchema) },
           system: DRAFT_PROMPT,
           messages: [{ role: 'user', content: cachedContent(draftParts(request)) }],
@@ -498,8 +493,7 @@ export function claudeJobSearch(
         const response = await client.beta.messages.create({
           model: JOB_SEARCH_MODEL,
           max_tokens: 16_000,
-          betas: ['server-side-fallback-2026-07-01'],
-          fallbacks: 'default',
+          ...fallbackFor(JOB_SEARCH_MODEL),
           output_config: { effort: 'medium', format: betaZodOutputFormat(TailorAnswerSchema) },
           system: TAILOR_PROMPT,
           messages: [{ role: 'user', content: cachedContent(tailorParts(request)) }],
@@ -528,8 +522,7 @@ export function claudeJobSearch(
         const response = await client.beta.messages.create({
           model: JOB_SEARCH_MODEL,
           max_tokens: 16_000,
-          betas: ['server-side-fallback-2026-07-01'],
-          fallbacks: 'default',
+          ...fallbackFor(JOB_SEARCH_MODEL),
           output_config: {
             effort: 'medium',
             format: betaZodOutputFormat(ApplicationTailorAnswerSchema),
@@ -561,8 +554,7 @@ export function claudeJobSearch(
         const response = await client.beta.messages.create({
           model: JOB_SEARCH_MODEL,
           max_tokens: 8_000,
-          betas: ['server-side-fallback-2026-07-01'],
-          fallbacks: 'default',
+          ...fallbackFor(JOB_SEARCH_MODEL),
           output_config: { effort: 'low', format: betaZodOutputFormat(LeadMessageAnswerSchema) },
           system: LEAD_MESSAGE_PROMPT,
           messages: [{ role: 'user', content: cachedContent(leadMessageParts(request)) }],
@@ -591,8 +583,7 @@ export function claudeJobSearch(
         const response = await client.beta.messages.create({
           model: JOB_SEARCH_MODEL,
           max_tokens: 16_000,
-          betas: ['server-side-fallback-2026-07-01'],
-          fallbacks: 'default',
+          ...fallbackFor(JOB_SEARCH_MODEL),
           output_config: { effort: 'medium', format: betaZodOutputFormat(CoverLetterAnswerSchema) },
           system: COVER_LETTER_PROMPT,
           messages: [{ role: 'user', content: cachedContent(coverLetterParts(request)) }],

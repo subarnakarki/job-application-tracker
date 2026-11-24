@@ -319,7 +319,7 @@ test('adds titles from the Resume match to the job titles', async ({ page, api }
       json: {
         id,
         fileName: 'cv.pdf',
-        model: 'claude-opus-5-5',
+        model: 'claude-haiku-5-5',
         createdAt: new Date().toISOString(),
         summary: 's',
         gaps: [],

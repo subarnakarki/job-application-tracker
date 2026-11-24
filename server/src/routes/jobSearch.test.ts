@@ -1138,7 +1138,7 @@ describe.skipIf(!TEST_DATABASE_URL)('job search API (real app, real database)', 
           },
         ],
         notCovered: [{ keyword: 'Figma', why: 'No design tools in the resume.' }],
-        model: 'claude-opus-5-5',
+        model: 'claude-haiku-5-5',
         createdAt: T0.toISOString(),
       });
 

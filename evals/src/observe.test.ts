@@ -50,7 +50,7 @@ function apiError(status: number, type: string, text = 'failed', headers?: Recor
   return { status, body: { type: 'error', error: { type, message: text } }, headers };
 }
 
-const request = (model = 'claude-opus-5-5') => ({
+const request = (model = 'claude-sonnet-5-5') => ({
   model,
   max_tokens: 100,
   messages: [{ role: 'user' as const, content: 'hi' }],
@@ -59,16 +59,16 @@ const request = (model = 'claude-opus-5-5') => ({
 describe('Observer', () => {
   it('records model, stop reason and usage, and returns the response unchanged', async () => {
     const observer = new Observer();
-    const anthropic = observer.attach(client(message('claude-opus-5-5')));
+    const anthropic = observer.attach(client(message('claude-sonnet-5-5')));
     const response = await observer.inCase('case-1', () =>
       anthropic.beta.messages.create(request()),
     );
-    expect(response.model).toBe('claude-opus-5-5');
+    expect(response.model).toBe('claude-sonnet-5-5');
     expect(observer.calls).toEqual([
       {
         caseId: 'case-1',
-        requestedModel: 'claude-opus-5-5',
-        model: 'claude-opus-5-5',
+        requestedModel: 'claude-sonnet-5-5',
+        model: 'claude-sonnet-5-5',
         fallback: false,
         stopReason: 'end_turn',
         usage: { inputTokens: 120, outputTokens: 30, cacheReadTokens: 100, cacheCreationTokens: 0 },
@@ -80,11 +80,11 @@ describe('Observer', () => {
 
   it('marks an answer from another model as a fallback', async () => {
     const observer = new Observer();
-    const anthropic = observer.attach(client(message('claude-sonnet-5-5', 'refusal')));
-    await anthropic.beta.messages.create(request('claude-opus-5-5'));
+    const anthropic = observer.attach(client(message('claude-sonnet-5', 'refusal')));
+    await anthropic.beta.messages.create(request('claude-sonnet-5-5'));
     expect(observer.calls[0]).toMatchObject({
       caseId: null,
-      model: 'claude-sonnet-5-5',
+      model: 'claude-sonnet-5',
       fallback: true,
       stopReason: 'refusal',
     });
@@ -110,7 +110,7 @@ describe('Observer', () => {
 
   it('keeps concurrent cases apart', async () => {
     const observer = new Observer();
-    const anthropic = observer.attach(client(message('claude-opus-5-5')));
+    const anthropic = observer.attach(client(message('claude-sonnet-5-5')));
     await Promise.all(
       ['a', 'b', 'c'].map((id) =>
         observer.inCase(id, async () => {
@@ -134,7 +134,7 @@ describe('Observer', () => {
 
   it('refuses to observe the same client twice', () => {
     const observer = new Observer();
-    const anthropic = observer.attach(client(message('claude-opus-5-5')));
+    const anthropic = observer.attach(client(message('claude-sonnet-5-5')));
     expect(() => new Observer().attach(anthropic)).toThrow('already observed');
   });
 });

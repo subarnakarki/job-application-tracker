@@ -1,11 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { apiFailureReason, throwIfLimited } from '../anthropic/limits';
+import { fallbackFor } from '../anthropic/fallback';
 import { ignoreUsage, usageEntry, type UsageRecorder } from '../usage/record';
 import type { GmailMessage } from './gmail';
 import { EmailVerdictSchema, type EmailVerdict } from './verdict';
 
-export const CLASSIFIER_MODEL = 'claude-opus-5-5';
+export const CLASSIFIER_MODEL = 'claude-haiku-5-5';
 
 /** How an answer is read: a missing posting link is no link, not a reason to discard the answer. */
 const AnswerSchema = EmailVerdictSchema.extend({
@@ -81,8 +82,7 @@ export function claudeClassifier(
           model: CLASSIFIER_MODEL,
           max_tokens: 4000,
           // A safety decline is retried on Anthropic's recommended fallback model.
-          betas: ['server-side-fallback-2026-07-01'],
-          fallbacks: 'default',
+          ...fallbackFor(CLASSIFIER_MODEL),
           output_config: { effort: 'low', format: betaZodOutputFormat(EmailVerdictSchema) },
           system: SYSTEM_PROMPT,
           messages: [{ role: 'user', content: renderEmail(message) }],

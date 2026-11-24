@@ -42,7 +42,7 @@ function message(stopReason: string, text: string) {
     id: 'msg_1',
     type: 'message',
     role: 'assistant',
-    model: 'claude-opus-5-5',
+    model: 'claude-haiku-5-5',
     content: [{ type: 'text', text }],
     stop_reason: stopReason,
     stop_sequence: null,
@@ -59,7 +59,7 @@ const verdict = {
 };
 
 describe('claudeClassifier', () => {
-  it('returns the verdict, and sends one delimited email with the fallback opt-in', async () => {
+  it('returns the verdict, and sends one delimited email', async () => {
     const { classifier, requests } = classifierAnswering(
       200,
       message('end_turn', JSON.stringify(verdict)),
@@ -71,8 +71,7 @@ describe('claudeClassifier', () => {
       verdict: { ...verdict, postingUrl: null },
     });
     expect(requests[0]).toMatchObject({
-      model: 'claude-opus-5-5',
-      fallbacks: 'default',
+      model: 'claude-haiku-5-5',
       output_config: { effort: 'low', format: { type: 'json_schema' } },
       messages: [{ role: 'user', content: renderEmail(email) }],
     });
@@ -141,7 +140,7 @@ describe('token usage', () => {
     expect(usage).toEqual([
       {
         call: 'classify_email',
-        model: 'claude-opus-5-5',
+        model: 'claude-haiku-5-5',
         inputTokens: 10,
         cacheWriteTokens: 0,
         cacheReadTokens: 0,

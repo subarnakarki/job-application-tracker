@@ -310,7 +310,7 @@ daily allowances are still spent by a call Anthropic declines.
 
 **Token efficiency.** Drafting, tailoring and lead messages send the resume as the first block of the request,
 marked for prompt caching: with the system prompt before it, it is the same in every request a user makes, so
-the next one within five minutes (the next draft in a run) reads it at a twentieth of the input price. Posting
+the next one within five minutes (the next draft in a run) reads it at a tenth of the input price. Posting
 text has its legal boilerplate removed before it is sent (`server/src/postings/trim.ts`: equal-opportunity,
 accommodation, E-Verify, privacy and agency notices). The job search is not cached: in real runs (2026-11-09)
 each query finished in one turn, so nothing is resent, and caching would only add the cache-write cost to its
@@ -320,12 +320,12 @@ Every Claude call records one row in `model_usage` (migration 0013): the kind of
 `tailor`, `classify_email`, `posting_keywords`, `resume_analysis`, `lead_message`,
 `cover_letter`), the model that answered, and its input,
 cache-write, cache-read and output tokens and web searches. No user and no text are stored. A failed write is
-logged and never fails the call. Cost per kind of call, at Claude Opus 5.5 prices ($4 input, $5 cache write,
-$0.40 cache read, $20 output per million tokens; web search $10 per 1,000):
+logged and never fails the call. Cost per kind of call, at Claude Haiku 5.5 prices for prompts up to 100K tokens ($0.10 input,
+$0.125 cache write, $0.01 cache read, $0.50 output per million tokens; web search $10 per 1,000):
 
 ```sql
 select call, count(*) as calls,
-  round(sum(input_tokens * 4 + cache_write_tokens * 5 + cache_read_tokens * 0.4 + output_tokens * 20)
+  round(sum(input_tokens * 0.1 + cache_write_tokens * 0.125 + cache_read_tokens * 0.01 + output_tokens * 0.5)
     / 1e6 + sum(web_searches) * 0.01, 2) as usd,
   round(avg(input_tokens)) as avg_in, round(avg(output_tokens)) as avg_out, sum(web_searches) as searches
 from model_usage where created_at > now() - interval '7 days'

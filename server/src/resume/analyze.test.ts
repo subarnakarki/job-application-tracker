@@ -30,7 +30,7 @@ function analyzerAnswering(status: number, body: unknown) {
   return { analyzer: claudeAnalyzer(client, record), requests, usage };
 }
 
-function message(stopReason: string, text: string, model = 'claude-sonnet-5-5') {
+function message(stopReason: string, text: string, model = 'claude-haiku-5-5') {
   return {
     id: 'msg_1',
     type: 'message',
@@ -70,15 +70,14 @@ describe('claudeAnalyzer', () => {
 
     expect(outcome.kind).toBe('result');
     if (outcome.kind !== 'result') return;
-    expect(outcome.model).toBe('claude-sonnet-5-5');
+    expect(outcome.model).toBe('claude-haiku-5-5');
     expect(outcome.result.titles).toHaveLength(20);
     expect(outcome.result.titles[0]?.keywords).toEqual([
       { term: 'Playwright', group: 'tool', found: true },
       { term: 'Selenium', group: 'tool', found: false },
     ]);
     expect(requests[0]).toMatchObject({
-      model: 'claude-sonnet-5-5',
-      fallbacks: 'default',
+      model: 'claude-haiku-5-5',
       output_config: { effort: 'medium', format: { type: 'json_schema' } },
       messages: [{ role: 'user', content: renderResume(RESUME) }],
     });
@@ -87,11 +86,11 @@ describe('claudeAnalyzer', () => {
   it('records the fallback model when one answered', async () => {
     const { analyzer } = analyzerAnswering(
       200,
-      message('end_turn', JSON.stringify(answer(20)), 'claude-opus-5'),
+      message('end_turn', JSON.stringify(answer(20)), 'claude-sonnet-5'),
     );
     expect(await analyzer.analyze(RESUME)).toMatchObject({
       kind: 'result',
-      model: 'claude-opus-5',
+      model: 'claude-sonnet-5',
     });
   });
 
@@ -150,10 +149,9 @@ describe('claudeAnalyzer.postingKeywords', () => {
     expect(await analyzer.postingKeywords(POSTING)).toEqual({
       kind: 'keywords',
       answer: keywords,
-      model: 'claude-sonnet-5-5',
+      model: 'claude-haiku-5-5',
     });
     expect(requests[0]).toMatchObject({
-      fallbacks: 'default',
       output_config: { effort: 'low', format: { type: 'json_schema' } },
       messages: [{ role: 'user', content: renderPosting(POSTING) }],
     });

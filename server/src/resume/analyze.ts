@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
+import { fallbackFor } from '../anthropic/fallback';
 import { apiFailureReason, throwIfLimited } from '../anthropic/limits';
 import { ignoreUsage, usageEntry, type UsageRecorder } from '../usage/record';
 import {
@@ -10,8 +11,8 @@ import {
   type ResumeResult,
 } from '@jat/shared';
 
-/** Sonnet, not Opus: about half the cost, and reading one resume or posting does not need more. */
-export const ANALYZER_MODEL = 'claude-sonnet-5-5';
+/** Haiku, like the rest of the app: reading one resume or posting does not need a larger model. */
+export const ANALYZER_MODEL = 'claude-haiku-5-5';
 
 export type AnalyzeOutcome =
   | { kind: 'result'; result: ResumeResult; model: string }
@@ -86,8 +87,7 @@ export function claudeAnalyzer(
         const response = await client.beta.messages.create({
           model: ANALYZER_MODEL,
           max_tokens: 8_000,
-          betas: ['server-side-fallback-2026-07-01'],
-          fallbacks: 'default',
+          ...fallbackFor(ANALYZER_MODEL),
           output_config: {
             effort: 'low',
             format: betaZodOutputFormat(PostingKeywordsAnswerSchema),
@@ -116,8 +116,7 @@ export function claudeAnalyzer(
           model: ANALYZER_MODEL,
           max_tokens: 16_000,
           // A safety decline is retried on Anthropic's recommended fallback model.
-          betas: ['server-side-fallback-2026-07-01'],
-          fallbacks: 'default',
+          ...fallbackFor(ANALYZER_MODEL),
           output_config: { effort: 'medium', format: betaZodOutputFormat(ResumeAnswerSchema) },
           system: SYSTEM_PROMPT,
           messages: [{ role: 'user', content: renderResume(resumeText) }],
