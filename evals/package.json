@@ -7,12 +7,14 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "eval": "vitest run --config vitest.eval.config.ts",
-    "eval:classify": "vitest run --config vitest.eval.config.ts suites/classify.eval.ts"
+    "eval:classify": "vitest run --config vitest.eval.config.ts suites/classify.eval.ts",
+    "eval:judge": "vitest run --config vitest.eval.config.ts suites/judge.eval.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "1.5.0",
     "@jat/server": "*",
     "@jat/shared": "*",
-    "deepeval": "0.9.26"
+    "deepeval": "0.9.26",
+    "zod": "^4.6.7"
   }
 }

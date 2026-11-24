@@ -37,6 +37,34 @@ export default defineConfig(
     languageOptions: { globals: { ...globals.browser } },
   },
   {
+    // A deepeval metric built without a model falls back to OpenAI, so judge metrics and judge models
+    // are built only in evals/src/judge.ts, which always passes the Claude judge.
+    files: ['evals/**/*.ts'],
+    ignores: ['evals/src/judge.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'deepeval/metrics',
+              message: 'Build judge metrics with the factories in evals/src/judge.ts.',
+            },
+            {
+              name: 'deepeval/models',
+              message: 'The judge model is ClaudeJudge in evals/src/judge.ts.',
+            },
+            {
+              name: 'deepeval',
+              importNames: ['metrics'],
+              message: 'Build judge metrics with the factories in evals/src/judge.ts.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // Plain JS config files are not part of any tsconfig.
     files: ['**/*.js', '**/*.mjs'],
     extends: [tseslint.configs.disableTypeChecked],
