@@ -1,6 +1,6 @@
 # LLM evals plan (DeepEval)
 
-Status: proposed, not started. Update this file when a decision changes. Revised 2026-11-23 after a review: score
+Status: E0 built (E0.1 to E0.5); the runs against a real key are pending (see "E0 findings"). Update this file when a decision changes. Revised 2026-11-23 after a review: score
 recording, tolerance granularity, API errors, the server-side fallback, run completeness, baseline floors,
 telemetry and judge calibration. Revised 2026-11-24: phases split into reviewable commits.
 
@@ -332,6 +332,39 @@ workflow run, then stops for review.
 | E4  | Writing suites: code checks, `GEval` and `DAGMetric` metrics, about 50 hand labels per metric, calibration. A judge metric joins the gate only when it passes calibration                                                                                                                                                                               |
 | E5  | Upkeep: every prompt bug found in real use adds a regression case to `data/` before it is fixed; README section on the evals and the local gate                                                                                                                                                                                                         |
 
+## E0 findings (2026-11-24)
+
+What the spike settled, and what still needs a real key.
+
+- **Vitest 5 works.** deepeval 0.9.26 declares `vitest >=1.0.0` as an optional peer. Its global setup, its
+  per-worker setup and the `toPass` matcher all run on this repo's Vitest 5.1: the smoke metric reached the
+  judge call from inside `toPass`. The open question about falling back to another runner is closed.
+- **Dependency clash, fixed with an override.** deepeval depends on `confident-trace`, which declares
+  `@anthropic-ai/sdk >=0.124 <0.125` as an optional peer; npm installed 0.124 at the root over the server's
+  1.5.0. The root `package.json` has `overrides: { deepeval: { "@anthropic-ai/sdk": "^1.5.0" } }`, so every
+  workspace keeps 1.5.0. `npm ls` reports that peer range as invalid; it only matters for confident-trace's
+  Anthropic tracing, which is not used. Revisit on every deepeval upgrade.
+- **deepeval loads `.env` files into `process.env` on import**, and reads a keystore at `.deepeval/.deepeval`.
+  `DEEPEVAL_DISABLE_DOTENV` stops the first (applied to the unit tests too); `checkEvalEnv` refuses a run with
+  another provider's key in the environment or the keystore.
+- **Telemetry is real and the opt-out works.** With every outbound connection logged (`net`, `http(s)` and
+  `fetch`, in the main process and the workers), a control run on deepeval's own setup with no opt-outs
+  contacted `api.anthropic.com` and `us.i.posthog.com`. The same suites through `global-setup.ts` contacted
+  `api.anthropic.com` only. No OpenAI or Confident AI host was seen in either.
+- **The judge is our own model class.** deepeval's `AnthropicModel` builds its own client, so judge calls
+  would bypass the observer. `ClaudeJudge` uses the observed client instead, and a lint rule keeps metrics
+  and models from being built anywhere but `judge.ts`.
+- **Spend limits stop the run.** `observe.ts` reuses the server's `claudeLimitOf`, so a spend limit or an empty
+  credit balance is `fatal`, not an infrastructure error to retry.
+
+Still pending, because this cloud session has no `ANTHROPIC_API_KEY` (Anthropic's hosts cannot take a network
+secret; the key has to be an environment variable): the passing runs of `eval:classify` and `eval:judge`, the
+answering model and stop reason as the observer records them (to confirm the `fallback` check, which compares
+`response.model` with the requested id), whether `claude-sonnet-5-5` accepts deepeval's judge prompts as sent,
+the egress log on a successful run, and the token cost of both. Both suites have so far run with a dummy key:
+each call reached `api.anthropic.com` and came back 401, which the app's classifier turned into its "key
+rejected" stop.
+
 ## Commits
 
 Each phase is split into commits that each do one thing, keep lint, type-check and `npm test` green, and can be
@@ -432,8 +465,6 @@ Three small changes to the design above fall out of this split:
   would need a judge.
 - Whether to run a cheaper smoke subset (about 10 cases, one repeat) locally for quick prompt iteration, and keep
   the full gated run for the commit.
-- If E0 finds `deepeval` does not work with Vitest 5, whether to run the evals on the Vitest version it supports
-  (the `evals/` workspace can pin its own) or fall back to promptfoo.
 - Who writes the synthetic emails (E1.7 to E1.11). The plan says hand-written and not by Claude, so they are not
   easy for Claude by construction. Either I write them, or Claude drafts them from real ATS layouts and I rewrite
   the wording before each dataset commit.
