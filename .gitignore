@@ -12,3 +12,4 @@ test-results
 build
 /resumes/
 .playwright-mcp/
+/evals/out/

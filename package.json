@@ -6,7 +6,8 @@
     "shared",
     "server",
     "web",
-    "e2e"
+    "e2e",
+    "evals"
   ],
   "engines": {
     "node": "24.x"
