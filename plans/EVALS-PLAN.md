@@ -74,9 +74,9 @@ evals/
     scores.ts                  # records a named score per case and repeat for the gate
     repeat.ts                  # runs a case EVAL_REPEATS times, retrying API errors
   suites/
-    classify.eval.ts           # the classifier suite
-    tailor.eval.ts             # the tailoring suite
-    writing.eval.ts            # cover letter, lead message, draft answers (Phase E4)
+    classify.eval.test.ts           # the classifier suite
+    tailor.eval.test.ts             # the tailoring suite
+    writing.eval.test.ts            # cover letter, lead message, draft answers (Phase E4)
   checks/
     verdict.ts                 # kind, company, postingUrl, confidence, decision checks
     honesty.ts                 # acceptTailoring + unverifiedIn: invented facts, dropped edits
@@ -376,7 +376,7 @@ Three small changes to the design above fall out of this split:
 
 - **Unit tests for the eval tooling run in `npm test`.** `evals/vitest.config.ts` covers only `*.test.ts` (no
   API calls) and joins the root `projects`; the model calls live in `evals/vitest.eval.config.ts`
-  (`*.eval.ts`), which only `npm run eval` uses. Without this, `compare-baseline.ts` and `kappa.ts` would be
+  (`*.eval.test.ts`), which only `npm run eval` uses. Without this, `compare-baseline.ts` and `kappa.ts` would be
   tested nowhere in CI.
 - **`scores.ts` records a numerator and a denominator**, not a single 0 to 1 value, so `invention_rate` and
   `honest_not_covered` can be averaged over edits and keywords, as the tailoring suite needs.
@@ -403,7 +403,7 @@ Three small changes to the design above fall out of this split:
 | E1.3  | Decision checks: a fixture list of applications, `decision_accuracy` through `decide()`, `injection_resisted` and `injection_label`                                                                                                | Unit tests, including a hijacked `offer` at `medium` (resisted) and at `high` (not) |
 | E1.4  | `scores.ts` (numerator and denominator per metric, case, repeat) and the Vitest reporter that writes `out/scores.json` with infrastructure errors and observed calls                                                               | Unit tests; the reporter tested with a fake run                                     |
 | E1.5  | `repeat.ts`: `EVAL_REPEATS`, two retries with backoff on infrastructure errors, then `infra_errors`; quality failures are never retried                                                                                            | Unit tests with fake timers                                                         |
-| E1.6  | `classify.eval.ts` over the goldens, the `EVAL_GROUP` / `EVAL_CASE` filters and three seed emails **(API)**                                                                                                                        | `npm run eval:classify` writes a complete `scores.json`                             |
+| E1.6  | `classify.eval.test.ts` over the goldens, the `EVAL_GROUP` / `EVAL_CASE` filters and three seed emails **(API)**                                                                                                                   | `npm run eval:classify` writes a complete `scores.json`                             |
 | E1.7  | Dataset: one per kind, 18 emails **(API)**                                                                                                                                                                                         | The emails themselves; group run result in the message                              |
 | E1.8  | Dataset: hard negatives, first 10 (job alerts, "jobs you may like", newsletters) **(API)**                                                                                                                                         | As above                                                                            |
 | E1.9  | Dataset: hard negatives, last 10 (application viewed, sign-up confirmations, talent communities, recruiter mass mail) **(API)**                                                                                                    | As above                                                                            |
@@ -422,7 +422,7 @@ Three small changes to the design above fall out of this split:
 | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | E2.1 | The fictional resume and the `tailor.json` schema in `goldens.ts` (posting file, keywords, unsupported keywords, expected keyword list), with two postings | Unit tests on the loader; the resume reads as one real person                                |
 | E2.2 | `checks/honesty.ts`: `edit_survival`, `invention_rate`, `honest_not_covered`, `keyword_gain`, built on `acceptTailoring` and `unverifiedIn`                | Unit tests with hand-built answers: an invented number, a dropped edit, a sneaked-in keyword |
-| E2.3 | `tailor.eval.ts` for `tailor` on the two postings **(API)**                                                                                                | `npm run eval:tailor`                                                                        |
+| E2.3 | `tailor.eval.test.ts` for `tailor` on the two postings **(API)**                                                                                           | `npm run eval:tailor`                                                                        |
 | E2.4 | `keyword_recall` and the `tailorPosting` cases **(API)**                                                                                                   | Unit test for the check; eval run                                                            |
 | E2.5 | Postings: close fits and stretch roles **(API)**                                                                                                           | The postings; run result                                                                     |
 | E2.6 | Postings: tools and certifications the resume lacks **(API)**                                                                                              | As above                                                                                     |
@@ -445,7 +445,7 @@ Three small changes to the design above fall out of this split:
 | E4.1 | Writing goldens: cover letter, lead message and draft requests on the fictional resume                                                    | Loader tests                      |
 | E4.2 | Cover letter code checks: greeting, placeholders, `COVER_LETTER_WORDS`, exclamation marks, markdown, `unverifiedIn`                       | Unit tests                        |
 | E4.3 | Lead message and draft code checks                                                                                                        | Unit tests                        |
-| E4.4 | `writing.eval.ts` with the code checks only, plus their baseline **(API)**                                                                | Gate table                        |
+| E4.4 | `writing.eval.test.ts` with the code checks only, plus their baseline **(API)**                                                           | Gate table                        |
 | E4.5 | `GEval` metrics in `metrics/` ("ties a real achievement to the posting", "tone matches the request"), report only **(API)**               | Criteria text; scores and reasons |
 | E4.6 | `DAGMetric` "no invented facts", report only **(API)**                                                                                    | The tree; scores and reasons      |
 | E4.7 | A labelling script that saves outputs for hand scoring without showing the judge's score                                                  | Run it once                       |

@@ -7,8 +7,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "eval": "vitest run --config vitest.eval.config.ts",
-    "eval:classify": "vitest run --config vitest.eval.config.ts suites/classify.eval.ts",
-    "eval:judge": "vitest run --config vitest.eval.config.ts suites/judge.eval.ts"
+    "eval:classify": "vitest run --config vitest.eval.config.ts suites/classify.eval.test.ts",
+    "eval:judge": "vitest run --config vitest.eval.config.ts suites/judge.eval.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "1.5.0",

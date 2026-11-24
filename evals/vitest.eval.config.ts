@@ -7,7 +7,7 @@ export default defineConfig({
   test: {
     name: 'evals:model',
     environment: 'node',
-    include: ['**/*.eval.ts'],
+    include: ['**/*.eval.test.ts'],
     globalSetup: ['./global-setup.ts'],
     setupFiles: ['./setup.ts'],
     testTimeout: 180_000,
