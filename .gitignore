@@ -13,3 +13,4 @@ build
 /resumes/
 .playwright-mcp/
 /evals/out/
+/evals/.deepeval/
