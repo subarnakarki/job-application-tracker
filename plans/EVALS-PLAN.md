@@ -2,7 +2,7 @@
 
 Status: proposed, not started. Update this file when a decision changes. Revised 2026-11-23 after a review: score
 recording, tolerance granularity, API errors, the server-side fallback, run completeness, baseline floors,
-telemetry and judge calibration.
+telemetry and judge calibration. Revised 2026-11-24: phases split into reviewable commits.
 
 ## Why
 
@@ -332,6 +332,100 @@ workflow run, then stops for review.
 | E4  | Writing suites: code checks, `GEval` and `DAGMetric` metrics, about 50 hand labels per metric, calibration. A judge metric joins the gate only when it passes calibration                                                                                                                                                                               |
 | E5  | Upkeep: every prompt bug found in real use adds a regression case to `data/` before it is fixed; README section on the evals and the local gate                                                                                                                                                                                                         |
 
+## Commits
+
+Each phase is split into commits that each do one thing, keep lint, type-check and `npm test` green, and can be
+reviewed on their own. Pure logic (loaders, checks, the gate, kappa) comes before anything that calls Anthropic,
+so most commits are reviewed through their unit tests and need no API key. A commit marked **(API)** is checked
+by a real eval run, and its message carries the command and the result.
+
+Three small changes to the design above fall out of this split:
+
+- **Unit tests for the eval tooling run in `npm test`.** `evals/vitest.config.ts` covers only `*.test.ts` (no
+  API calls) and joins the root `projects`; the model calls live in `evals/vitest.eval.config.ts`
+  (`*.eval.ts`), which only `npm run eval` uses. Without this, `compare-baseline.ts` and `kappa.ts` would be
+  tested nowhere in CI.
+- **`scores.ts` records a numerator and a denominator**, not a single 0 to 1 value, so `invention_rate` and
+  `honest_not_covered` can be averaged over edits and keywords, as the tailoring suite needs.
+- **`EVAL_GROUP` and `EVAL_CASE` filters** run part of a suite, so a dataset commit can be checked on its own
+  group. They are also the cheap local subset from the open questions.
+
+### E0: spike
+
+| #    | Commit                                                                                                                                                                                                      | Review by                                                        |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| E0.1 | `evals/` workspace skeleton: `package.json`, `tsconfig.json`, the two Vitest configs, root `workspaces` and `projects`, `out/` in `.gitignore`, one placeholder unit test                                   | `npm ci`, lint, type-check and `npm test` pick it up             |
+| E0.2 | Pin `deepeval`. `setup.ts` with the checks as a pure `checkEvalEnv(env)` (needs `ANTHROPIC_API_KEY`, refuses `OPENAI_API_KEY`, sets the telemetry opt-out), unit-tested                                     | Unit tests; the lockfile diff shows only `deepeval` and its deps |
+| E0.3 | `observe.ts`: wraps `beta.messages.create`, tags calls with the current case, keeps model, stop reason and usage, and sorts errors into infrastructure (overloaded, 5xx, timeout, 429) and the rest         | Unit tests against a fake client, one per error class            |
+| E0.4 | `clients.ts` and the first real case: one hand-written email through `claudeClassifier` **(API)**                                                                                                           | `npm run eval:classify` passes and prints the observed call      |
+| E0.5 | `judge.ts`: the judge model and a `gEval()` factory, unit-tested that every metric it builds uses the Anthropic judge; one smoke `GEval` case **(API)**                                                     | Unit tests; the smoke case returns a score and a reason          |
+| E0.6 | Spike findings in this plan: Vitest 5 compatibility, the hosts seen during a run (only `api.anthropic.com`), token cost of the smoke run. If Vitest 5 does not work, stop here and settle the open question | Plan diff                                                        |
+
+### E1: classifier suite
+
+| #     | Commit                                                                                                                                                                                                                             | Review by                                                                           |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| E1.1  | `goldens.ts`: zod schema for `emails.json` (name, group, message, expected kind or accepted kinds, company, link, decision) and the loader; rejects duplicate names, ambiguous cases with one kind, unknown groups                 | Unit tests on good and bad files                                                    |
+| E1.2  | `checks/verdict.ts`, field checks: `kind_accuracy`, `company_accuracy` (with `normalizeCompany` and the ATS list), `link_accuracy`, `false_positive_rate`, `calibrated_confidence`, `clear_case_high`; null scores zero everywhere | Unit tests, one per metric plus the null case                                       |
+| E1.3  | Decision checks: a fixture list of applications, `decision_accuracy` through `decide()`, `injection_resisted` and `injection_label`                                                                                                | Unit tests, including a hijacked `offer` at `medium` (resisted) and at `high` (not) |
+| E1.4  | `scores.ts` (numerator and denominator per metric, case, repeat) and the Vitest reporter that writes `out/scores.json` with infrastructure errors and observed calls                                                               | Unit tests; the reporter tested with a fake run                                     |
+| E1.5  | `repeat.ts`: `EVAL_REPEATS`, two retries with backoff on infrastructure errors, then `infra_errors`; quality failures are never retried                                                                                            | Unit tests with fake timers                                                         |
+| E1.6  | `classify.eval.ts` over the goldens, the `EVAL_GROUP` / `EVAL_CASE` filters and three seed emails **(API)**                                                                                                                        | `npm run eval:classify` writes a complete `scores.json`                             |
+| E1.7  | Dataset: one per kind, 18 emails **(API)**                                                                                                                                                                                         | The emails themselves; group run result in the message                              |
+| E1.8  | Dataset: hard negatives, first 10 (job alerts, "jobs you may like", newsletters) **(API)**                                                                                                                                         | As above                                                                            |
+| E1.9  | Dataset: hard negatives, last 10 (application viewed, sign-up confirmations, talent communities, recruiter mass mail) **(API)**                                                                                                    | As above                                                                            |
+| E1.10 | Dataset: ambiguous (6) and company and link (4) **(API)**                                                                                                                                                                          | As above                                                                            |
+| E1.11 | Dataset: injection, 6 emails **(API)**                                                                                                                                                                                             | As above                                                                            |
+| E1.12 | `compare-baseline.ts`, steps 1 and 2: completeness against the goldens and repeats, and the 10% infrastructure limit                                                                                                               | Unit tests: missing file, missing metric, lost case, too many infra errors          |
+| E1.13 | Steps 3 and 4: floors and per-metric tolerances written in samples, the strict `injection_resisted` rule, the gate table                                                                                                           | Unit tests at, just under and just over each limit                                  |
+| E1.14 | `summary.ts`: the markdown table, fallback rate, infrastructure errors, token cost, usage flag                                                                                                                                     | Unit test on a fixed `scores.json`                                                  |
+| E1.15 | `baseline:update`: writes `main.json` from a scores file                                                                                                                                                                           | Unit test                                                                           |
+| E1.16 | Five-run spread on the unchanged prompt, recorded in this plan; tolerances and `floors.json` set from it **(API)**                                                                                                                 | The spread table and the chosen numbers                                             |
+| E1.17 | First `baselines/main.json`, gate table in the message **(API)**                                                                                                                                                                   | Baseline diff; `npm run gate` passes                                                |
+
+### E2: tailoring suite
+
+| #    | Commit                                                                                                                                                     | Review by                                                                                    |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| E2.1 | The fictional resume and the `tailor.json` schema in `goldens.ts` (posting file, keywords, unsupported keywords, expected keyword list), with two postings | Unit tests on the loader; the resume reads as one real person                                |
+| E2.2 | `checks/honesty.ts`: `edit_survival`, `invention_rate`, `honest_not_covered`, `keyword_gain`, built on `acceptTailoring` and `unverifiedIn`                | Unit tests with hand-built answers: an invented number, a dropped edit, a sneaked-in keyword |
+| E2.3 | `tailor.eval.ts` for `tailor` on the two postings **(API)**                                                                                                | `npm run eval:tailor`                                                                        |
+| E2.4 | `keyword_recall` and the `tailorPosting` cases **(API)**                                                                                                   | Unit test for the check; eval run                                                            |
+| E2.5 | Postings: close fits and stretch roles **(API)**                                                                                                           | The postings; run result                                                                     |
+| E2.6 | Postings: tools and certifications the resume lacks **(API)**                                                                                              | As above                                                                                     |
+| E2.7 | Spread, tolerances, floors and baseline for the tailoring metrics **(API)**                                                                                | Gate table                                                                                   |
+
+### E3: CI and calibration tooling
+
+| #    | Commit                                                                                                                                         | Review by                                        |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| E3.1 | `evals.yml`, `workflow_dispatch` only: eval, gate, job summary, artifact upload, telemetry opt-out. Needs the `ANTHROPIC_API_KEY` secret first | One manual run, green, with the summary          |
+| E3.2 | Push trigger with the `paths:` filter, monthly schedule, concurrency group                                                                     | Workflow diff; a later prompt commit triggers it |
+| E3.3 | `kappa.ts`: banding and quadratic-weighted kappa                                                                                               | Unit tests against worked examples               |
+| E3.4 | Bootstrap 95% interval (seeded) and the join-the-gate rule (kappa ≥ 0.6, lower end ≥ 0.4)                                                      | Unit tests                                       |
+| E3.5 | `labels.jsonl` schema and loader, and `npm run calibrate` that prints kappa and interval per metric                                            | Unit tests; run on a small fixture file          |
+
+### E4: writing suites
+
+| #    | Commit                                                                                                                                    | Review by                         |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| E4.1 | Writing goldens: cover letter, lead message and draft requests on the fictional resume                                                    | Loader tests                      |
+| E4.2 | Cover letter code checks: greeting, placeholders, `COVER_LETTER_WORDS`, exclamation marks, markdown, `unverifiedIn`                       | Unit tests                        |
+| E4.3 | Lead message and draft code checks                                                                                                        | Unit tests                        |
+| E4.4 | `writing.eval.ts` with the code checks only, plus their baseline **(API)**                                                                | Gate table                        |
+| E4.5 | `GEval` metrics in `metrics/` ("ties a real achievement to the posting", "tone matches the request"), report only **(API)**               | Criteria text; scores and reasons |
+| E4.6 | `DAGMetric` "no invented facts", report only **(API)**                                                                                    | The tree; scores and reasons      |
+| E4.7 | A labelling script that saves outputs for hand scoring without showing the judge's score                                                  | Run it once                       |
+| E4.8 | Hand labels, one commit per metric (yours)                                                                                                | —                                 |
+| E4.9 | One commit per metric that passes calibration: kappa result in the message, metric moves into the gate with floor and tolerance **(API)** | Calibration output; gate table    |
+
+### E5: upkeep
+
+| #    | Commit                                                                                                  | Review by    |
+| ---- | ------------------------------------------------------------------------------------------------------- | ------------ |
+| E5.1 | README section: what the evals cover, the local gate before a prompt commit, costs, updating a baseline | README diff  |
+| E5.2 | Afterwards, per prompt bug found in real use: one commit adding the failing case, then the fix          | The new case |
+
 ## Open questions
 
 - Whether to add `resume/analyze.ts` (the 20 job titles) as a suite once E2 is done. It is open-ended, so it
@@ -340,3 +434,6 @@ workflow run, then stops for review.
   the full gated run for the commit.
 - If E0 finds `deepeval` does not work with Vitest 5, whether to run the evals on the Vitest version it supports
   (the `evals/` workspace can pin its own) or fall back to promptfoo.
+- Who writes the synthetic emails (E1.7 to E1.11). The plan says hand-written and not by Claude, so they are not
+  easy for Claude by construction. Either I write them, or Claude drafts them from real ATS layouts and I rewrite
+  the wording before each dataset commit.
